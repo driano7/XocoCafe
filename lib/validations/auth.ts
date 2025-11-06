@@ -179,6 +179,7 @@ export interface AuthResponse {
 
 // Tipos para el usuario en el contexto de autenticación
 export interface AuthUser {
+  createdAt?: string | null;
   id: string;
   email: string;
   clientId: string;
