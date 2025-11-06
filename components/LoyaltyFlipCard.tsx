@@ -137,7 +137,9 @@ export default function LoyaltyFlipCard({ className = '' }: LoyaltyFlipCardProps
       </div>
 
       <p className="mt-auto pt-6 text-[11px] text-[#8b5a3c]">
-        Toca la tarjeta para conocer tu progreso de lealtad
+        <span className="font-semibold underline">
+          Toca la tarjeta para conocer tu progreso de lealtad
+        </span>
       </p>
     </div>
   );

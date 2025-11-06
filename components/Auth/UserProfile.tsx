@@ -292,443 +292,450 @@ export default function UserProfile() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
-        <div className="space-y-6">
-          {/* Información del perfil */}
-          <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-4">
-                <AvatarUpload
-                  currentAvatarUrl={user.avatarUrl}
-                  onAvatarUpdate={(updatedUser) => {
-                    updateUser(updatedUser);
-                    setMessage('Avatar actualizado');
-                    setTimeout(() => setMessage(''), 3000);
-                  }}
-                />
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Mi Perfil</h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Mantén tu información personal y de contacto al día.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!isEditing) {
-                    prefillProfileForm(user);
-                  }
-                  setIsEditing(!isEditing);
+        {/* 1. Perfil */}
+        <div className="order-1 lg:order-1 lg:col-start-1 lg:row-start-1 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <AvatarUpload
+                currentAvatarUrl={user.avatarUrl}
+                onAvatarUpdate={(updatedUser) => {
+                  updateUser(updatedUser);
+                  setMessage('Avatar actualizado');
+                  setTimeout(() => setMessage(''), 3000);
                 }}
-                className="self-start rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 sm:self-auto"
-              >
-                {isEditing ? 'Cancelar' : 'Editar'}
-              </button>
+              />
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Mi Perfil</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Mantén tu información personal y de contacto al día.
+                </p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (!isEditing) {
+                  prefillProfileForm(user);
+                }
+                setIsEditing(!isEditing);
+              }}
+              className="self-start rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 sm:self-auto"
+            >
+              {isEditing ? 'Cancelar' : 'Editar'}
+            </button>
+          </div>
 
-            {isEditing ? (
-              <form onSubmit={handleSubmitProfile(onUpdateProfile)} className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label
-                      htmlFor="profile-firstName"
-                      className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                      Nombre
-                    </label>
-                    <input
-                      {...registerProfile('firstName')}
-                      id="profile-firstName"
-                      type="text"
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    />
-                    {profileErrors.firstName && (
-                      <p className="mt-1 text-sm text-red-600">{profileErrors.firstName.message}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="profile-lastName"
-                      className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                      Apellido
-                    </label>
-                    <input
-                      {...registerProfile('lastName')}
-                      id="profile-lastName"
-                      type="text"
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    />
-                    {profileErrors.lastName && (
-                      <p className="mt-1 text-sm text-red-600">{profileErrors.lastName.message}</p>
-                    )}
-                  </div>
-                </div>
-
+          {isEditing ? (
+            <form onSubmit={handleSubmitProfile(onUpdateProfile)} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <label
-                    htmlFor="profile-phone"
+                    htmlFor="profile-firstName"
                     className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    Teléfono
+                    Nombre
                   </label>
                   <input
-                    {...registerProfile('phone')}
-                    type="tel"
-                    id="profile-phone"
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  />
-                  {profileErrors.phone && (
-                    <p className="mt-1 text-sm text-red-600">{profileErrors.phone.message}</p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label
-                      htmlFor="profile-city"
-                      className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                      Ciudad
-                    </label>
-                    <input
-                      {...registerProfile('city')}
-                      id="profile-city"
-                      type="text"
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    />
-                    {profileErrors.city && (
-                      <p className="mt-1 text-sm text-red-600">{profileErrors.city.message}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="profile-country"
-                      className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                      País
-                    </label>
-                    <input
-                      {...registerProfile('country')}
-                      id="profile-country"
-                      type="text"
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    />
-                    {profileErrors.country && (
-                      <p className="mt-1 text-sm text-red-600">{profileErrors.country.message}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="profile-wallet"
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    Wallet EVM
-                  </label>
-                  <input
-                    {...registerProfile('walletAddress')}
-                    id="profile-wallet"
+                    {...registerProfile('firstName')}
+                    id="profile-firstName"
                     type="text"
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    placeholder="0x..."
                   />
-                  {profileErrors.walletAddress && (
-                    <p className="mt-1 text-sm text-red-600">
-                      {profileErrors.walletAddress.message}
-                    </p>
+                  {profileErrors.firstName && (
+                    <p className="mt-1 text-sm text-red-600">{profileErrors.firstName.message}</p>
                   )}
                 </div>
 
-                <div className="flex justify-end space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      prefillProfileForm(user);
-                      setIsEditing(false);
-                    }}
-                    className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-                  >
-                    Guardar
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</p>
-                    <p className="mt-1 text-sm text-gray-900 dark:text-white">{user.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                      ID Cliente
-                    </p>
-                    <p className="mt-1 text-sm text-gray-900 dark:text-white">{user.clientId}</p>
-                  </div>
-                </div>
-
-                {(user.firstName || user.lastName || user.phone) && (
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div>
-                      <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Nombre</p>
-                      <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                        {[user.firstName, user.lastName].filter(Boolean).join(' ') || '—'}
-                      </p>
-                    </div>
-                    {user.phone && (
-                      <div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                          Teléfono
-                        </p>
-                        <p className="mt-1 text-sm text-gray-900 dark:text-white">{user.phone}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {(user.city || user.country) && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Ubicación
-                    </p>
-                    <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                      {user.city && user.country
-                        ? `${user.city}, ${user.country}`
-                        : user.city || user.country}
-                    </p>
-                  </div>
-                )}
-
-                {user.walletAddress && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Wallet EVM
-                    </p>
-                    <p className="mt-1 font-mono text-sm text-gray-900 dark:text-white">
-                      {user.walletAddress}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-            <FavoritesSelect />
-          </div>
-
-          <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-            <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
-              Preferencias de Marketing
-            </h3>
-
-            <form onSubmit={handleSubmitConsent(onUpdateConsent)} className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-center">
-                  <input
-                    {...registerConsent('marketingEmail')}
-                    type="checkbox"
-                    id="marketingEmail"
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
+                <div>
                   <label
-                    htmlFor="marketingEmail"
-                    className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
+                    htmlFor="profile-lastName"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    Recibir ofertas por email
+                    Apellido
                   </label>
-                </div>
-
-                <div className="flex items-center">
                   <input
-                    {...registerConsent('marketingSms')}
-                    type="checkbox"
-                    id="marketingSms"
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    {...registerProfile('lastName')}
+                    id="profile-lastName"
+                    type="text"
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                   />
-                  <label
-                    htmlFor="marketingSms"
-                    className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
-                  >
-                    Recibir ofertas por SMS
-                  </label>
+                  {profileErrors.lastName && (
+                    <p className="mt-1 text-sm text-red-600">{profileErrors.lastName.message}</p>
+                  )}
                 </div>
-
-                <div className="flex items-center">
-                  <input
-                    {...registerConsent('marketingPush')}
-                    type="checkbox"
-                    id="marketingPush"
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label
-                    htmlFor="marketingPush"
-                    className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
-                  >
-                    Recibir notificaciones push
-                  </label>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isUpdatingConsent}
-                className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {isUpdatingConsent ? 'Actualizando...' : 'Actualizar Preferencias'}
-              </button>
-            </form>
-          </div>
-
-          <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-              Gestión de Datos (GDPR)
-            </h3>
-
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Exportar mis datos
-                </h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                  Descarga una copia de todos tus datos personales en formato CSV.
-                </p>
-                <button
-                  onClick={exportData}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                >
-                  Exportar Datos
-                </button>
-              </div>
-
-              <div className="border-t pt-4">
-                <h4 className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">
-                  Eliminar mi cuenta
-                </h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                  Esta acción eliminará permanentemente tu cuenta y todos tus datos. No se puede
-                  deshacer.
-                </p>
-                <button
-                  onClick={deleteAccount}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                >
-                  Eliminar Cuenta
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-            <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
-              Déjanos tus comentarios
-            </h3>
-            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-              Tu opinión nos ayuda a mejorar. Comparte sugerencias o cualquier detalle sobre tu
-              experiencia en Xoco Café.
-            </p>
-
-            {feedbackMessage && (
-              <div
-                className={`mb-4 rounded-md px-4 py-3 text-sm ${
-                  feedbackMessage.toLowerCase().includes('error') ||
-                  feedbackMessage.toLowerCase().includes('no ')
-                    ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200'
-                    : 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-200'
-                }`}
-              >
-                {feedbackMessage}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmitFeedback(submitFeedback)} className="space-y-4">
-              <div>
-                <label
-                  htmlFor="feedback-rating"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  Calificación
-                </label>
-                <select
-                  id="feedback-rating"
-                  {...registerFeedback('rating', { valueAsNumber: true })}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                >
-                  {[5, 4, 3, 2, 1].map((value) => (
-                    <option key={value} value={value}>
-                      {value} {value === 1 ? 'estrella' : 'estrellas'}
-                    </option>
-                  ))}
-                </select>
-                {feedbackErrors.rating && (
-                  <p className="mt-1 text-sm text-red-600">{feedbackErrors.rating.message}</p>
-                )}
               </div>
 
               <div>
                 <label
-                  htmlFor="feedback-title"
+                  htmlFor="profile-phone"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  Título (opcional)
+                  Teléfono
                 </label>
                 <input
-                  id="feedback-title"
-                  type="text"
-                  maxLength={120}
-                  {...registerFeedback('title')}
+                  {...registerProfile('phone')}
+                  type="tel"
+                  id="profile-phone"
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  placeholder="Ej. Servicio excelente"
                 />
-                {feedbackErrors.title && (
-                  <p className="mt-1 text-sm text-red-600">{feedbackErrors.title.message}</p>
+                {profileErrors.phone && (
+                  <p className="mt-1 text-sm text-red-600">{profileErrors.phone.message}</p>
                 )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="profile-city"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Ciudad
+                  </label>
+                  <input
+                    {...registerProfile('city')}
+                    id="profile-city"
+                    type="text"
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  />
+                  {profileErrors.city && (
+                    <p className="mt-1 text-sm text-red-600">{profileErrors.city.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="profile-country"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    País
+                  </label>
+                  <input
+                    {...registerProfile('country')}
+                    id="profile-country"
+                    type="text"
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  />
+                  {profileErrors.country && (
+                    <p className="mt-1 text-sm text-red-600">{profileErrors.country.message}</p>
+                  )}
+                </div>
               </div>
 
               <div>
                 <label
-                  htmlFor="feedback-content"
+                  htmlFor="profile-wallet"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  Comentario
+                  Wallet EVM
                 </label>
-                <textarea
-                  id="feedback-content"
-                  rows={4}
-                  {...registerFeedback('content')}
+                <input
+                  {...registerProfile('walletAddress')}
+                  id="profile-wallet"
+                  type="text"
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  placeholder="Cuéntanos tu experiencia o sugerencia..."
+                  placeholder="0x..."
                 />
-                {feedbackErrors.content && (
-                  <p className="mt-1 text-sm text-red-600">{feedbackErrors.content.message}</p>
+                {profileErrors.walletAddress && (
+                  <p className="mt-1 text-sm text-red-600">{profileErrors.walletAddress.message}</p>
                 )}
               </div>
 
-              <button
-                type="submit"
-                disabled={isSendingFeedback}
-                className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isSendingFeedback ? 'Enviando...' : 'Enviar comentario'}
-              </button>
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    prefillProfileForm(user);
+                    setIsEditing(false);
+                  }}
+                  className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                >
+                  Guardar
+                </button>
+              </div>
             </form>
-          </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</p>
+                  <p className="mt-1 text-sm text-gray-900 dark:text-white">{user.email}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">ID Cliente</p>
+                  <p className="mt-1 text-sm text-gray-900 dark:text-white">{user.clientId}</p>
+                </div>
+              </div>
+
+              {(user.firstName || user.lastName || user.phone) && (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Nombre</p>
+                    <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                      {[user.firstName, user.lastName].filter(Boolean).join(' ') || '—'}
+                    </p>
+                  </div>
+                  {user.phone && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        Teléfono
+                      </p>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-white">{user.phone}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {(user.city || user.country) && (
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Ubicación</p>
+                  <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                    {user.city && user.country
+                      ? `${user.city}, ${user.country}`
+                      : user.city || user.country || '—'}
+                  </p>
+                </div>
+              )}
+
+              {user.walletAddress && (
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Wallet EVM</p>
+                  <p className="mt-1 text-sm break-all text-gray-900 dark:text-white">
+                    {user.walletAddress}
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                  Cuenta creada
+                </p>
+                <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                  {new Date(user.createdAt ?? Date.now()).toLocaleDateString('es-MX', {
+                    year: 'numeric',
+                    month: 'long',
+                  })}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex flex-col gap-6 lg:sticky lg:top-24">
+        {/* 2. Mis favoritos */}
+        <div className="order-2 lg:order-2 lg:col-start-1 lg:row-start-2 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+          <FavoritesSelect />
+        </div>
+
+        {/* 3. Mi QR de cliente, 4. Tarjeta de lealtad, 5. Consumo */}
+        <div className="order-3 flex flex-col gap-6 lg:order-2 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24">
           <UserQrCard />
           <LoyaltyFlipCard className="w-full" />
           <ConsumptionChart />
+        </div>
+
+        {/* 6. Déjanos tus comentarios */}
+        <div className="order-6 lg:order-3 lg:col-start-1 lg:row-start-3 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+          <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
+            Déjanos tus comentarios
+          </h3>
+          <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+            Tu opinión nos ayuda a mejorar. Comparte sugerencias o cualquier detalle sobre tu
+            experiencia en Xoco Café.
+          </p>
+
+          {feedbackMessage && (
+            <div
+              className={`mb-4 rounded-md px-4 py-3 text-sm ${
+                feedbackMessage.toLowerCase().includes('error') ||
+                feedbackMessage.toLowerCase().includes('no ')
+                  ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200'
+                  : 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-200'
+              }`}
+            >
+              {feedbackMessage}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmitFeedback(submitFeedback)} className="space-y-4">
+            <div>
+              <label
+                htmlFor="feedback-rating"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                Calificación
+              </label>
+              <select
+                id="feedback-rating"
+                {...registerFeedback('rating', { valueAsNumber: true })}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              >
+                {[5, 4, 3, 2, 1].map((value) => (
+                  <option key={value} value={value}>
+                    {value} {value === 1 ? 'estrella' : 'estrellas'}
+                  </option>
+                ))}
+              </select>
+              {feedbackErrors.rating && (
+                <p className="mt-1 text-sm text-red-600">{feedbackErrors.rating.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label
+                htmlFor="feedback-title"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                Título (opcional)
+              </label>
+              <input
+                id="feedback-title"
+                type="text"
+                maxLength={120}
+                {...registerFeedback('title')}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                placeholder="Ej. Servicio excelente"
+              />
+              {feedbackErrors.title && (
+                <p className="mt-1 text-sm text-red-600">{feedbackErrors.title.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label
+                htmlFor="feedback-content"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                Comentario
+              </label>
+              <textarea
+                id="feedback-content"
+                rows={4}
+                {...registerFeedback('content')}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                placeholder="Cuéntanos tu experiencia o sugerencia..."
+              />
+              {feedbackErrors.content && (
+                <p className="mt-1 text-sm text-red-600">{feedbackErrors.content.message}</p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSendingFeedback}
+              className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSendingFeedback ? 'Enviando...' : 'Enviar comentario'}
+            </button>
+          </form>
+        </div>
+
+        {/* 7. Preferencias de marketing */}
+        <div className="order-7 lg:order-4 lg:col-start-1 lg:row-start-4 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+          <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
+            Preferencias de Marketing
+          </h3>
+
+          <form onSubmit={handleSubmitConsent(onUpdateConsent)} className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-center">
+                <input
+                  {...registerConsent('marketingEmail')}
+                  type="checkbox"
+                  id="marketingEmail"
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label
+                  htmlFor="marketingEmail"
+                  className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
+                >
+                  Recibir ofertas por email
+                </label>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  {...registerConsent('marketingSms')}
+                  type="checkbox"
+                  id="marketingSms"
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label
+                  htmlFor="marketingSms"
+                  className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
+                >
+                  Recibir ofertas por SMS
+                </label>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  {...registerConsent('marketingPush')}
+                  type="checkbox"
+                  id="marketingPush"
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label
+                  htmlFor="marketingPush"
+                  className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
+                >
+                  Recibir notificaciones push
+                </label>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isUpdatingConsent}
+              className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isUpdatingConsent ? 'Actualizando...' : 'Actualizar Preferencias'}
+            </button>
+          </form>
+        </div>
+
+        {/* 8. Gestión de datos (GDPR) */}
+        <div className="order-8 lg:order-5 lg:col-start-1 lg:row-start-5 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+          <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
+            Gestión de Datos (GDPR)
+          </h3>
+
+          <div className="space-y-4">
+            <div>
+              <h4 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Exportar mis datos
+              </h4>
+              <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+                Descarga una copia de todos tus datos personales en formato CSV.
+              </p>
+              <button
+                onClick={exportData}
+                className="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700"
+              >
+                Exportar Datos
+              </button>
+            </div>
+
+            <div className="border-t pt-4">
+              <h4 className="mb-2 text-sm font-medium text-red-700 dark:text-red-400">
+                Eliminar mi cuenta
+              </h4>
+              <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+                Esta acción eliminará permanentemente tu cuenta y todos tus datos. No se puede
+                deshacer.
+              </p>
+              <button
+                onClick={deleteAccount}
+                className="rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+              >
+                Eliminar Cuenta
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
