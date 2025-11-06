@@ -1,10 +1,12 @@
 import '@/css/prism.css';
 import '@/css/tailwind.css';
+import '@/css/flip-card.css';
 import '@fontsource/mukta';
 
 import Analytics from '@/components/Analytics';
 import { AnalyticsProvider } from '@/components/Analytics/AnalyticsProvider';
 import { AuthProvider } from '@/components/Auth/AuthProvider';
+import { LanguageProvider } from '@/components/Language/LanguageProvider';
 import Footer from '@/components/Footer';
 import Header from '@/components/Header';
 import LenisProvider from '@/components/Providers/LenisProvider';
@@ -39,32 +41,34 @@ export default function RootLayout({ children }: RootLayoutProps) {
       </head>
       <body className="bg-white text-black antialiased dark:bg-black dark:text-white">
         <SessionProvider>
-          <AnalyticsProvider
-            options={{
-              trackPageViews: true,
-              trackScrollDepth: true,
-              trackTimeOnPage: true,
-              trackBounce: true,
-              trackExitPage: true,
-              debug: process.env.NODE_ENV === 'development',
-            }}
-          >
-            <AuthProvider>
-              <ThemeProvider
-                attribute="class"
-                defaultTheme="dark"
-                enableSystem={false}
-                themes={['dark', 'light']}
-              >
-                <Header />
-                <LenisProvider>
-                  <main>{children}</main>
-                </LenisProvider>
-                <Footer />
-                <Analytics />
-              </ThemeProvider>
-            </AuthProvider>
-          </AnalyticsProvider>
+          <LanguageProvider fallbackLanguage="es">
+            <AnalyticsProvider
+              options={{
+                trackPageViews: true,
+                trackScrollDepth: true,
+                trackTimeOnPage: true,
+                trackBounce: true,
+                trackExitPage: true,
+                debug: process.env.NODE_ENV === 'development',
+              }}
+            >
+              <AuthProvider>
+                <ThemeProvider
+                  attribute="class"
+                  defaultTheme="dark"
+                  enableSystem={false}
+                  themes={['dark', 'light']}
+                >
+                  <Header />
+                  <LenisProvider>
+                    <main>{children}</main>
+                  </LenisProvider>
+                  <Footer />
+                  <Analytics />
+                </ThemeProvider>
+              </AuthProvider>
+            </AnalyticsProvider>
+          </LanguageProvider>
         </SessionProvider>
       </body>
     </html>

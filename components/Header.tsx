@@ -8,6 +8,7 @@ import CommandPalette from './CommandPalette/CommandPalette';
 import MobileNav from './MobileNav';
 import SectionContainer from './SectionContainer';
 import ThemeSwitch from './ThemeSwitch';
+import AuthNav from './Auth/AuthNav';
 
 export default function Header() {
   const pathName = usePathname();
@@ -31,7 +32,7 @@ export default function Header() {
             </Link>
           </div>
           <div className="flex items-center space-x-3 text-base leading-5">
-            <div className="hidden space-x-5 sm:flex">
+            <div className="hidden space-x-3 sm:flex">
               {headerNavLinks.map(({ title, href }) => {
                 const active = pathName?.includes(href);
                 return (
@@ -51,7 +52,8 @@ export default function Header() {
                 );
               })}
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center space-x-3">
+              <AuthNav />
               <CommandPalette />
               <ThemeSwitch />
               <MobileNav />

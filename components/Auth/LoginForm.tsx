@@ -1,15 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, type LoginInput } from '@/lib/validations/auth';
 import { signIn } from 'next-auth/react';
 import { useConversionTracking } from '@/components/Analytics/AnalyticsProvider';
+import type { AuthSuccessHandler } from '@/components/Auth/types';
 
 interface LoginFormProps {
-  onSuccess: (token: string, user: any) => void;
-  onError: (message: string) => void;
+  onSuccess: AuthSuccessHandler;
+  onError: (message: string | ReactNode) => void;
   onForgotPassword: () => void;
 }
 
@@ -17,6 +18,7 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword }: Logi
   const [isLoading, setIsLoading] = useState(false);
   const { trackLogin, trackFormSubmit, trackButtonClick } = useConversionTracking();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -47,7 +49,7 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword }: Logi
 
         // Guardar token en localStorage
         localStorage.setItem('authToken', result.token);
-        onSuccess(result.token, result.user);
+        onSuccess(result.token, result.user, { source: 'login' });
       } else {
         // Track failed login
         trackFormSubmit('login', false);
@@ -99,13 +101,23 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword }: Logi
         >
           Contraseña
         </label>
-        <input
-          {...register('password')}
-          type="password"
-          id="password"
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-          placeholder="Tu contraseña"
-        />
+        <div className="relative">
+          <input
+            {...register('password')}
+            type={showPassword ? 'text' : 'password'}
+            id="password"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+            placeholder="Tu contraseña"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute inset-y-0 right-2 flex items-center text-sm text-gray-500"
+            aria-label="Mostrar u ocultar contraseña"
+          >
+            {showPassword ? 'Ocultar' : 'Ver'}
+          </button>
+        </div>
         {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
       </div>
 

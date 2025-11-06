@@ -1,0 +1,97 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { verifyToken, getUserById } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+
+export async function GET(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json(
+        { success: false, message: 'Token no proporcionado' },
+        { status: 401 }
+      );
+    }
+
+    // Verificar token
+    const decoded = verifyToken(token);
+    if (!decoded) {
+      return NextResponse.json({ success: false, message: 'Token inválido' }, { status: 401 });
+    }
+
+    // Obtener resumen de compras del último mes
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+    const { data: recentOrders, error: ordersError } = await supabase
+      .from('orders')
+      .select(
+        `
+        id,
+        userId,
+        orderNumber,
+        status,
+        total,
+        currency,
+        createdAt,
+        items:order_items(
+          id,
+          quantity,
+          price,
+          product:products(
+            id,
+            name
+          )
+        )
+      `
+      )
+      .eq('userId', decoded.userId)
+      .gte('createdAt', oneMonthAgo.toISOString())
+      .order('createdAt', { ascending: false })
+      .limit(10);
+
+    if (ordersError) {
+      throw new Error(ordersError.message);
+    }
+
+    // Calcular métricas del último mes
+    const monthlyMetrics = {
+      totalOrders: recentOrders?.length || 0,
+      totalSpent: recentOrders?.reduce((sum, order) => sum + Number(order.total ?? 0), 0) ?? 0,
+      favoriteProducts: {} as Record<string, number>,
+      ordersByDay: {} as Record<string, number>,
+    };
+
+    // Contar productos favoritos
+    recentOrders?.forEach((order) => {
+      order.items.forEach((item) => {
+        const productName = item.product?.name ?? 'Producto';
+        monthlyMetrics.favoriteProducts[productName] =
+          (monthlyMetrics.favoriteProducts[productName] || 0) + item.quantity;
+      });
+
+      // Contar órdenes por día
+      const dayKey = new Date(order.createdAt).toISOString().split('T')[0];
+      monthlyMetrics.ordersByDay[dayKey] = (monthlyMetrics.ordersByDay[dayKey] || 0) + 1;
+    });
+
+    // Obtener datos del usuario
+    const user = await getUserById(decoded.userId);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        user,
+        recentOrders,
+        monthlyMetrics,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error obteniendo resumen de usuario:', error);
+    return NextResponse.json(
+      { success: false, message: 'Error interno del servidor' },
+      { status: 500 }
+    );
+  }
+}

@@ -4,8 +4,12 @@ import { createContext, useContext, useEffect, ReactNode } from 'react';
 import { useAnalytics } from '@/hooks/useAnalytics';
 
 interface AnalyticsContextType {
-  trackEvent: (eventType: string, eventData?: any) => Promise<void>;
-  trackConversion: (eventType: string, value?: number, eventData?: any) => Promise<void>;
+  trackEvent: (eventType: string, eventData?: Record<string, unknown>) => Promise<void>;
+  trackConversion: (
+    eventType: string,
+    value?: number,
+    eventData?: Record<string, unknown>
+  ) => Promise<void>;
   sessionId: string | null;
   userId: string | null;
   setUserId: (userId: string | null) => void;

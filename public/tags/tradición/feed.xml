@@ -1,0 +1,24 @@
+
+  <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+      <title>Xoco Café</title>
+      <link>https://xococafe.netlify.app/blog</link>
+      <description>Sabor ancestral, placer eterno.</description>
+      <language>en-us</language>
+      <managingEditor>dnvn77@gmail.com (Donovan Riaño)</managingEditor>
+      <webMaster>dnvn77@gmail.com (Donovan Riaño)</webMaster>
+      <lastBuildDate>Wed, 02 Jul 2025 00:00:00 GMT</lastBuildDate>
+      <atom:link href="https://xococafe.netlify.app/tags/tradición/feed.xml" rel="self" type="application/rss+xml"/>
+      
+  <item>
+    <guid>https://xococafe.netlify.app/blog/chocolate</guid>
+    <title>Aquí el chocolate no se toma, se apapacha</title>
+    <link>https://xococafe.netlify.app/blog/chocolate</link>
+    <description>Deleita chocolate en Xoco Café.</description>
+    <pubDate>Wed, 02 Jul 2025 00:00:00 GMT</pubDate>
+    <author>dnvn77@gmail.com (Donovan Riaño)</author>
+    <category>Chocolate</category><category>Tradición</category><category>Cariño</category>
+  </item>
+
+    </channel>
+  </rss>

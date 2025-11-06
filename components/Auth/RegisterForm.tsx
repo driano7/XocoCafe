@@ -1,19 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSchema, type RegisterInput } from '@/lib/validations/auth';
 import CountryDropdown from './CountryDropdown';
 import { useConversionTracking } from '@/components/Analytics/AnalyticsProvider';
+import { encryptWithUserId, generateLocalUserId } from '@/lib/clientEncryption';
+import type { AuthSuccessHandler } from '@/components/Auth/types';
 
 interface RegisterFormProps {
-  onSuccess: (token: string, user: any) => void;
-  onError: (message: string) => void;
+  onSuccess: AuthSuccessHandler;
+  onError: (message: string | ReactNode) => void;
+  onExistingAccount: (email: string) => void;
 }
 
-export default function RegisterForm({ onSuccess, onError }: RegisterFormProps) {
+export default function RegisterForm({ onSuccess, onError, onExistingAccount }: RegisterFormProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { trackSignup, trackFormSubmit } = useConversionTracking();
 
   const {
@@ -27,6 +32,105 @@ export default function RegisterForm({ onSuccess, onError }: RegisterFormProps) 
   });
 
   const countryValue = watch('country');
+  const passwordValue = watch('password', '');
+  const confirmPasswordValue = watch('confirmPassword', '');
+
+  const passwordCriteria = [
+    {
+      key: 'special',
+      label: 'Caracter permitido (!@#$%^&*)',
+      isMet: /[!@#$%^&*]/.test(passwordValue),
+    },
+    {
+      key: 'uppercase',
+      label: 'Letra mayúscula',
+      isMet: /[A-Z]/.test(passwordValue),
+    },
+    {
+      key: 'number',
+      label: 'Número',
+      isMet: /\d/.test(passwordValue),
+    },
+  ];
+
+  const metCriteriaCount = passwordCriteria.filter((criterion) => criterion.isMet).length;
+  const firstUnmetCriterionIndex = passwordCriteria.findIndex((criterion) => !criterion.isMet);
+
+  const strengthMeta =
+    metCriteriaCount === 3
+      ? { label: 'Strong', barClass: 'bg-green-500', textClass: 'text-green-600' }
+      : metCriteriaCount === 2
+      ? { label: 'Medium', barClass: 'bg-yellow-400', textClass: 'text-yellow-600' }
+      : { label: 'Weak', barClass: 'bg-red-500', textClass: 'text-red-600' };
+
+  const passwordsMatch =
+    passwordValue.length > 0 &&
+    confirmPasswordValue.length > 0 &&
+    passwordValue === confirmPasswordValue;
+
+  const passwordTimeline = [
+    ...passwordCriteria,
+    {
+      key: 'match',
+      label: 'Contraseñas iguales',
+      isMet: passwordsMatch,
+      isPending: confirmPasswordValue.length === 0,
+    },
+  ];
+
+  const getTimelineStepClasses = (
+    index: number,
+    key: string,
+    isMet: boolean,
+    isPending?: boolean
+  ): string => {
+    if (key === 'match') {
+      if (isPending) {
+        return 'border-gray-300 bg-gray-100 text-gray-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300';
+      }
+      return isMet
+        ? 'border-green-500 bg-green-500 text-white'
+        : 'border-red-500 bg-red-500 text-white';
+    }
+
+    if (isMet) {
+      return 'border-green-500 bg-green-500 text-white';
+    }
+
+    if (firstUnmetCriterionIndex === index) {
+      return 'border-yellow-400 bg-yellow-300 text-yellow-900';
+    }
+
+    return 'border-red-500 bg-red-500 text-white';
+  };
+
+  const getConnectorClasses = (
+    index: number,
+    key: string,
+    isMet: boolean,
+    isPending?: boolean
+  ): string => {
+    if (index >= passwordTimeline.length - 1) {
+      return '';
+    }
+
+    if (key === 'match') {
+      if (isPending) {
+        return 'bg-gray-300 dark:bg-gray-600';
+      }
+      return isMet ? 'bg-green-500' : 'bg-red-500';
+    }
+
+    if (isMet) {
+      return 'bg-green-500';
+    }
+
+    if (firstUnmetCriterionIndex === index) {
+      return 'bg-yellow-300';
+    }
+
+    return 'bg-red-500';
+  };
 
   const onSubmit = async (data: RegisterInput) => {
     setIsLoading(true);
@@ -49,11 +153,37 @@ export default function RegisterForm({ onSuccess, onError }: RegisterFormProps) 
 
         // Guardar token en localStorage
         localStorage.setItem('authToken', result.token);
-        onSuccess(result.token, result.user);
+
+        try {
+          const localUserId = generateLocalUserId();
+          const { password, confirmPassword, ...formSnapshot } = data;
+          void password;
+          void confirmPassword;
+          const encryptedPayload = await encryptWithUserId(localUserId, {
+            endpoint: '/api/auth/register',
+            method: 'POST',
+            user: result.user,
+            token: result.token,
+            formData: formSnapshot,
+          });
+
+          localStorage.setItem('xocoUserId', localUserId);
+          localStorage.setItem('xocoUserData', JSON.stringify(encryptedPayload));
+        } catch (storageError) {
+          console.error('Error al guardar datos cifrados localmente:', storageError);
+        }
+
+        onSuccess(result.token, result.user, { source: 'register' });
       } else {
         // Track failed signup
         trackFormSubmit('register', false);
-        onError(result.message);
+
+        if (response.status === 400 && result?.code === 'USER_EXISTS') {
+          onExistingAccount(data.email);
+          onError(result.message || 'Ya existe una cuenta con este correo.');
+        } else {
+          onError(result.message || 'No se pudo crear la cuenta. Inténtalo nuevamente.');
+        }
       }
     } catch (error) {
       onError('Error de conexión. Inténtalo de nuevo.');
@@ -130,16 +260,90 @@ export default function RegisterForm({ onSuccess, onError }: RegisterFormProps) 
           >
             Contraseña *
           </label>
-          <input
-            {...register('password')}
-            type="password"
-            id="password"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-            placeholder="Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número"
-          />
+          <div className="relative">
+            <input
+              {...register('password')}
+              type={showPassword ? 'text' : 'password'}
+              id="password"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+              placeholder="Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute inset-y-0 right-2 flex items-center text-sm text-gray-500"
+              aria-label="Mostrar u ocultar contraseña"
+            >
+              {showPassword ? 'Ocultar' : 'Ver'}
+            </button>
+          </div>
           {errors.password && (
             <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
           )}
+          <div className="mt-3 space-y-3" aria-live="polite">
+            <div className="flex items-center space-x-1" aria-hidden="true">
+              {[0, 1, 2].map((index) => (
+                <span
+                  key={index}
+                  className={`h-1 flex-1 rounded-full transition-colors ${
+                    index < metCriteriaCount
+                      ? strengthMeta.barClass
+                      : 'bg-gray-200 dark:bg-gray-700'
+                  }`}
+                />
+              ))}
+            </div>
+            <div className="mt-2 text-xs font-semibold">
+              <span className={strengthMeta.textClass}>
+                Password strength: {strengthMeta.label}
+              </span>
+            </div>
+            <ol
+              className="mt-3 flex flex-col gap-3 text-xs sm:flex-row sm:items-center sm:gap-0"
+              aria-label="Timeline de requisitos de contraseña"
+            >
+              {passwordTimeline.map((step, index) => (
+                <li key={step.key} className="flex items-center sm:flex-1 sm:justify-between">
+                  <div className="flex items-center">
+                    <span
+                      className={`flex h-7 w-7 items-center justify-center rounded-full border text-[10px] font-semibold uppercase ${getTimelineStepClasses(
+                        index,
+                        step.key,
+                        step.isMet,
+                        'isPending' in step ? step.isPending : undefined
+                      )}`}
+                    >
+                      {step.key === 'match'
+                        ? 'isPending' in step && step.isPending
+                          ? '?'
+                          : step.isMet
+                          ? '✔'
+                          : '✖'
+                        : step.isMet
+                        ? '✔'
+                        : firstUnmetCriterionIndex === index
+                        ? '!'
+                        : '✖'}
+                    </span>
+                    <span className="ml-2 font-semibold text-gray-700 dark:text-gray-200">
+                      {step.label}
+                    </span>
+                  </div>
+                  {index < passwordTimeline.length - 1 && (
+                    <span
+                      className={`ml-4 hidden h-0.5 flex-1 rounded-full sm:flex ${getConnectorClasses(
+                        index,
+                        step.key,
+                        step.isMet,
+                        'isPending' in step ? step.isPending : undefined
+                      )}`}
+                      aria-hidden="true"
+                    />
+                  )}
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
 
         <div>
@@ -149,16 +353,41 @@ export default function RegisterForm({ onSuccess, onError }: RegisterFormProps) 
           >
             Confirmar Contraseña *
           </label>
-          <input
-            {...register('confirmPassword')}
-            type="password"
-            id="confirmPassword"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-            placeholder="Repite tu contraseña"
-          />
+          <div className="relative">
+            <input
+              {...register('confirmPassword')}
+              type={showConfirmPassword ? 'text' : 'password'}
+              id="confirmPassword"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+              placeholder="Repite tu contraseña"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute inset-y-0 right-2 flex items-center text-sm text-gray-500"
+              aria-label="Mostrar u ocultar confirmación de contraseña"
+            >
+              {showConfirmPassword ? 'Ocultar' : 'Ver'}
+            </button>
+          </div>
           {errors.confirmPassword && (
             <p className="mt-1 text-sm text-red-600">{errors.confirmPassword.message}</p>
           )}
+          <div
+            className={`mt-3 inline-flex items-center rounded-md px-2 py-1 text-sm font-semibold ${
+              confirmPasswordValue.length === 0
+                ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                : passwordsMatch
+                ? 'bg-green-100 text-green-700'
+                : 'bg-red-100 text-red-700'
+            }`}
+          >
+            {confirmPasswordValue.length === 0
+              ? 'Confirma tu contraseña'
+              : passwordsMatch
+              ? 'Las contraseñas son iguales'
+              : 'Las contraseñas no coinciden'}
+          </div>
         </div>
       </div>
 
@@ -225,6 +454,7 @@ export default function RegisterForm({ onSuccess, onError }: RegisterFormProps) 
             value={countryValue || ''}
             onChange={(value) => setValue('country', value)}
             error={errors.country?.message}
+            inputId="country"
           />
         </div>
       </div>

@@ -1,0 +1,54 @@
+
+  <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+      <title>Xoco Café</title>
+      <link>https://xococafe.netlify.app/blog</link>
+      <description>Sabor ancestral, placer eterno.</description>
+      <language>en-us</language>
+      <managingEditor>dnvn77@gmail.com (Donovan Riaño)</managingEditor>
+      <webMaster>dnvn77@gmail.com (Donovan Riaño)</webMaster>
+      <lastBuildDate>Thu, 03 Jul 2025 00:00:00 GMT</lastBuildDate>
+      <atom:link href="https://xococafe.netlify.app/feed.xml" rel="self" type="application/rss+xml"/>
+      
+  <item>
+    <guid>https://xococafe.netlify.app/blog/cafe</guid>
+    <title>Café que no da gusto, no es de Xoco</title>
+    <link>https://xococafe.netlify.app/blog/cafe</link>
+    <description>Como el café de Xoco no hay dos.</description>
+    <pubDate>Thu, 03 Jul 2025 00:00:00 GMT</pubDate>
+    <author>dnvn77@gmail.com (Donovan Riaño)</author>
+    <category>Café</category><category>Sentidos</category><category>Gusto</category>
+  </item>
+
+  <item>
+    <guid>https://xococafe.netlify.app/blog/chocolate</guid>
+    <title>Aquí el chocolate no se toma, se apapacha</title>
+    <link>https://xococafe.netlify.app/blog/chocolate</link>
+    <description>Deleita chocolate en Xoco Café.</description>
+    <pubDate>Wed, 02 Jul 2025 00:00:00 GMT</pubDate>
+    <author>dnvn77@gmail.com (Donovan Riaño)</author>
+    <category>Chocolate</category><category>Tradición</category><category>Cariño</category>
+  </item>
+
+  <item>
+    <guid>https://xococafe.netlify.app/blog/facturacion</guid>
+    <title>Facturación de Xoco</title>
+    <link>https://xococafe.netlify.app/blog/facturacion</link>
+    <description>La tecnología forma parte de Xoco café.</description>
+    <pubDate>Sun, 03 Mar 2024 00:00:00 GMT</pubDate>
+    <author>dnvn77@gmail.com (Donovan Riaño)</author>
+    <category>Ubicación</category><category>Horarios</category><category>Mapa</category>
+  </item>
+
+  <item>
+    <guid>https://xococafe.netlify.app/blog/ubicacion</guid>
+    <title>¿Dónde acudir a despertar tus sentidos y relajarte?</title>
+    <link>https://xococafe.netlify.app/blog/ubicacion</link>
+    <description>La tecnología forma parte de Anónimo café.</description>
+    <pubDate>Fri, 05 Jul 2024 00:00:00 GMT</pubDate>
+    <author>dnvn77@gmail.com (Donovan Riaño)</author>
+    <category>Ubicación</category><category>Horarios</category><category>Mapa</category>
+  </item>
+
+    </channel>
+  </rss>

@@ -33,12 +33,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   // Obtener contexto de analítica de forma segura
-  let analyticsContext;
-  try {
-    analyticsContext = useAnalyticsContext();
-  } catch {
-    analyticsContext = null;
-  }
+  const analyticsContext = useAnalyticsContext();
 
   useEffect(() => {
     // Verificar si hay un token guardado

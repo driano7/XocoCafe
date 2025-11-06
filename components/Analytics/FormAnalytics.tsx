@@ -6,11 +6,9 @@ import { useConversionTracking } from '@/components/Analytics/AnalyticsProvider'
 interface FormAnalyticsProps {
   formName: string;
   children: React.ReactNode;
-  onSuccess?: () => void;
-  onError?: () => void;
 }
 
-export function FormAnalytics({ formName, children, onSuccess, onError }: FormAnalyticsProps) {
+export function FormAnalytics({ formName, children }: FormAnalyticsProps) {
   const { trackFormSubmit, trackButtonClick } = useConversionTracking();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -18,7 +16,7 @@ export function FormAnalytics({ formName, children, onSuccess, onError }: FormAn
     const form = formRef.current;
     if (!form) return;
 
-    const handleSubmit = (event: Event) => {
+    const handleSubmit = () => {
       const formData = new FormData(form as HTMLFormElement);
       const formValues = Object.fromEntries(formData.entries());
 
@@ -33,19 +31,10 @@ export function FormAnalytics({ formName, children, onSuccess, onError }: FormAn
       });
     };
 
-    const handleButtonClick = (event: Event) => {
-      const target = event.target as HTMLElement;
-      if (target.tagName === 'BUTTON' || target.type === 'submit') {
-        trackButtonClick(`${formName}_submit_button`, formName);
-      }
-    };
-
     form.addEventListener('submit', handleSubmit);
-    form.addEventListener('click', handleButtonClick);
 
     return () => {
       form.removeEventListener('submit', handleSubmit);
-      form.removeEventListener('click', handleButtonClick);
     };
   }, [formName, trackFormSubmit, trackButtonClick]);
 

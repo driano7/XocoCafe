@@ -38,7 +38,8 @@ export const workTiles: WorkTile[] = [
   },
   {
     description: `Su propuesta minimalista y centrada en el “grab & go”`,
-    title: 'nos posiciona a la vanguardia de los nuevos hábitos de consumo, conectando con generaciones digitales y prácticas.',
+    title:
+      'nos posiciona a la vanguardia de los nuevos hábitos de consumo, conectando con generaciones digitales y prácticas.',
     image: {
       src: '/static/images/imgsCafe/arte.jpeg',
       width: 600,
