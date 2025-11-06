@@ -3,6 +3,7 @@ import '@/css/tailwind.css';
 import '@/css/flip-card.css';
 import '@fontsource/mukta';
 
+import { Suspense } from 'react';
 import Analytics from '@/components/Analytics';
 import { AnalyticsProvider } from '@/components/Analytics/AnalyticsProvider';
 import { AuthProvider } from '@/components/Auth/AuthProvider';
@@ -42,32 +43,34 @@ export default function RootLayout({ children }: RootLayoutProps) {
       <body className="bg-white text-black antialiased dark:bg-black dark:text-white">
         <SessionProvider>
           <LanguageProvider fallbackLanguage="es">
-            <AnalyticsProvider
-              options={{
-                trackPageViews: true,
-                trackScrollDepth: true,
-                trackTimeOnPage: true,
-                trackBounce: true,
-                trackExitPage: true,
-                debug: process.env.NODE_ENV === 'development',
-              }}
-            >
-              <AuthProvider>
-                <ThemeProvider
-                  attribute="class"
-                  defaultTheme="dark"
-                  enableSystem={false}
-                  themes={['dark', 'light']}
-                >
-                  <Header />
-                  <LenisProvider>
-                    <main>{children}</main>
-                  </LenisProvider>
-                  <Footer />
-                  <Analytics />
-                </ThemeProvider>
-              </AuthProvider>
-            </AnalyticsProvider>
+            <Suspense fallback={null}>
+              <AnalyticsProvider
+                options={{
+                  trackPageViews: true,
+                  trackScrollDepth: true,
+                  trackTimeOnPage: true,
+                  trackBounce: true,
+                  trackExitPage: true,
+                  debug: process.env.NODE_ENV === 'development',
+                }}
+              >
+                <AuthProvider>
+                  <ThemeProvider
+                    attribute="class"
+                    defaultTheme="dark"
+                    enableSystem={false}
+                    themes={['dark', 'light']}
+                  >
+                    <Header />
+                    <LenisProvider>
+                      <main>{children}</main>
+                    </LenisProvider>
+                    <Footer />
+                    <Analytics />
+                  </ThemeProvider>
+                </AuthProvider>
+              </AnalyticsProvider>
+            </Suspense>
           </LanguageProvider>
         </SessionProvider>
       </body>

@@ -473,3 +473,4 @@ function normalizeError(error: unknown): unknown {
 
   return { message: String(error) };
 }
+export const dynamic = 'force-dynamic';
