@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
 import { completeProfileSchema } from '@/lib/validations/auth';
 import { auth } from '@/lib/auth-config';
 import { encryptUserData, mapEncryptedDataToColumnNames } from '@/lib/encryption';
@@ -8,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(auth);
+    const session = await auth();
 
     if (!session?.user?.email) {
       return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 });

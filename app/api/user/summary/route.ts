@@ -65,8 +65,15 @@ export async function GET(request: NextRequest) {
 
     // Contar productos favoritos
     recentOrders?.forEach((order) => {
-      order.items.forEach((item) => {
-        const productName = item.product?.name ?? 'Producto';
+      (order.items ?? []).forEach((item) => {
+        const productRelation = item.product as
+          | { name?: string | null }[]
+          | { name?: string | null }
+          | null
+          | undefined;
+        const productName = Array.isArray(productRelation)
+          ? productRelation[0]?.name ?? 'Producto'
+          : productRelation?.name ?? 'Producto';
         monthlyMetrics.favoriteProducts[productName] =
           (monthlyMetrics.favoriteProducts[productName] || 0) + item.quantity;
       });

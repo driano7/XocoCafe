@@ -75,7 +75,6 @@ export async function POST(request: NextRequest) {
       clientId,
       email: validatedData.email,
       passwordHash,
-      walletAddress: validatedData.walletAddress,
       walletAddress: normalizeWalletAddress(validatedData.walletAddress),
       city: validatedData.city,
       country: validatedData.country,

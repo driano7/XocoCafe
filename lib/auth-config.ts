@@ -101,6 +101,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       if (session.user) {
+        type MutableSessionUser = typeof session.user & {
+          id?: string;
+          clientId?: string | null;
+          firstName?: string | null;
+          lastName?: string | null;
+          authProvider?: string | null;
+          profileComplete?: boolean;
+        };
+        const sessionUser = session.user as MutableSessionUser;
+
         const { data: dbUser, error } = await supabase
           .from('users')
           .select(
@@ -118,21 +128,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // Descifrar datos sensibles
           const decryptedData = decryptUserData(session.user.email!, dbUser);
 
-          session.user.id = dbUser.id;
-          session.user.clientId = dbUser.clientId;
-          session.user.firstName = decryptedData.firstName;
-          session.user.lastName = decryptedData.lastName;
-          session.user.authProvider = dbUser.authProvider;
-          session.user.profileComplete = dbUser.termsAccepted && dbUser.privacyAccepted;
+          sessionUser.id = dbUser.id;
+          sessionUser.clientId = dbUser.clientId;
+          sessionUser.firstName = decryptedData.firstName;
+          sessionUser.lastName = decryptedData.lastName;
+          sessionUser.authProvider = dbUser.authProvider;
+          sessionUser.profileComplete = dbUser.termsAccepted && dbUser.privacyAccepted;
           // Enriquecer con datos del token (Google profile)
           if (token && typeof token === 'object') {
-            // @ts-expect-error campos extendidos en session.user
-            if ((token as any).givenName) session.user.givenName = (token as any).givenName;
-            // @ts-expect-error campos extendidos en session.user
-            if ((token as any).familyName) session.user.familyName = (token as any).familyName;
-            // @ts-expect-error campos extendidos en session.user
-            if ((token as any).picture && !session.user.image)
-              session.user.image = (token as any).picture as string;
+            const extendedSessionUser = session.user as unknown as Record<string, unknown>;
+            if ((token as any).givenName) {
+              extendedSessionUser.givenName = (token as any).givenName;
+            }
+            if ((token as any).familyName) {
+              extendedSessionUser.familyName = (token as any).familyName;
+            }
+            if ((token as any).picture && !session.user.image) {
+              extendedSessionUser.image = (token as any).picture as string;
+            }
           }
         }
       }
@@ -156,15 +169,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   debug: process.env.NODE_ENV === 'development',
   logger: {
-    error(code, metadata) {
-      console.error('NextAuth Error:', code, metadata);
+    error(...args: unknown[]) {
+      console.error('NextAuth Error:', ...args);
     },
-    warn(code) {
-      console.warn('NextAuth Warning:', code);
+    warn(...args: unknown[]) {
+      console.warn('NextAuth Warning:', ...args);
     },
-    debug(code, metadata) {
+    debug(...args: unknown[]) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('NextAuth Debug:', code, metadata);
+        console.log('NextAuth Debug:', ...args);
       }
     },
   },

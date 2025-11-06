@@ -145,18 +145,13 @@ export type ResetPasswordWithCodeInput = z.infer<typeof resetPasswordWithCodeSch
 export type ForgotPasswordInput = RequestPasswordResetInput;
 
 export const userFeedbackSchema = z.object({
-  rating: z
-    .number({
-      required_error: 'Selecciona una calificación',
-      invalid_type_error: 'Selecciona una calificación válida',
-    })
-    .min(1, 'La calificación mínima es 1')
-    .max(5, 'La calificación máxima es 5'),
+  rating: z.number().min(1, { message: 'La calificación mínima es 1' }).max(5, {
+    message: 'La calificación máxima es 5',
+  }),
   title: z
     .string()
     .max(120, 'El título debe tener máximo 120 caracteres')
-    .optional()
-    .transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined)),
+    .transform((value) => value.trim()),
   content: z
     .string()
     .min(10, 'Cuéntanos con al menos 10 caracteres')

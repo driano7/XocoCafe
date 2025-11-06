@@ -25,7 +25,6 @@
     "@material-ui/styles": "^4.11.5",
     "@mui/material": "^7.0.1",
     "@mui/styled-engine-sc": "^7.0.1",
-    "@next/swc-darwin-arm64": "^16.0.1",
     "@radix-ui/react-tooltip": "^1.1.2",
     "@studio-freight/react-lenis": "0.0.36",
     "@supabase/supabase-js": "^2.47.7",
