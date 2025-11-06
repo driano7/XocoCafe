@@ -142,3 +142,4 @@ async function getCount(table: 'users' | 'sessions' | 'page_analytics'): Promise
   if (error) throw new Error(error.message);
   return count ?? 0;
 }
+export const dynamic = 'force-dynamic';
