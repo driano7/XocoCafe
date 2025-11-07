@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createBrowserSupabaseClient } from '@/lib/supabase-browser';
 import { useAuth } from '@/components/Auth/AuthProvider';
@@ -163,6 +164,8 @@ export default function OrdersDashboardPage() {
     () => orders.filter((order) => order.status !== 'pending'),
     [orders]
   );
+  const MAX_ACTIVE_ORDERS = 3;
+  const hasReachedOrderLimit = pendingOrders.length >= MAX_ACTIVE_ORDERS;
 
   const handleDownloadTicket = async () => {
     if (!selectedOrder || !ticketRef.current) return;
@@ -218,10 +221,13 @@ export default function OrdersDashboardPage() {
               className="flex w-full items-center justify-between gap-4 py-4 text-left transition hover:bg-gray-50 dark:hover:bg-gray-800/60"
             >
               <div className="flex items-center gap-4">
-                <span className={`h-3 w-3 rounded-full ${STATUS_STYLES[order.status]}`} />
                 <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    Ticket {order.ticketId ?? order.orderNumber ?? order.id}
+                  <p className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${STATUS_STYLES[order.status]}`}
+                      aria-hidden="true"
+                    />
+                    <span>Ticket {order.ticketId ?? order.orderNumber ?? order.id}</span>
                   </p>
                   <p className="text-xs text-gray-500">
                     {order.createdAt ? new Date(order.createdAt).toLocaleString('es-MX') : ''}
@@ -244,13 +250,37 @@ export default function OrdersDashboardPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 lg:px-0">
-      <header className="mb-8 space-y-2">
-        <p className="text-xs uppercase tracking-[0.35em] text-primary-500">Panel</p>
-        <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Mis pedidos</h1>
-        <p className="text-sm text-gray-500">
-          Visualiza el estado de tus pedidos web o POS en tiempo real.
-        </p>
+      <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.35em] text-primary-500">Panel</p>
+          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Mis pedidos</h1>
+          <p className="text-sm text-gray-500">
+            Visualiza el estado de tus pedidos web o POS en tiempo real.
+          </p>
+        </div>
+        {hasReachedOrderLimit ? (
+          <button
+            type="button"
+            disabled
+            className="inline-flex items-center justify-center rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-400 cursor-not-allowed dark:border-gray-600 dark:text-gray-500"
+          >
+            Crear nuevo pedido
+          </button>
+        ) : (
+          <Link
+            href="/order"
+            className="inline-flex items-center justify-center rounded-full bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-primary-700"
+          >
+            Crear nuevo pedido
+          </Link>
+        )}
       </header>
+      {hasReachedOrderLimit && (
+        <div className="mb-6 rounded-xl bg-amber-100 px-4 py-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">
+          Solo puedes tener 3 pedidos pendientes al mismo tiempo. Finaliza o cancela uno para crear
+          otro.
+        </div>
+      )}
 
       {error && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-900/30 dark:text-red-100">

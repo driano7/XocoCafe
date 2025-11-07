@@ -7,7 +7,7 @@ export default function AuthNav() {
   const { user, logout } = useAuth();
 
   if (user) {
-    const displayName = user.firstName?.trim() || '' || undefined;
+    const displayName = user.firstName?.trim() || '';
     return (
       <div className="flex items-center space-x-4">
         <span className="text-sm text-gray-600 dark:text-gray-300">

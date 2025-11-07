@@ -102,7 +102,7 @@ export async function getUserByEmail(email: string) {
   const { data: user, error } = await supabase
     .from('users')
     .select(
-      'id,email,passwordHash,clientId,authProvider,firstNameEncrypted,firstNameIv,firstNameTag,lastNameEncrypted,lastNameIv,lastNameTag,walletAddress,city,country,favoriteColdDrink,favoriteHotDrink,favoriteFood,termsAccepted,privacyAccepted,marketingEmail,marketingSms,marketingPush,createdAt,lastLoginAt,avatarUrl'
+      'id,email,passwordHash,clientId,authProvider,firstNameEncrypted,firstNameIv,firstNameTag,firstNameSalt,lastNameEncrypted,lastNameIv,lastNameTag,lastNameSalt,phoneEncrypted,phoneIv,phoneTag,phoneSalt,walletAddress,city,country,favoriteColdDrink,favoriteHotDrink,favoriteFood,termsAccepted,privacyAccepted,marketingEmail,marketingSms,marketingPush,createdAt,lastLoginAt,avatarUrl'
     )
     .eq('email', email)
     .maybeSingle();
@@ -137,7 +137,7 @@ export async function getUserById(id: string) {
   const { data: user, error } = await supabase
     .from('users')
     .select(
-      'id,email,clientId,firstNameEncrypted,firstNameIv,firstNameTag,lastNameEncrypted,lastNameIv,lastNameTag,walletAddress,phoneEncrypted,phoneIv,phoneTag,city,country,favoriteColdDrink,favoriteHotDrink,favoriteFood,termsAccepted,privacyAccepted,marketingEmail,marketingSms,marketingPush,createdAt,lastLoginAt,avatarUrl'
+      'id,email,clientId,firstNameEncrypted,firstNameIv,firstNameTag,firstNameSalt,lastNameEncrypted,lastNameIv,lastNameTag,lastNameSalt,phoneEncrypted,phoneIv,phoneTag,phoneSalt,walletAddress,city,country,favoriteColdDrink,favoriteHotDrink,favoriteFood,termsAccepted,privacyAccepted,marketingEmail,marketingSms,marketingPush,createdAt,lastLoginAt,avatarUrl'
     )
     .eq('id', id)
     .maybeSingle();

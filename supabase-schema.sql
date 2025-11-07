@@ -172,6 +172,54 @@ CREATE TABLE IF NOT EXISTS public.order_items (
 
 CREATE INDEX IF NOT EXISTS order_items_order_id_idx ON public.order_items ("orderId");
 
+-- Métricas de consumo por usuario
+CREATE TABLE IF NOT EXISTS public.user_consumption_metrics (
+  "userId" TEXT PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
+  "beverageCount" INTEGER NOT NULL DEFAULT 0,
+  "foodCount" INTEGER NOT NULL DEFAULT 0,
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE OR REPLACE FUNCTION public.increment_consumption_metrics()
+RETURNS TRIGGER AS $$
+DECLARE
+  item RECORD;
+  beverage_total INTEGER := 0;
+  food_total INTEGER := 0;
+BEGIN
+  IF TG_OP = 'UPDATE' AND NEW.status = 'completed' AND (OLD.status IS DISTINCT FROM 'completed') THEN
+    FOR item IN SELECT "productId", quantity FROM public.order_items WHERE "orderId" = NEW.id LOOP
+      IF item."productId" ILIKE '%food%' THEN
+        food_total := food_total + COALESCE(item.quantity, 0);
+      ELSE
+        beverage_total := beverage_total + COALESCE(item.quantity, 0);
+      END IF;
+    END LOOP;
+
+    IF beverage_total > 0 OR food_total > 0 THEN
+      UPDATE public.user_consumption_metrics
+        SET "beverageCount" = "beverageCount" + beverage_total,
+            "foodCount" = "foodCount" + food_total,
+            "updatedAt" = NOW()
+        WHERE "userId" = NEW."userId";
+
+      IF NOT FOUND THEN
+        INSERT INTO public.user_consumption_metrics ("userId", "beverageCount", "foodCount", "updatedAt")
+        VALUES (NEW."userId", beverage_total, food_total, NOW());
+      END IF;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_orders_consumption_metrics ON public.orders;
+CREATE TRIGGER trg_orders_consumption_metrics
+  AFTER UPDATE ON public.orders
+  FOR EACH ROW
+  EXECUTE FUNCTION public.increment_consumption_metrics();
+
 -- ---------------------------------------------------------------------
 -- Programa de lealtad
 -- ---------------------------------------------------------------------
@@ -434,6 +482,56 @@ DROP TRIGGER IF EXISTS trg_sync_last_login_from_auth ON auth.users;
 CREATE TRIGGER trg_sync_last_login_from_auth
 AFTER UPDATE OF last_sign_in_at ON auth.users
 FOR EACH ROW EXECUTE FUNCTION public.sync_last_login_from_auth();
+
+-- ---------------------------------------------------------------------
+-- Reservaciones de clientes
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.reservations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  "userId" TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  "branchId" TEXT NOT NULL,
+  "reservationDate" DATE NOT NULL,
+  "reservationTime" TEXT NOT NULL,
+  "peopleCount" INTEGER NOT NULL CHECK ("peopleCount" > 0),
+  message TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  "reservationCode" TEXT NOT NULL UNIQUE,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS reservations_unique_slot_idx
+  ON public.reservations ("branchId", "reservationDate", "reservationTime");
+
+CREATE INDEX IF NOT EXISTS reservations_user_id_idx
+  ON public.reservations ("userId");
+
+DROP TRIGGER IF EXISTS trg_reservations_touch_updated_at ON public.reservations;
+CREATE TRIGGER trg_reservations_touch_updated_at
+  BEFORE UPDATE ON public.reservations
+  FOR EACH ROW
+  EXECUTE FUNCTION public.touch_users_updated_at();
+
+-- ---------------------------------------------------------------------
+-- Reservaciones no completadas / vencidas
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.reservation_failures (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  "originalReservationId" UUID NOT NULL UNIQUE,
+  "userId" TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  "reservationCode" TEXT,
+  "reservationDate" DATE NOT NULL,
+  "reservationTime" TEXT NOT NULL,
+  "branchId" TEXT NOT NULL,
+  "peopleCount" INTEGER NOT NULL,
+  message TEXT,
+  status TEXT NOT NULL,
+  "archivedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "cleanupAt" TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '7 days')
+);
+
+CREATE INDEX IF NOT EXISTS reservation_failures_user_idx ON public.reservation_failures ("userId");
+CREATE INDEX IF NOT EXISTS reservation_failures_cleanup_idx ON public.reservation_failures ("cleanupAt");
 
 -- =====================================================================
 --  Fin del script

@@ -30,7 +30,6 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
   const {
     trackPageViews = true,
     trackScrollDepth = true,
-    trackTimeOnPage = true,
     trackBounce = true,
     trackExitPage = true,
     debug = false,
@@ -128,7 +127,7 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
     // Track page view después de un pequeño delay para asegurar que la página está cargada
     const timeoutId = setTimeout(() => {
       trackPageView();
-    }, 100);
+    }, 200); // Delay duplicado para reducir a la mitad los envíos automáticos
 
     return () => clearTimeout(timeoutId);
   }, [pathname, searchParams, sessionId, trackPageViews]);
