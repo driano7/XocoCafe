@@ -29,6 +29,16 @@ interface AnalyticsPayload {
 export async function POST(request: NextRequest) {
   try {
     const payload: AnalyticsPayload = await request.json();
+    const normalizedTimeOnPage =
+      typeof payload.timeOnPage === 'number' && Number.isFinite(payload.timeOnPage)
+        ? payload.timeOnPage
+        : 0;
+    const normalizedScrollDepth =
+      typeof payload.scrollDepth === 'number' && Number.isFinite(payload.scrollDepth)
+        ? payload.scrollDepth
+        : 0;
+    const normalizedBounce = typeof payload.bounce === 'boolean' ? payload.bounce : false;
+    const normalizedExitPage = typeof payload.exitPage === 'boolean' ? payload.exitPage : false;
 
     // Verificar conexión a la base de datos
     const connectivityAttempt = await safeSupabase(() =>
@@ -174,10 +184,10 @@ export async function POST(request: NextRequest) {
         pagePath: payload.pagePath,
         pageTitle: payload.pageTitle,
         pageCategory: payload.pageCategory,
-        timeOnPage: payload.timeOnPage,
-        scrollDepth: payload.scrollDepth,
-        bounce: payload.bounce,
-        exitPage: payload.exitPage,
+        timeOnPage: normalizedTimeOnPage,
+        scrollDepth: normalizedScrollDepth,
+        bounce: normalizedBounce,
+        exitPage: normalizedExitPage,
         ipAddress,
         userAgent,
         referrerUrl: payload.referrerUrl,

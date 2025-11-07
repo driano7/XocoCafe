@@ -9,11 +9,14 @@ import AvatarUpload from '@/components/AvatarUpload';
 import FavoritesSelect from '@/components/FavoritesSelect';
 import ConsumptionChart from '@/components/ConsumptionChart';
 import { useAuth } from './AuthProvider';
+import ClientActionsFlipCard from '@/components/ClientActionsFlipCard';
 import {
   updateProfileSchema,
   updateConsentSchema,
+  changePasswordSchema,
   type UpdateProfileInput,
   type UpdateConsentInput,
+  type ChangePasswordInput,
   userFeedbackSchema,
   type UserFeedbackInput,
 } from '@/lib/validations/auth';
@@ -25,6 +28,11 @@ export default function UserProfile() {
   const [message, setMessage] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordAlert, setPasswordAlert] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   const {
     register: registerProfile,
@@ -67,6 +75,20 @@ export default function UserProfile() {
       rating: 5,
       title: '',
       content: '',
+    },
+  });
+
+  const {
+    register: registerPassword,
+    handleSubmit: handleSubmitPassword,
+    reset: resetPassword,
+    formState: { errors: passwordErrors },
+  } = useForm<ChangePasswordInput>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: {
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
     },
   });
 
@@ -157,6 +179,56 @@ export default function UserProfile() {
       setMessage('Error actualizando preferencias');
     } finally {
       setIsUpdatingConsent(false);
+    }
+  };
+
+  const onChangePassword = async (data: ChangePasswordInput) => {
+    if (!token) {
+      setPasswordAlert({
+        type: 'error',
+        message: 'No se pudo validar tu sesión. Inicia sesión nuevamente.',
+      });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    setPasswordAlert(null);
+
+    try {
+      const response = await fetch('/api/auth/change-password', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        setPasswordAlert({
+          type: 'success',
+          message: result.message || 'Contraseña actualizada correctamente.',
+        });
+        resetPassword({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        });
+      } else {
+        setPasswordAlert({
+          type: 'error',
+          message: result.message || 'No pudimos actualizar tu contraseña. Intenta de nuevo.',
+        });
+      }
+    } catch (error) {
+      setPasswordAlert({
+        type: 'error',
+        message: 'Error actualizando tu contraseña. Intenta más tarde.',
+      });
+    } finally {
+      setIsChangingPassword(false);
+      setTimeout(() => setPasswordAlert(null), 6000);
     }
   };
 
@@ -278,6 +350,8 @@ export default function UserProfile() {
   };
 
   if (!user) return null;
+
+  const isGoogleOnly = user.authProvider === 'google';
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 lg:px-0">
@@ -524,6 +598,112 @@ export default function UserProfile() {
               </div>
             </div>
           )}
+
+          <div className="mt-8 border-t border-gray-100 pt-6 dark:border-gray-700">
+            <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
+              Seguridad de la cuenta
+            </h3>
+            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+              Actualiza tu contraseña para mantener tu cuenta protegida.
+            </p>
+
+            {passwordAlert && (
+              <div
+                className={`mb-4 rounded-md px-4 py-3 text-sm ${
+                  passwordAlert.type === 'success'
+                    ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-200'
+                    : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200'
+                }`}
+              >
+                {passwordAlert.message}
+              </div>
+            )}
+
+            {isGoogleOnly ? (
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+                Esta cuenta se administra con Google. Usa &ldquo;Continuar con Google&rdquo; para
+                gestionar tu acceso.
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitPassword(onChangePassword)} className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="current-password"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Contraseña actual
+                  </label>
+                  <input
+                    id="current-password"
+                    type="password"
+                    autoComplete="current-password"
+                    {...registerPassword('currentPassword')}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  />
+                  {passwordErrors.currentPassword && (
+                    <p className="mt-1 text-sm text-red-600">
+                      {passwordErrors.currentPassword.message}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="new-password"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Nueva contraseña
+                  </label>
+                  <input
+                    id="new-password"
+                    type="password"
+                    autoComplete="new-password"
+                    {...registerPassword('newPassword')}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  />
+                  {passwordErrors.newPassword && (
+                    <p className="mt-1 text-sm text-red-600">
+                      {passwordErrors.newPassword.message}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="confirm-password"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Confirmar nueva contraseña
+                  </label>
+                  <input
+                    id="confirm-password"
+                    type="password"
+                    autoComplete="new-password"
+                    {...registerPassword('confirmPassword')}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  />
+                  {passwordErrors.confirmPassword && (
+                    <p className="mt-1 text-sm text-red-600">
+                      {passwordErrors.confirmPassword.message}
+                    </p>
+                  )}
+                </div>
+
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Debe contener al menos 8 caracteres, incluir mayúsculas, minúsculas, un número y
+                  un caracter especial.
+                </p>
+
+                <button
+                  type="submit"
+                  disabled={isChangingPassword}
+                  className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isChangingPassword ? 'Actualizando...' : 'Actualizar contraseña'}
+                </button>
+              </form>
+            )}
+          </div>
         </div>
 
         {/* 2. Mis favoritos */}
@@ -533,13 +713,14 @@ export default function UserProfile() {
 
         {/* 3. Mi QR de cliente, 4. Tarjeta de lealtad, 5. Consumo */}
         <div className="order-3 flex flex-col gap-6 lg:order-2 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24">
+          <ClientActionsFlipCard />
           <UserQrCard />
           <LoyaltyFlipCard className="w-full" />
           <ConsumptionChart />
         </div>
 
         {/* 6. Déjanos tus comentarios */}
-        <div className="order-6 lg:order-3 lg:col-start-1 lg:row-start-3 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+        <div className="order-4 lg:order-3 lg:col-start-1 lg:row-start-3 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
           <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
             Déjanos tus comentarios
           </h3>
@@ -635,7 +816,7 @@ export default function UserProfile() {
         </div>
 
         {/* 7. Preferencias de marketing */}
-        <div className="order-7 lg:order-4 lg:col-start-1 lg:row-start-4 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+        <div className="order-5 lg:order-4 lg:col-start-1 lg:row-start-4 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
           <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
             Preferencias de Marketing
           </h3>
@@ -699,7 +880,7 @@ export default function UserProfile() {
         </div>
 
         {/* 8. Gestión de datos (GDPR) */}
-        <div className="order-8 lg:order-5 lg:col-start-1 lg:row-start-5 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+        <div className="order-6 lg:order-5 lg:col-start-1 lg:row-start-5 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
           <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
             Gestión de Datos (GDPR)
           </h3>

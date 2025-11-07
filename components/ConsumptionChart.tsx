@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useAuth } from '@/components/Auth/AuthProvider';
 
 interface ProductStat {
@@ -101,6 +101,11 @@ export default function ConsumptionChart() {
   }, [buckets, selectedKey]);
 
   const currentBucket = buckets.find((bucket) => bucket.key === selectedKey);
+  const periodToggleId = useId();
+  const periodIds = {
+    monthly: `${periodToggleId}-monthly`,
+    yearly: `${periodToggleId}-yearly`,
+  };
 
   const bars = useMemo(() => {
     if (!currentBucket)
@@ -124,8 +129,9 @@ export default function ConsumptionChart() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
             <input
+              id={periodIds.monthly}
               type="radio"
               name="consumption-period"
               value="monthly"
@@ -133,10 +139,11 @@ export default function ConsumptionChart() {
               onChange={() => setPeriod('monthly')}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500"
             />
-            Mensual
-          </label>
-          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <label htmlFor={periodIds.monthly}>Mensual</label>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
             <input
+              id={periodIds.yearly}
               type="radio"
               name="consumption-period"
               value="yearly"
@@ -144,8 +151,8 @@ export default function ConsumptionChart() {
               onChange={() => setPeriod('yearly')}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500"
             />
-            Anual
-          </label>
+            <label htmlFor={periodIds.yearly}>Anual</label>
+          </div>
         </div>
       </div>
 

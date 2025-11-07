@@ -6,6 +6,8 @@ const headerNavLinks = [
   { href: '/blog/ubicacion', title: 'Ubicación' },
   { href: '/blog/facturacion', title: 'Facturación' },
   { href: '/blog', title: 'Blog' },
+  { href: '/dashboard/pedidos', title: 'Mis pedidos' },
+  { href: '/reserve', title: 'Mis reservas' },
 ];
 
 export default headerNavLinks;

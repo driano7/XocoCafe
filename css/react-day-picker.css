@@ -1,0 +1,29 @@
+.rdp {
+  font-family:
+    'Lato',
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.rdp .rdp-day {
+  height: 2.5rem;
+  width: 2.5rem;
+  border-radius: 9999px;
+}
+
+.rdp-day_selected {
+  background-color: #d97706 !important;
+  color: #fff !important;
+}
+
+.rdp-day_today:not(.rdp-day_selected) {
+  font-weight: 600;
+  color: #b45309;
+}
+
+.rdp-caption_label {
+  font-weight: 600;
+}
