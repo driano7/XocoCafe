@@ -95,22 +95,24 @@ export async function POST(request: NextRequest) {
     if (!existingSession) {
       // Crear nueva sesión
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const buildNewSession = () => ({
+        id: randomUUID(),
+        token: payload.sessionId,
+        userId: payload.userId || null,
+        expiresAt,
+        ipAddress,
+        userAgent,
+        deviceType,
+        browser,
+        os,
+        country: 'unknown',
+        city: 'unknown',
+      });
+
       const insertSessionAttempt = await safeSupabase(() =>
         supabase
           .from('sessions')
-          .insert({
-            id: randomUUID(),
-            token: payload.sessionId,
-            userId: payload.userId || null,
-            expiresAt,
-            ipAddress,
-            userAgent,
-            deviceType,
-            browser,
-            os,
-            country: 'unknown',
-            city: 'unknown',
-          })
+          .insert(buildNewSession())
           .select('id,createdAt,pageViews')
           .maybeSingle()
       );
@@ -120,16 +122,43 @@ export async function POST(request: NextRequest) {
       const { data: newSession, error: insertSessionError } = insertSessionAttempt.result!;
 
       if (insertSessionError) {
-        const skip = maybeSkipDueToDb(insertSessionError);
-        if (skip) {
-          return skip;
-        }
-        throw new Error(insertSessionError.message);
-      }
+        if (insertSessionError.code === '23505') {
+          const conflictResolutionAttempt = await safeSupabase(() =>
+            supabase
+              .from('sessions')
+              .select('id,createdAt,pageViews')
+              .eq('token', payload.sessionId)
+              .maybeSingle()
+          );
+          if (conflictResolutionAttempt.skip) {
+            return conflictResolutionAttempt.skip;
+          }
+          const { data: conflictSession, error: conflictResolutionError } =
+            conflictResolutionAttempt.result!;
 
-      sessionId = newSession?.id ?? null;
-      sessionCreatedAt = newSession?.createdAt ?? new Date().toISOString();
-      sessionPageViews = newSession?.pageViews ?? 0;
+          if (conflictResolutionError) {
+            const skip = maybeSkipDueToDb(conflictResolutionError);
+            if (skip) {
+              return skip;
+            }
+            throw new Error(conflictResolutionError.message);
+          }
+
+          sessionId = conflictSession?.id ?? null;
+          sessionCreatedAt = conflictSession?.createdAt ?? new Date().toISOString();
+          sessionPageViews = conflictSession?.pageViews ?? 0;
+        } else {
+          const skip = maybeSkipDueToDb(insertSessionError);
+          if (skip) {
+            return skip;
+          }
+          throw new Error(insertSessionError.message);
+        }
+      } else {
+        sessionId = newSession?.id ?? null;
+        sessionCreatedAt = newSession?.createdAt ?? new Date().toISOString();
+        sessionPageViews = newSession?.pageViews ?? 0;
+      }
     } else {
       sessionId = existingSession.id;
       sessionCreatedAt = existingSession.createdAt;

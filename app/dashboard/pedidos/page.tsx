@@ -248,6 +248,23 @@ export default function OrdersDashboardPage() {
     </section>
   );
 
+  if (!user || !token) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-12 text-center">
+        <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Mis pedidos</h1>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          Inicia sesión para revisar el historial de pedidos y crear nuevos.
+        </p>
+        <Link
+          href="/login"
+          className="mt-6 inline-flex items-center justify-center rounded-full bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-primary-700"
+        >
+          Ir a iniciar sesión
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 lg:px-0">
       <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

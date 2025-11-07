@@ -10,9 +10,10 @@ interface OrderItemPayload {
   quantity: number;
 }
 
-function generateOrderNumber() {
+function generateOrderNumber(source: 'client' | 'store' = 'client') {
+  const prefix = source === 'client' ? 'C-' : 'S-';
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = 'WEB-';
+  let code = prefix;
   for (let i = 0; i < 5; i += 1) {
     code += chars[Math.floor(Math.random() * chars.length)];
   }
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
     const orderPayload = {
       id: randomUUID(),
       userId: decoded.userId,
-      orderNumber: generateOrderNumber(),
+      orderNumber: generateOrderNumber('client'),
       status: 'pending',
       total: totalAmount,
       currency: 'MXN',

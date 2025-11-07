@@ -23,7 +23,7 @@ export const archiveExpiredReservations = async () => {
     const { data: expired, error } = await supabase
       .from('reservations')
       .select(
-        'id,userId,reservationCode,reservationDate,reservationTime,branchId,peopleCount,message,status'
+        'id,userId,reservationCode,reservationDate,reservationTime,branchId,peopleCount,message,preOrderItems,linkedOrderId,status'
       )
       .lt('reservationDate', todayDate)
       .neq('status', 'completed');
@@ -52,6 +52,8 @@ export const archiveExpiredReservations = async () => {
       branchId: reservation.branchId,
       peopleCount: reservation.peopleCount,
       message: reservation.message,
+      preOrderItems: reservation.preOrderItems,
+      linkedOrderId: reservation.linkedOrderId,
       status: 'failed',
       archivedAt: archivedAtIso,
       cleanupAt: calculateCleanupTimestamp(archivedAt),

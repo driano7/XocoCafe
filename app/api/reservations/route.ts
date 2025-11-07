@@ -39,7 +39,25 @@ const ReservationPayloadSchema = z.object({
   reservationDate: z.string().min(1),
   reservationTime: z.string().regex(/^\d{2}:\d{2}$/, 'Formato de hora inválido. Usa HH:MM'),
   branchId: z.string().min(1),
+  branchNumber: z
+    .string()
+    .trim()
+    .max(8, 'El número de sucursal es demasiado largo')
+    .optional()
+    .nullable(),
   message: z.string().trim().max(500, 'Mensaje demasiado largo').optional().nullable(),
+  preOrderItems: z
+    .string()
+    .trim()
+    .max(1000, 'Lista de alimentos/bebidas demasiado larga')
+    .optional()
+    .nullable(),
+  linkedOrderId: z
+    .string()
+    .trim()
+    .max(64, 'El ID del pedido es demasiado largo')
+    .optional()
+    .nullable(),
 });
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -91,7 +109,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .from('reservations')
       .select(
-        'id,reservationCode,reservationDate,reservationTime,branchId,peopleCount,message,status,createdAt,updatedAt'
+        'id,reservationCode,reservationDate,reservationTime,branchId,branchNumber,peopleCount,message,preOrderItems,linkedOrderId,status,createdAt,updatedAt'
       )
       .eq('userId', decoded.userId)
       .order('reservationDate', { ascending: true })
@@ -105,7 +123,7 @@ export async function GET(request: NextRequest) {
     const { data: failed, error: failedError } = await supabase
       .from('reservation_failures')
       .select(
-        'id,originalReservationId,userId,reservationCode,reservationDate,reservationTime,branchId,peopleCount,message,status,archivedAt,cleanupAt'
+        'id,originalReservationId,userId,reservationCode,reservationDate,reservationTime,branchId,branchNumber,peopleCount,message,preOrderItems,linkedOrderId,status,archivedAt,cleanupAt'
       )
       .eq('userId', decoded.userId)
       .order('archivedAt', { ascending: false });
@@ -194,6 +212,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (payload.linkedOrderId) {
+      const { data: linkedOrder, error: linkedOrderError } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('id', payload.linkedOrderId)
+        .eq('userId', decoded.userId)
+        .maybeSingle();
+
+      if (linkedOrderError && linkedOrderError.code !== 'PGRST116') {
+        console.error('Error validando pedido vinculado:', linkedOrderError);
+        return NextResponse.json(
+          { success: false, message: 'No pudimos validar el pedido vinculado.' },
+          { status: 500 }
+        );
+      }
+
+      if (!linkedOrder) {
+        return NextResponse.json(
+          { success: false, message: 'No encontramos un pedido con ese ID en tu cuenta.' },
+          { status: 400 }
+        );
+      }
+    }
+
     const reservationCode = await generateReservationCode();
 
     const { data, error } = await supabase
@@ -205,7 +247,10 @@ export async function POST(request: NextRequest) {
         reservationDate,
         reservationTime: slotTime,
         branchId,
+        branchNumber: payload.branchNumber || null,
         message: payload.message ?? null,
+        preOrderItems: payload.preOrderItems ?? null,
+        linkedOrderId: payload.linkedOrderId ?? null,
         reservationCode,
         status: 'pending',
       })
