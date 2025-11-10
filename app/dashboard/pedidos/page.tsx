@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createBrowserSupabaseClient } from '@/lib/supabase-browser';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import VirtualTicket from '@/components/Orders/VirtualTicket';
@@ -156,16 +156,26 @@ export default function OrdersDashboardPage() {
     };
   }, [supabase, user]);
 
+  const isExpiredPending = useCallback((order: Order) => {
+    if (order.status !== 'pending' || !order.createdAt) {
+      return false;
+    }
+    const cutoff = new Date(order.createdAt);
+    cutoff.setHours(23, 59, 59, 999);
+    return Date.now() > cutoff.getTime();
+  }, []);
+
   const pendingOrders = useMemo(
-    () => orders.filter((order) => order.status === 'pending'),
-    [orders]
+    () => orders.filter((order) => order.status === 'pending' && !isExpiredPending(order)),
+    [orders, isExpiredPending]
   );
   const completedOrders = useMemo(
-    () => orders.filter((order) => order.status !== 'pending'),
-    [orders]
+    () => orders.filter((order) => order.status !== 'pending' || isExpiredPending(order)),
+    [orders, isExpiredPending]
   );
   const MAX_ACTIVE_ORDERS = 3;
   const hasReachedOrderLimit = pendingOrders.length >= MAX_ACTIVE_ORDERS;
+  const expiredSelectedOrder = selectedOrder ? isExpiredPending(selectedOrder) : false;
 
   const handleDownloadTicket = async () => {
     if (!selectedOrder || !ticketRef.current) return;
@@ -298,6 +308,10 @@ export default function OrdersDashboardPage() {
           otro.
         </div>
       )}
+      <div className="mb-6 rounded-xl bg-orange-50 px-4 py-3 text-sm text-orange-900 dark:bg-orange-900/30 dark:text-orange-100">
+        Si no acudiste antes del corte (23:59), movemos el ticket a seguimiento en color naranja y
+        eliminamos su QR. El registro se conserva por 7 días.
+      </div>
 
       {error && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-900/30 dark:text-red-100">
@@ -366,9 +380,16 @@ export default function OrdersDashboardPage() {
               </p>
             </div>
 
-            <div className="mt-6 flex justify-center">
-              <VirtualTicket order={selectedOrder} ref={ticketRef} />
-            </div>
+            {expiredSelectedOrder ? (
+              <div className="mt-6 rounded-2xl border border-dashed border-orange-200 bg-orange-50 p-4 text-sm text-orange-900 dark:border-orange-900/50 dark:bg-orange-900/20 dark:text-orange-100">
+                El ticket ya no está disponible porque no se completó antes del corte del día. Solo
+                conservamos su descripción para referencia.
+              </div>
+            ) : (
+              <div className="mt-6 flex justify-center">
+                <VirtualTicket order={selectedOrder} ref={ticketRef} />
+              </div>
+            )}
 
             {selectedOrder.shipping?.address && (
               <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
@@ -402,7 +423,7 @@ export default function OrdersDashboardPage() {
               </div>
             )}
 
-            {selectedOrder.status === 'pending' && (
+            {selectedOrder.status === 'pending' && !expiredSelectedOrder && (
               <button
                 type="button"
                 onClick={() => void handleDownloadTicket()}

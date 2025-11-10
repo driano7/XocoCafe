@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { DayPicker } from 'react-day-picker';
 import '@/css/react-day-picker.css';
@@ -84,7 +84,6 @@ interface BaseReservationRecord {
   peopleCount: number;
   message: string | null;
   preOrderItems?: string | null;
-  linkedOrderId?: string | null;
   status: string;
 }
 
@@ -108,6 +107,19 @@ const buildSlotDateTime = (reservationDate: string, reservationTime: string) => 
   const [hours, minutes] = reservationTime.split(':').map(Number);
   const [year, month, day] = reservationDate.split('-').map(Number);
   return new Date(year, (month || 1) - 1, day || 1, hours || 0, minutes || 0, 0, 0);
+};
+
+const formatReservationDate = (
+  reservationDate: string,
+  locale: string,
+  options?: Intl.DateTimeFormatOptions
+) => {
+  const [year, month, day] = reservationDate.split('-').map(Number);
+  if ([year, month, day].some((value) => Number.isNaN(value))) {
+    return reservationDate;
+  }
+  const date = new Date(year, (month || 1) - 1, day || 1);
+  return date.toLocaleDateString(locale, options);
 };
 export default function ReservePage() {
   const { token, user } = useAuth();
@@ -139,7 +151,6 @@ export default function ReservePage() {
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [preOrderItems, setPreOrderItems] = useState('');
-  const [linkedOrderId, setLinkedOrderId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
@@ -150,6 +161,7 @@ export default function ReservePage() {
   const [isLoadingReservations, setIsLoadingReservations] = useState(false);
   const [reservationsError, setReservationsError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(() => new Date());
+  const reservationCardRefs = useRef<Record<string, HTMLLIElement | null>>({});
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 60 * 1000);
@@ -277,7 +289,6 @@ export default function ReservePage() {
     people: `${idPrefix}-people`,
     message: `${idPrefix}-message`,
     preOrder: `${idPrefix}-preorder`,
-    linkedOrder: `${idPrefix}-linked-order`,
   };
 
   const availableTimeSlots = useMemo(() => {
@@ -390,9 +401,6 @@ export default function ReservePage() {
       if (reservation.preOrderItems) {
         payload.preOrderItems = reservation.preOrderItems;
       }
-      if (reservation.linkedOrderId) {
-        payload.linkedOrder = reservation.linkedOrderId;
-      }
       return payload;
     },
     [userDisplayName, user]
@@ -428,6 +436,38 @@ export default function ReservePage() {
     [buildQrPayload, setAlert]
   );
 
+  const handleDownloadReservationCard = useCallback(
+    async (reservation: ReservationRecord) => {
+      const cardNode = reservationCardRefs.current[reservation.id];
+      if (!cardNode) {
+        setAlert({
+          type: 'error',
+          text: 'No pudimos preparar la imagen de la reserva. Intenta de nuevo.',
+        });
+        return;
+      }
+      try {
+        const html2canvas = (await import('html2canvas')).default;
+        const canvas = await html2canvas(cardNode, {
+          scale: 2,
+          backgroundColor: '#ffffff',
+        });
+        const dataUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = `${reservation.reservationCode}-${reservation.reservationDate}-reserva.png`;
+        link.click();
+      } catch (error) {
+        console.error('Error descargando la tarjeta de reserva:', error);
+        setAlert({
+          type: 'error',
+          text: 'No pudimos descargar la imagen de la reserva. Intenta de nuevo.',
+        });
+      }
+    },
+    [setAlert]
+  );
+
   const renderReservationCard = (
     reservation: ReservationRecord,
     categoryKey: 'active' | 'past'
@@ -443,7 +483,7 @@ export default function ReservePage() {
     const qrImageSrc = `${QR_API_URL}?size=${QR_IMAGE_SIZE}&data=${encodeURIComponent(
       qrDataString
     )}`;
-    const formattedDate = new Date(reservation.reservationDate).toLocaleDateString('es-MX', {
+    const formattedDate = formatReservationDate(reservation.reservationDate, 'es-MX', {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
@@ -453,6 +493,9 @@ export default function ReservePage() {
     return (
       <li
         key={reservation.id}
+        ref={(element) => {
+          reservationCardRefs.current[reservation.id] = element;
+        }}
         className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 lg:flex-row lg:items-center lg:justify-between"
       >
         <div className="space-y-2">
@@ -484,11 +527,6 @@ export default function ReservePage() {
               Pre-orden: {reservation.preOrderItems}
             </p>
           )}
-          {reservation.linkedOrderId && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Pedido vinculado: #{reservation.linkedOrderId}
-            </p>
-          )}
           <span
             className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusVisuals.badgeClass}`}
           >
@@ -515,15 +553,24 @@ export default function ReservePage() {
                 })}`
               : `Este QR se eliminó automáticamente ${QR_EXPIRATION_MINUTES} min después de la hora.`}
           </p>
-          {qrIsActive && (
+          <div className="flex flex-col items-center gap-1">
+            {qrIsActive && (
+              <button
+                type="button"
+                onClick={() => void handleDownloadQr(reservation)}
+                className="text-xs font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-300"
+              >
+                Descargar QR
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => void handleDownloadQr(reservation)}
-              className="text-xs font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-300"
+              onClick={() => void handleDownloadReservationCard(reservation)}
+              className="text-xs font-semibold text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100"
             >
-              Descargar QR
+              Descargar pase
             </button>
-          )}
+          </div>
         </div>
       </li>
     );
@@ -598,7 +645,6 @@ export default function ReservePage() {
           branchNumber: BRANCH_NUMBER,
           message: message.trim() || null,
           preOrderItems: preOrderItems.trim() || null,
-          linkedOrderId: linkedOrderId.trim() || null,
         }),
       });
 
@@ -614,7 +660,6 @@ export default function ReservePage() {
       });
       setMessage('');
       setPreOrderItems('');
-      setLinkedOrderId('');
       if (timeJustBooked) {
         setBookedSlots((prev) =>
           prev.includes(timeJustBooked) ? prev : [...prev, timeJustBooked]
@@ -869,25 +914,6 @@ export default function ReservePage() {
                     la sucursal.
                   </p>
                 </div>
-                <div>
-                  <label
-                    htmlFor={fieldIds.linkedOrder}
-                    className="block text-sm font-medium text-gray-800 dark:text-gray-200"
-                  >
-                    ID de pedido vinculado (opcional)
-                  </label>
-                  <input
-                    id={fieldIds.linkedOrder}
-                    type="text"
-                    value={linkedOrderId}
-                    onChange={(event) => setLinkedOrderId(event.target.value)}
-                    className="mt-2 block w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                    placeholder="Ingresa el ID de pedido si ya pagaste."
-                  />
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Si ya realizaste un pedido, ingresa el ID para tenerlo listo.
-                  </p>
-                </div>
               </div>
             </div>
 
@@ -918,11 +944,6 @@ export default function ReservePage() {
                 {preOrderItems.trim() && (
                   <li>
                     <span className="font-medium">Pre-orden:</span> {preOrderItems.trim()}
-                  </li>
-                )}
-                {linkedOrderId.trim() && (
-                  <li>
-                    <span className="font-medium">Pedido vinculado:</span> #{linkedOrderId.trim()}
                   </li>
                 )}
               </ul>
@@ -1067,9 +1088,14 @@ export default function ReservePage() {
                         month: 'long',
                       }
                     );
-                    const formattedDate = new Date(reservation.reservationDate).toLocaleDateString(
+                    const formattedDate = formatReservationDate(
+                      reservation.reservationDate,
                       'es-MX',
-                      { weekday: 'long', day: 'numeric', month: 'long' }
+                      {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                      }
                     );
                     return (
                       <li
@@ -1100,9 +1126,6 @@ export default function ReservePage() {
                             <p className="text-primary-700 dark:text-primary-200">
                               Pre-orden: {reservation.preOrderItems}
                             </p>
-                          )}
-                          {reservation.linkedOrderId && (
-                            <p>Pedido vinculado: #{reservation.linkedOrderId}</p>
                           )}
                           <span
                             className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusVisuals.badgeClass}`}

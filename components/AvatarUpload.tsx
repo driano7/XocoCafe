@@ -28,37 +28,31 @@ export default function AvatarUpload({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validar tipo de archivo
     if (!file.type.startsWith('image/')) {
       alert('Por favor selecciona una imagen válida');
       return;
     }
 
-    // Validar tamaño (máximo 5MB)
     if (file.size > 5 * 1024 * 1024) {
       alert('La imagen debe ser menor a 5MB');
       return;
     }
 
-    // Crear preview
     const reader = new FileReader();
     reader.onload = (e) => {
       setPreviewUrl(e.target?.result as string);
     };
     reader.readAsDataURL(file);
 
-    // Subir archivo
     uploadAvatar(file);
   };
 
   const uploadAvatar = async (file: File) => {
     setIsUploading(true);
     try {
-      // Crear FormData
       const formData = new FormData();
       formData.append('avatar', file);
 
-      // Subir a Supabase Storage (o tu servicio de almacenamiento)
       const uploadResponse = await fetch('/api/upload/avatar', {
         method: 'POST',
         headers: {
@@ -119,7 +113,6 @@ export default function AvatarUpload({
           </div>
         )}
 
-        {/* Overlay de hover */}
         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 opacity-0 transition-opacity group-hover:opacity-100">
           {isUploading ? (
             <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-white"></div>
@@ -155,7 +148,7 @@ export default function AvatarUpload({
         className="hidden"
       />
 
-      <p className="text-xs text-gray-500 mt-1 text-center">
+      <p className="mt-1 text-center text-xs text-gray-500">
         {isUploading ? 'Subiendo...' : 'Click para cambiar'}
       </p>
     </div>

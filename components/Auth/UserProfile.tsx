@@ -24,7 +24,6 @@ import {
 export default function UserProfile() {
   const { user, token, updateUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [isUpdatingConsent, setIsUpdatingConsent] = useState(false);
   const [message, setMessage] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
@@ -51,11 +50,7 @@ export default function UserProfile() {
     },
   });
 
-  const {
-    register: registerConsent,
-    handleSubmit: handleSubmitConsent,
-    reset: resetConsent,
-  } = useForm<UpdateConsentInput>({
+  const { register: registerConsent, reset: resetConsent } = useForm<UpdateConsentInput>({
     resolver: zodResolver(updateConsentSchema),
     defaultValues: {
       marketingEmail: user?.marketingEmail || false,
@@ -150,35 +145,6 @@ export default function UserProfile() {
       }
     } catch (error) {
       setMessage('Error actualizando perfil');
-    }
-  };
-
-  const onUpdateConsent = async (data: UpdateConsentInput) => {
-    setIsUpdatingConsent(true);
-    try {
-      const response = await fetch('/api/auth/consent', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        updateUser(result.user);
-        prefillConsentForm(result.user);
-        setMessage('Preferencias actualizadas exitosamente');
-        setTimeout(() => setMessage(''), 3000);
-      } else {
-        setMessage(result.message);
-      }
-    } catch (error) {
-      setMessage('Error actualizando preferencias');
-    } finally {
-      setIsUpdatingConsent(false);
     }
   };
 
@@ -821,62 +787,55 @@ export default function UserProfile() {
             Preferencias de Marketing
           </h3>
 
-          <form onSubmit={handleSubmitConsent(onUpdateConsent)} className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-center">
-                <input
-                  {...registerConsent('marketingEmail')}
-                  type="checkbox"
-                  id="marketingEmail"
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <label
-                  htmlFor="marketingEmail"
-                  className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
-                >
-                  Recibir ofertas por email
-                </label>
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  {...registerConsent('marketingSms')}
-                  type="checkbox"
-                  id="marketingSms"
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <label
-                  htmlFor="marketingSms"
-                  className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
-                >
-                  Recibir ofertas por SMS
-                </label>
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  {...registerConsent('marketingPush')}
-                  type="checkbox"
-                  id="marketingPush"
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <label
-                  htmlFor="marketingPush"
-                  className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
-                >
-                  Recibir notificaciones push
-                </label>
-              </div>
+          <div className="space-y-3">
+            <div className="flex items-center">
+              <input
+                {...registerConsent('marketingEmail')}
+                type="checkbox"
+                id="marketingEmail"
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                disabled
+              />
+              <label
+                htmlFor="marketingEmail"
+                className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
+              >
+                Recibir ofertas por email
+              </label>
             </div>
 
-            <button
-              type="submit"
-              disabled={isUpdatingConsent}
-              className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {isUpdatingConsent ? 'Actualizando...' : 'Actualizar Preferencias'}
-            </button>
-          </form>
+            <div className="flex items-center">
+              <input
+                {...registerConsent('marketingSms')}
+                type="checkbox"
+                id="marketingSms"
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                disabled
+              />
+              <label
+                htmlFor="marketingSms"
+                className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
+              >
+                Recibir ofertas por SMS
+              </label>
+            </div>
+
+            <div className="flex items-center">
+              <input
+                {...registerConsent('marketingPush')}
+                type="checkbox"
+                id="marketingPush"
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                disabled
+              />
+              <label
+                htmlFor="marketingPush"
+                className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
+              >
+                Recibir notificaciones push
+              </label>
+            </div>
+          </div>
         </div>
 
         {/* 8. Gestión de datos (GDPR) */}

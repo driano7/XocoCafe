@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from './Auth/AuthProvider';
 
 interface LoyaltyFlipCardProps {
@@ -24,6 +24,7 @@ export default function LoyaltyFlipCard({ className = '' }: LoyaltyFlipCardProps
   const [isLoading, setIsLoading] = useState(false);
   const [showCongrats, setShowCongrats] = useState(false);
   const [recentlyStamped, setRecentlyStamped] = useState<number | null>(null);
+  const [loyaltyError, setLoyaltyError] = useState<string | null>(null);
   const hideCongratsTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -31,6 +32,33 @@ export default function LoyaltyFlipCard({ className = '' }: LoyaltyFlipCardProps
       setCoffeeCount(user.weeklyCoffeeCount);
     }
   }, [user]);
+
+  const fetchCoffeeCount = useCallback(async () => {
+    if (!token) return;
+    setLoyaltyError(null);
+    try {
+      const response = await fetch('/api/user/coffee-count', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as CoffeeCountResult;
+      if (!payload?.success) {
+        throw new Error(payload?.data?.message || 'No pudimos obtener tu progreso.');
+      }
+      if (typeof payload.data?.weeklyCoffeeCount === 'number') {
+        setCoffeeCount(payload.data.weeklyCoffeeCount);
+      }
+    } catch (error) {
+      console.error('Error cargando contador de cafés:', error);
+      setLoyaltyError('No pudimos cargar tu progreso de lealtad. Intenta más tarde.');
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void fetchCoffeeCount();
+  }, [fetchCoffeeCount]);
 
   useEffect(() => {
     if (recentlyStamped !== null) {
@@ -51,6 +79,10 @@ export default function LoyaltyFlipCard({ className = '' }: LoyaltyFlipCardProps
   };
 
   const incrementCoffeeCount = async (increment: number): Promise<CoffeeCountResult | null> => {
+    if (!token) {
+      setLoyaltyError('Inicia sesión para sumar sellos.');
+      return null;
+    }
     try {
       const response = await fetch('/api/user/coffee-count', {
         method: 'POST',
@@ -60,9 +92,14 @@ export default function LoyaltyFlipCard({ className = '' }: LoyaltyFlipCardProps
         },
         body: JSON.stringify({ increment }),
       });
-      return (await response.json()) as CoffeeCountResult;
+      const payload = (await response.json()) as CoffeeCountResult;
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.data?.message || 'No pudimos actualizar tu progreso.');
+      }
+      return payload;
     } catch (error) {
       console.error('Error incrementando contador:', error);
+      setLoyaltyError('No pudimos registrar el sello. Revisa tu conexión e inténtalo de nuevo.');
       return null;
     }
   };
@@ -71,6 +108,7 @@ export default function LoyaltyFlipCard({ className = '' }: LoyaltyFlipCardProps
     if (coffeeCount >= 7 || isLoading) return;
 
     setIsLoading(true);
+    setLoyaltyError(null);
     try {
       const firstStep = await incrementCoffeeCount(1);
       if (!firstStep?.success) return;
@@ -86,6 +124,7 @@ export default function LoyaltyFlipCard({ className = '' }: LoyaltyFlipCardProps
       } else {
         setRecentlyStamped(Math.max(0, updatedCount - 1));
       }
+      await fetchCoffeeCount();
     } finally {
       setIsLoading(false);
     }
@@ -238,6 +277,9 @@ export default function LoyaltyFlipCard({ className = '' }: LoyaltyFlipCardProps
       </div>
 
       <p className="mt-3 text-center text-sm text-gray-600">Toca la tarjeta para voltear</p>
+      {loyaltyError && (
+        <p className="mt-2 text-center text-xs text-red-600 dark:text-red-400">{loyaltyError}</p>
+      )}
     </div>
   );
 }

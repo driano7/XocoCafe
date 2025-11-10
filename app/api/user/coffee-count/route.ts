@@ -3,22 +3,90 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
-export async function POST(request: NextRequest) {
-  try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+const authenticate = (request: NextRequest) => {
+  const authHeader = request.headers.get('authorization');
+  const token = authHeader?.replace('Bearer ', '');
 
-    if (!token) {
-      return NextResponse.json(
+  if (!token) {
+    return {
+      error: NextResponse.json(
         { success: false, message: 'Token no proporcionado' },
         { status: 401 }
-      );
+      ),
+    };
+  }
+
+  const decoded = verifyToken(token);
+  if (!decoded) {
+    return {
+      error: NextResponse.json({ success: false, message: 'Token inválido' }, { status: 401 }),
+    };
+  }
+
+  return { decoded, token };
+};
+
+export async function GET(request: NextRequest) {
+  const auth = authenticate(request);
+  if ('error' in auth) {
+    return auth.error;
+  }
+
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('weeklyCoffeeCount')
+      .eq('id', auth.decoded.userId)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
     }
 
-    // Verificar token
-    const decoded = verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Token inválido' }, { status: 401 });
+    let weeklyCoffeeCount = user?.weeklyCoffeeCount ?? null;
+
+    if (weeklyCoffeeCount === null || weeklyCoffeeCount === undefined) {
+      const now = new Date();
+      const startOfWeek = new Date(now);
+      startOfWeek.setHours(0, 0, 0, 0);
+      const day = startOfWeek.getDay();
+      const diff = (day + 6) % 7; // lunes como inicio
+      startOfWeek.setDate(startOfWeek.getDate() - diff);
+
+      const { count: loyaltyCount, error: loyaltyError } = await supabase
+        .from('loyalty_points')
+        .select('id', { count: 'exact', head: true })
+        .eq('userId', auth.decoded.userId)
+        .eq('reason', 'coffee_increment')
+        .gte('createdAt', startOfWeek.toISOString());
+
+      if (loyaltyError) {
+        throw new Error(loyaltyError.message);
+      }
+
+      weeklyCoffeeCount = loyaltyCount ?? 0;
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        weeklyCoffeeCount: Math.min(weeklyCoffeeCount ?? 0, 7),
+      },
+    });
+  } catch (error: any) {
+    console.error('Error obteniendo contador de cafés:', error);
+    return NextResponse.json(
+      { success: false, message: 'Error interno del servidor' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const auth = authenticate(request);
+    if ('error' in auth) {
+      return auth.error;
     }
 
     const body = await request.json();
@@ -28,7 +96,7 @@ export async function POST(request: NextRequest) {
     const { data: user, error } = await supabase
       .from('users')
       .select('weeklyCoffeeCount')
-      .eq('id', decoded.userId)
+      .eq('id', auth.decoded.userId)
       .maybeSingle();
 
     if (error) {
@@ -51,7 +119,7 @@ export async function POST(request: NextRequest) {
         weeklyCoffeeCount: newCount,
         updatedAt: new Date().toISOString(),
       })
-      .eq('id', decoded.userId)
+      .eq('id', auth.decoded.userId)
       .select('id,weeklyCoffeeCount')
       .maybeSingle();
 
@@ -74,7 +142,7 @@ export async function POST(request: NextRequest) {
 
     await insertLoyaltyEntry({
       id: randomUUID(),
-      userId: decoded.userId,
+      userId: auth.decoded.userId,
       points: updatedUser.weeklyCoffeeCount,
       reason: 'coffee_increment',
       metadata: incrementMetadata,
@@ -88,7 +156,7 @@ export async function POST(request: NextRequest) {
 
       await insertLoyaltyEntry({
         id: randomUUID(),
-        userId: decoded.userId,
+        userId: auth.decoded.userId,
         points: updatedUser.weeklyCoffeeCount,
         reason: 'coffee_reward',
         metadata: {
@@ -105,7 +173,7 @@ export async function POST(request: NextRequest) {
           weeklyCoffeeCount: 0,
           updatedAt: new Date().toISOString(),
         })
-        .eq('id', decoded.userId)
+        .eq('id', auth.decoded.userId)
         .select('weeklyCoffeeCount')
         .maybeSingle();
 

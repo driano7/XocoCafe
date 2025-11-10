@@ -52,12 +52,6 @@ const ReservationPayloadSchema = z.object({
     .max(1000, 'Lista de alimentos/bebidas demasiado larga')
     .optional()
     .nullable(),
-  linkedOrderId: z
-    .string()
-    .trim()
-    .max(64, 'El ID del pedido es demasiado largo')
-    .optional()
-    .nullable(),
 });
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -109,7 +103,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .from('reservations')
       .select(
-        'id,reservationCode,reservationDate,reservationTime,branchId,branchNumber,peopleCount,message,preOrderItems,linkedOrderId,status,createdAt,updatedAt'
+        'id,reservationCode,reservationDate,reservationTime,branchId,branchNumber,peopleCount,message,preOrderItems,status,createdAt,updatedAt'
       )
       .eq('userId', decoded.userId)
       .order('reservationDate', { ascending: true })
@@ -123,7 +117,7 @@ export async function GET(request: NextRequest) {
     const { data: failed, error: failedError } = await supabase
       .from('reservation_failures')
       .select(
-        'id,originalReservationId,userId,reservationCode,reservationDate,reservationTime,branchId,branchNumber,peopleCount,message,preOrderItems,linkedOrderId,status,archivedAt,cleanupAt'
+        'id,originalReservationId,userId,reservationCode,reservationDate,reservationTime,branchId,branchNumber,peopleCount,message,preOrderItems,status,archivedAt,cleanupAt'
       )
       .eq('userId', decoded.userId)
       .order('archivedAt', { ascending: false });
@@ -176,6 +170,7 @@ export async function POST(request: NextRequest) {
     const payload = parsed.data;
     const branchId = payload.branchId || DEFAULT_BRANCH_ID;
     const reservationDate = normalizeDateOnly(payload.reservationDate);
+    let normalizedBranchNumber = payload.branchNumber?.trim() || null;
 
     if (!isDateWithinRange(reservationDate)) {
       return NextResponse.json(
@@ -212,27 +207,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (payload.linkedOrderId) {
-      const { data: linkedOrder, error: linkedOrderError } = await supabase
-        .from('orders')
-        .select('id')
-        .eq('id', payload.linkedOrderId)
-        .eq('userId', decoded.userId)
+    if (normalizedBranchNumber) {
+      const { data: branchRecord, error: branchLookupError } = await supabase
+        .from('branches')
+        .select('number')
+        .eq('number', normalizedBranchNumber)
         .maybeSingle();
 
-      if (linkedOrderError && linkedOrderError.code !== 'PGRST116') {
-        console.error('Error validando pedido vinculado:', linkedOrderError);
-        return NextResponse.json(
-          { success: false, message: 'No pudimos validar el pedido vinculado.' },
-          { status: 500 }
-        );
-      }
-
-      if (!linkedOrder) {
-        return NextResponse.json(
-          { success: false, message: 'No encontramos un pedido con ese ID en tu cuenta.' },
-          { status: 400 }
-        );
+      if (branchLookupError && branchLookupError.code !== 'PGRST116') {
+        console.error('Error validando sucursal:', branchLookupError);
+        normalizedBranchNumber = null;
+      } else if (!branchRecord) {
+        normalizedBranchNumber = null;
+      } else {
+        normalizedBranchNumber = branchRecord.number ?? null;
       }
     }
 
@@ -247,10 +235,9 @@ export async function POST(request: NextRequest) {
         reservationDate,
         reservationTime: slotTime,
         branchId,
-        branchNumber: payload.branchNumber || null,
+        branchNumber: normalizedBranchNumber,
         message: payload.message ?? null,
         preOrderItems: payload.preOrderItems ?? null,
-        linkedOrderId: payload.linkedOrderId ?? null,
         reservationCode,
         status: 'pending',
       })
