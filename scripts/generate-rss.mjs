@@ -1,9 +1,12 @@
 import { writeFileSync, mkdirSync } from 'fs';
 import path from 'path';
+import { createRequire } from 'module';
 import GithubSlugger from 'github-slugger';
 import { escape } from './htmlEscaper.mjs';
 import siteMetadata from '../content/siteMetadata.js';
-import { allBlogs } from '../.contentlayer/generated/index.mjs';
+
+const require = createRequire(import.meta.url);
+const allBlogs = require('../.contentlayer/generated/Blog/_index.json');
 
 export async function getAllTags() {
   const tagCount = {};

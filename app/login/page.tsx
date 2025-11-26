@@ -39,6 +39,9 @@ export default function LoginPage() {
 
   const handleSuccess = (token: string, authUser: any, context: AuthSuccessContext) => {
     login(token, authUser);
+    if (typeof window !== 'undefined' && context.source === 'login' && context.showFeedbackPrompt) {
+      sessionStorage.setItem('xoco:feedbackPrompt', 'true');
+    }
     setPostAuthRedirect(context.source === 'register' ? '/onboarding/favorites' : '/profile');
   };
 

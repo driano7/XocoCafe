@@ -3,13 +3,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { FaWhatsapp } from 'react-icons/fa';
+import siteMetadata from 'content/siteMetadata';
 import LoyaltyFlipCard from '@/components/LoyaltyFlipCard';
 import UserQrCard from '@/components/Auth/UserQrCard';
-import AvatarUpload from '@/components/AvatarUpload';
 import FavoritesSelect from '@/components/FavoritesSelect';
 import ConsumptionChart from '@/components/ConsumptionChart';
+import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
+import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
 import { useAuth } from './AuthProvider';
 import ClientActionsFlipCard from '@/components/ClientActionsFlipCard';
+import ShareExperienceForm from '@/components/Feedback/ShareExperienceForm';
 import {
   updateProfileSchema,
   updateConsentSchema,
@@ -17,18 +21,23 @@ import {
   type UpdateProfileInput,
   type UpdateConsentInput,
   type ChangePasswordInput,
-  userFeedbackSchema,
-  type UserFeedbackInput,
 } from '@/lib/validations/auth';
 
 export default function UserProfile() {
   const { user, token, updateUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [message, setMessage] = useState('');
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
-  const [isSendingFeedback, setIsSendingFeedback] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordAlert, setPasswordAlert] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+  const loyaltyReminder = useLoyaltyReminder({
+    userId: user?.id,
+    enrolled: user?.loyaltyEnrolled ?? false,
+    token,
+  });
+  const [loyaltyReminderAlert, setLoyaltyReminderAlert] = useState<{
     type: 'success' | 'error';
     message: string;
   } | null>(null);
@@ -56,20 +65,6 @@ export default function UserProfile() {
       marketingEmail: user?.marketingEmail || false,
       marketingSms: user?.marketingSms || false,
       marketingPush: user?.marketingPush || false,
-    },
-  });
-
-  const {
-    register: registerFeedback,
-    handleSubmit: handleSubmitFeedback,
-    reset: resetFeedback,
-    formState: { errors: feedbackErrors },
-  } = useForm<UserFeedbackInput>({
-    resolver: zodResolver(userFeedbackSchema),
-    defaultValues: {
-      rating: 5,
-      title: '',
-      content: '',
     },
   });
 
@@ -120,6 +115,26 @@ export default function UserProfile() {
       prefillConsentForm(user);
     }
   }, [user, prefillProfileForm, prefillConsentForm]);
+
+  useEffect(() => {
+    if (!loyaltyReminderAlert) {
+      return undefined;
+    }
+    const timeout = setTimeout(() => setLoyaltyReminderAlert(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [loyaltyReminderAlert]);
+
+  const handleActivateLoyaltyReminder = useCallback(async () => {
+    const result = await loyaltyReminder.activate();
+    setLoyaltyReminderAlert({
+      type: result.success ? 'success' : 'error',
+      message:
+        result.message ??
+        (result.success
+          ? 'Activamos tu programa de lealtad. Ya puedes acumular sellos.'
+          : 'No pudimos activar tu programa de lealtad. Intenta más tarde.'),
+    });
+  }, [loyaltyReminder]);
 
   const onUpdateProfile = async (data: UpdateProfileInput) => {
     try {
@@ -282,39 +297,6 @@ export default function UserProfile() {
     }
   };
 
-  const submitFeedback = async (data: UserFeedbackInput) => {
-    if (!token) {
-      setFeedbackMessage('Debes iniciar sesión para enviar un comentario.');
-      return;
-    }
-
-    setIsSendingFeedback(true);
-    setFeedbackMessage(null);
-    try {
-      const response = await fetch('/api/user/feedback', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        setFeedbackMessage(result.message || '¡Gracias por tu comentario!');
-        resetFeedback({ rating: 5, title: '', content: '' });
-      } else {
-        setFeedbackMessage(result.message || 'No pudimos guardar tu comentario. Intenta de nuevo.');
-      }
-    } catch (error) {
-      setFeedbackMessage('Error enviando tu comentario. Intenta de nuevo.');
-    } finally {
-      setIsSendingFeedback(false);
-      setTimeout(() => setFeedbackMessage(null), 5000);
-    }
-  };
-
   if (!user) return null;
 
   const isGoogleOnly = user.authProvider === 'google';
@@ -335,21 +317,11 @@ export default function UserProfile() {
         {/* 1. Perfil */}
         <div className="order-1 lg:order-1 lg:col-start-1 lg:row-start-1 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <AvatarUpload
-                currentAvatarUrl={user.avatarUrl}
-                onAvatarUpdate={(updatedUser) => {
-                  updateUser(updatedUser);
-                  setMessage('Avatar actualizado');
-                  setTimeout(() => setMessage(''), 3000);
-                }}
-              />
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Mi Perfil</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Mantén tu información personal y de contacto al día.
-                </p>
-              </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Mi Perfil</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Mantén tu información personal y de contacto al día.
+              </p>
             </div>
             <button
               type="button"
@@ -565,6 +537,20 @@ export default function UserProfile() {
             </div>
           )}
 
+          <div className="mt-8 flex flex-wrap items-center gap-2 rounded-3xl bg-primary-50 px-4 py-3 text-sm text-primary-900 shadow-sm dark:bg-primary-900/30 dark:text-primary-100">
+            <span>¿Necesitas ayuda? Mándanos un</span>
+            <a
+              href={siteMetadata.whats}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-primary-500 shadow dark:bg-[#0f1728]"
+              aria-label="WhatsApp"
+            >
+              <FaWhatsapp />
+            </a>
+            <span>y con todo gusto te ayudamos.</span>
+          </div>
+
           <div className="mt-8 border-t border-gray-100 pt-6 dark:border-gray-700">
             <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
               Seguridad de la cuenta
@@ -679,6 +665,24 @@ export default function UserProfile() {
 
         {/* 3. Mi QR de cliente, 4. Tarjeta de lealtad, 5. Consumo */}
         <div className="order-3 flex flex-col gap-6 lg:order-2 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24">
+          {loyaltyReminderAlert && (
+            <div
+              className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                loyaltyReminderAlert.type === 'success'
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
+                  : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-100'
+              }`}
+            >
+              {loyaltyReminderAlert.message}
+            </div>
+          )}
+          {loyaltyReminder.showReminder && (
+            <LoyaltyReminderCard
+              onActivate={handleActivateLoyaltyReminder}
+              isLoading={loyaltyReminder.isActivating}
+              className="w-full"
+            />
+          )}
           <ClientActionsFlipCard />
           <UserQrCard />
           <LoyaltyFlipCard className="w-full" />
@@ -694,91 +698,7 @@ export default function UserProfile() {
             Tu opinión nos ayuda a mejorar. Comparte sugerencias o cualquier detalle sobre tu
             experiencia en Xoco Café.
           </p>
-
-          {feedbackMessage && (
-            <div
-              className={`mb-4 rounded-md px-4 py-3 text-sm ${
-                feedbackMessage.toLowerCase().includes('error') ||
-                feedbackMessage.toLowerCase().includes('no ')
-                  ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200'
-                  : 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-200'
-              }`}
-            >
-              {feedbackMessage}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmitFeedback(submitFeedback)} className="space-y-4">
-            <div>
-              <label
-                htmlFor="feedback-rating"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Calificación
-              </label>
-              <select
-                id="feedback-rating"
-                {...registerFeedback('rating', { valueAsNumber: true })}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              >
-                {[5, 4, 3, 2, 1].map((value) => (
-                  <option key={value} value={value}>
-                    {value} {value === 1 ? 'estrella' : 'estrellas'}
-                  </option>
-                ))}
-              </select>
-              {feedbackErrors.rating && (
-                <p className="mt-1 text-sm text-red-600">{feedbackErrors.rating.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label
-                htmlFor="feedback-title"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Título (opcional)
-              </label>
-              <input
-                id="feedback-title"
-                type="text"
-                maxLength={120}
-                {...registerFeedback('title')}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                placeholder="Ej. Servicio excelente"
-              />
-              {feedbackErrors.title && (
-                <p className="mt-1 text-sm text-red-600">{feedbackErrors.title.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label
-                htmlFor="feedback-content"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Comentario
-              </label>
-              <textarea
-                id="feedback-content"
-                rows={4}
-                {...registerFeedback('content')}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                placeholder="Cuéntanos tu experiencia o sugerencia..."
-              />
-              {feedbackErrors.content && (
-                <p className="mt-1 text-sm text-red-600">{feedbackErrors.content.message}</p>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSendingFeedback}
-              className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSendingFeedback ? 'Enviando...' : 'Enviar comentario'}
-            </button>
-          </form>
+          <ShareExperienceForm />
         </div>
 
         {/* 7. Preferencias de marketing */}

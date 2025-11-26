@@ -8,6 +8,9 @@ interface OrderItemPayload {
   name: string;
   price: number;
   quantity: number;
+  category?: string | null;
+  size?: string | null;
+  packageItems?: string[] | null;
 }
 
 function generateOrderNumber(source: 'client' | 'store' = 'client') {
@@ -35,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { items, totalAmount, notes, shipping } = body;
+    const { items, totalAmount, tipAmount, tipPercent, totals, notes, shipping } = body;
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -51,11 +54,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (typeof tipAmount !== 'undefined' && (Number.isNaN(tipAmount) || tipAmount < 0)) {
+      return NextResponse.json(
+        { success: false, message: 'La propina es inválida.' },
+        { status: 400 }
+      );
+    }
+
     const normalizedItems: OrderItemPayload[] = items.map((item: any) => ({
       productId: String(item.productId ?? ''),
       name: String(item.name ?? ''),
       price: Number(item.price ?? 0),
       quantity: Number(item.quantity ?? 0),
+      category: typeof item.category === 'string' ? item.category : null,
+      size: typeof item.size === 'string' ? item.size : null,
+      packageItems: Array.isArray(item.packageItems)
+        ? item.packageItems.map((entry: any) => String(entry))
+        : null,
     }));
 
     if (normalizedItems.some((item) => !item.productId || item.quantity <= 0 || item.price < 0)) {
@@ -64,6 +79,22 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const subtotal = normalizedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const normalizedTotals =
+      totals && typeof totals === 'object'
+        ? {
+            subtotal: Number.isFinite(totals.subtotal) ? Number(totals.subtotal) : subtotal,
+            tip: Number.isFinite(totals.tip) ? Number(totals.tip) : tipAmount ?? 0,
+            total: Number.isFinite(totals.total) ? Number(totals.total) : totalAmount,
+          }
+        : { subtotal, tip: tipAmount ?? 0, total: totalAmount };
+    const normalizedTipAmount =
+      typeof tipAmount === 'number' && Number.isFinite(tipAmount) && tipAmount > 0
+        ? tipAmount
+        : null;
+    const normalizedTipPercent =
+      typeof tipPercent === 'number' && Number.isFinite(tipPercent) ? tipPercent : null;
 
     const orderPayload = {
       id: randomUUID(),
@@ -76,7 +107,10 @@ export async function POST(request: NextRequest) {
         list: normalizedItems,
         shipping: shipping ?? null,
         notes: notes ?? null,
+        totals: normalizedTotals,
       },
+      tipAmount: normalizedTipAmount,
+      tipPercent: normalizedTipPercent,
     };
 
     const { data, error } = await supabase.from('orders').insert(orderPayload).select('*').single();

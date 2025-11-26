@@ -2,23 +2,31 @@
 
 import { useSyncExternalStore } from 'react';
 
+export type CartCategory = 'beverage' | 'food' | 'package';
+
 export interface CartItem {
+  lineId: string;
   productId: string;
   name: string;
   price: number;
   imageUrl?: string | null;
   quantity: number;
+  category?: CartCategory | null;
+  size?: string | null;
+  packageItems?: string[] | null;
 }
+
+type CartPayload = Omit<CartItem, 'lineId' | 'quantity'>;
 
 interface CartStoreSnapshot {
   items: CartItem[];
   itemCount: number;
   subtotal: number;
   total: number;
-  addItem: (payload: Omit<CartItem, 'quantity'>, quantity?: number) => void;
-  increment: (productId: string) => void;
-  decrement: (productId: string) => void;
-  removeItem: (productId: string) => void;
+  addItem: (payload: CartPayload, quantity?: number) => void;
+  increment: (lineId: string) => void;
+  decrement: (lineId: string) => void;
+  removeItem: (lineId: string) => void;
   clearCart: () => void;
 }
 
@@ -26,40 +34,66 @@ let cartState: CartItem[] = [];
 
 const listeners = new Set<() => void>();
 
-const addItem = (payload: Omit<CartItem, 'quantity'>, quantity = 1) => {
+const matchesCartItem = (item: CartItem, payload: CartPayload) => {
+  const packageKey = JSON.stringify(item.packageItems ?? []);
+  const payloadPackageKey = JSON.stringify(payload.packageItems ?? []);
+  return (
+    item.productId === payload.productId &&
+    (item.size ?? null) === (payload.size ?? null) &&
+    (item.category ?? null) === (payload.category ?? null) &&
+    packageKey === payloadPackageKey
+  );
+};
+
+const createLineId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `cart-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+};
+
+const addItem = (payload: CartPayload, quantity = 1) => {
   setState((prev) => {
-    const existing = prev.find((item) => item.productId === payload.productId);
-    if (existing) {
-      return prev.map((item) =>
-        item.productId === payload.productId
-          ? { ...item, quantity: Math.min(item.quantity + quantity, 99) }
+    const normalizedQty = Math.max(1, quantity);
+    const matchIndex = prev.findIndex((item) => matchesCartItem(item, payload));
+    if (matchIndex >= 0) {
+      return prev.map((item, index) =>
+        index === matchIndex
+          ? { ...item, quantity: Math.min(item.quantity + normalizedQty, 99) }
           : item
       );
     }
-    return [...prev, { ...payload, quantity: Math.min(quantity, 99) }];
+    return [
+      ...prev,
+      {
+        ...payload,
+        lineId: createLineId(),
+        quantity: Math.min(normalizedQty, 99),
+      },
+    ];
   });
 };
 
-const increment = (productId: string) => {
+const increment = (lineId: string) => {
   setState((prev) =>
     prev.map((item) =>
-      item.productId === productId ? { ...item, quantity: Math.min(item.quantity + 1, 99) } : item
+      item.lineId === lineId ? { ...item, quantity: Math.min(item.quantity + 1, 99) } : item
     )
   );
 };
 
-const decrement = (productId: string) => {
+const decrement = (lineId: string) => {
   setState((prev) =>
     prev
       .map((item) =>
-        item.productId === productId ? { ...item, quantity: Math.max(item.quantity - 1, 0) } : item
+        item.lineId === lineId ? { ...item, quantity: Math.max(item.quantity - 1, 0) } : item
       )
       .filter((item) => item.quantity > 0)
   );
 };
 
-const removeItem = (productId: string) => {
-  setState((prev) => prev.filter((item) => item.productId !== productId));
+const removeItem = (lineId: string) => {
+  setState((prev) => prev.filter((item) => item.lineId !== lineId));
 };
 
 const clearCart = () => {

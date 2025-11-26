@@ -311,11 +311,20 @@ function getBrowser(userAgent: string): string {
 }
 
 function getOS(userAgent: string): string {
-  if (userAgent.includes('Windows')) return 'Windows';
-  if (userAgent.includes('Mac')) return 'macOS';
-  if (userAgent.includes('Linux')) return 'Linux';
-  if (userAgent.includes('Android')) return 'Android';
-  if (userAgent.includes('iOS')) return 'iOS';
+  const normalized = userAgent.toLowerCase();
+  if (normalized.includes('windows')) return 'Windows';
+  if (normalized.includes('android')) return 'Android';
+  if (
+    normalized.includes('iphone') ||
+    normalized.includes('ipad') ||
+    normalized.includes('ipod') ||
+    (normalized.includes('mac') && normalized.includes('mobile'))
+  ) {
+    return 'iOS';
+  }
+  if (normalized.includes('mac')) return 'macOS';
+  if (normalized.includes('linux')) return 'Linux';
+  if (normalized.includes('cros')) return 'ChromeOS';
   return 'Other';
 }
 

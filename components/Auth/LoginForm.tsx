@@ -45,7 +45,11 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword }: Logi
         trackLogin('email');
         trackFormSubmit('login', true);
         localStorage.setItem('authToken', result.token);
-        onSuccess(result.token, result.user, { source: 'login' });
+        onSuccess(result.token, result.user, {
+          source: 'login',
+          loginCount: result.loginCount ?? null,
+          showFeedbackPrompt: Boolean(result.showFeedbackPrompt),
+        });
       } else {
         trackFormSubmit('login', false);
         onError(result.message);

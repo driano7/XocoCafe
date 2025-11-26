@@ -28,6 +28,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const loyaltyEnrolled = Array.isArray((user as any).loyaltyPoints)
+      ? (user as any).loyaltyPoints.length > 0
+      : false;
+
     return NextResponse.json({
       success: true,
       user: {
@@ -49,6 +53,7 @@ export async function POST(request: NextRequest) {
         addresses: user.addresses,
         avatarUrl: user.avatarUrl,
         avatarStoragePath: user.avatarStoragePath,
+        loyaltyEnrolled,
       },
     });
   } catch (error) {

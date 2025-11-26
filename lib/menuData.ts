@@ -3,18 +3,50 @@ import { allAuthors } from 'contentlayer/generated';
 export interface MenuItem {
   id: string;
   label: string;
-  category: 'beverage' | 'food';
+  category: 'beverage' | 'food' | 'package';
   subcategory?: 'hot' | 'cold' | 'dessert' | 'snack';
   price?: number | null;
   metadata?: {
     mediumPrice?: number | null;
     largePrice?: number | null;
     calories?: number | null;
+    availableSizes?: string[];
+    defaultSize?: string;
+    description?: string;
+    items?: string[];
+    loyaltyExclusion?: boolean;
   };
 }
 
 const usesDoc = allAuthors.find((doc) => doc.slug === 'uses');
 const rawContent = usesDoc?.body?.raw ?? '';
+const UNIQUE_SIZE_BEVERAGES = new Set(
+  ['Café expreso', 'Refresco', 'Agua embotellada', 'Agua mineral'].map((value) =>
+    normalizeString(value)
+  )
+);
+const HOT_BEVERAGES = new Set(
+  [
+    'Café mexicano 🇲🇽',
+    'Café expreso',
+    'Café capuccino',
+    'Café moka',
+    'Chocolate de agua',
+    'Chocolate de leche',
+    'Té chai',
+    'Chai latte',
+  ].map((value) => normalizeString(value))
+);
+const COLD_BEVERAGES = new Set(
+  [
+    'Chocolate frío',
+    'Matcha',
+    'Frappé (chocolate, café, matcha)',
+    'Refresco',
+    'Agua embotellada',
+    'Agua mineral',
+  ].map((value) => normalizeString(value))
+);
 
 function normalizeString(value: string) {
   return value
@@ -80,7 +112,23 @@ function parseBeverages(section: string): MenuItem[] {
     const largePrice = parsePrice(rawLarge);
     const calories = parseCalories(rawCalories);
 
-    const subcategory = symbol.includes('🔥') ? 'hot' : symbol.includes('❄️') ? 'cold' : undefined;
+    let subcategory: MenuItem['subcategory'];
+    const normalizedName = normalizeString(name);
+    if (HOT_BEVERAGES.has(normalizedName)) subcategory = 'hot';
+    else if (COLD_BEVERAGES.has(normalizedName)) subcategory = 'cold';
+    else subcategory = symbol.includes('🔥') ? 'hot' : symbol.includes('❄️') ? 'cold' : undefined;
+
+    let availableSizes: string[] = [];
+    if (UNIQUE_SIZE_BEVERAGES.has(normalizedName)) {
+      availableSizes = ['único'];
+    } else {
+      if (mediumPrice) availableSizes.push('mediano');
+      if (largePrice) availableSizes.push('grande');
+    }
+    if (!availableSizes.length) {
+      availableSizes = ['único'];
+    }
+    const defaultSize = availableSizes[0];
 
     beverages.push({
       id: `beverage-${slugify(name)}`,
@@ -92,6 +140,8 @@ function parseBeverages(section: string): MenuItem[] {
         mediumPrice,
         largePrice,
         calories,
+        availableSizes,
+        defaultSize,
       },
     });
   }
@@ -132,12 +182,63 @@ const postresSection = extractSection(rawContent, '## Postres');
 const beverages = parseBeverages(beveragesSection);
 const alimentos = parseFoodList(alimentosSection, 'snack');
 const postres = parseFoodList(postresSection, 'dessert');
+const packages: MenuItem[] = [
+  {
+    id: 'package-1',
+    label: 'Paquete 1 · Café mexicano + panqué',
+    category: 'package',
+    price: 50,
+    metadata: {
+      items: ['Café mexicano 🇲🇽', 'Panqué'],
+      calories: 405,
+      description: 'Incluye Café mexicano 🇲🇽 y panqué artesanal.',
+      loyaltyExclusion: true,
+    },
+  },
+  {
+    id: 'package-2',
+    label: 'Paquete 2 · Café mexicano + sándwich',
+    category: 'package',
+    price: 50,
+    metadata: {
+      items: ['Café mexicano 🇲🇽', 'Sándwich'],
+      calories: 355,
+      description: 'Incluye Café mexicano 🇲🇽 acompañado de un sándwich.',
+      loyaltyExclusion: true,
+    },
+  },
+  {
+    id: 'package-3',
+    label: 'Paquete 3 · Café mexicano + cheesecake o pastel',
+    category: 'package',
+    price: 50,
+    metadata: {
+      items: ['Café mexicano 🇲🇽', 'Cheesecake o pastel'],
+      calories: 480,
+      description: 'Café mexicano 🇲🇽 con tu postre favorito.',
+      loyaltyExclusion: true,
+    },
+  },
+  {
+    id: 'package-4',
+    label: 'Paquete 4 · Chocolate de agua + pan de yema',
+    category: 'package',
+    price: 50,
+    metadata: {
+      items: ['Chocolate de agua', 'Pan de yema'],
+      calories: 520,
+      description: 'Chocolate de agua tradicional con pan de yema.',
+      loyaltyExclusion: true,
+    },
+  },
+];
 
 export const beverageOptions: MenuItem[] = beverages;
 export const foodOptions: MenuItem[] = [...alimentos, ...postres];
+export const packageOptions: MenuItem[] = packages;
 
 const menuItemsById = new Map<string, MenuItem>();
-for (const item of [...beverageOptions, ...foodOptions]) {
+for (const item of [...beverageOptions, ...foodOptions, ...packages]) {
   menuItemsById.set(item.id, item);
 }
 

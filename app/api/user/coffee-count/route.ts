@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { insertLoyaltyEntry } from '@/lib/loyalty';
 
 const authenticate = (request: NextRequest) => {
   const authHeader = request.headers.get('authorization');
@@ -200,56 +201,6 @@ export async function POST(request: NextRequest) {
       { success: false, message: 'Error interno del servidor' },
       { status: 500 }
     );
-  }
-}
-
-let loyaltyMetadataSupported = true;
-
-async function insertLoyaltyEntry({
-  id,
-  userId,
-  points,
-  reason,
-  metadata,
-}: {
-  id: string;
-  userId: string;
-  points: number;
-  reason: string;
-  metadata?: Record<string, unknown>;
-}) {
-  const payload = {
-    id,
-    userId,
-    points,
-    reason,
-    orderId: null as string | null,
-    expiresAt: null as string | null,
-    createdAt: new Date().toISOString(),
-  };
-
-  if (metadata && loyaltyMetadataSupported) {
-    const { error } = await supabase.from('loyalty_points').insert({ ...payload, metadata });
-    if (error) {
-      if (error.message?.includes('metadata')) {
-        loyaltyMetadataSupported = false;
-        console.warn(
-          "Columna 'metadata' ausente en loyalty_points. Reintentando inserciones sin metadata."
-        );
-        const fallback = await supabase.from('loyalty_points').insert(payload);
-        if (fallback.error) {
-          console.error('Error registrando historial de lealtad:', fallback.error);
-        }
-      } else {
-        console.error('Error registrando historial de lealtad:', error);
-      }
-    }
-    return;
-  }
-
-  const { error } = await supabase.from('loyalty_points').insert(payload);
-  if (error) {
-    console.error('Error registrando historial de lealtad:', error);
   }
 }
 

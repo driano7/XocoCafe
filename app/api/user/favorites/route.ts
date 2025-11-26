@@ -17,7 +17,8 @@ function normalizeFavorite(value: unknown): string | null | undefined {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function mapCategoryToLabel(category: 'beverage' | 'food'): string {
+function mapCategoryToLabel(category: 'beverage' | 'food' | 'package'): string {
+  if (category === 'package') return 'paquetes';
   return category === 'beverage' ? 'bebidas' : 'alimentos';
 }
 

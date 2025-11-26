@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import CheckoutForm from '@/components/Order/CheckoutForm';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import { useCartStore } from '@/hooks/useCartStore';
+import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
+import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
 import SearchableDropdown from '@/components/SearchableDropdown';
-import { beverageOptions, foodOptions, getMenuItemById } from '@/lib/menuData';
+import { beverageOptions, foodOptions, getMenuItemById, packageOptions } from '@/lib/menuData';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-MX', {
@@ -18,8 +20,19 @@ export default function OrderPage() {
   const { user, token } = useAuth();
   const { items, addItem, increment, decrement, removeItem, subtotal, itemCount, clearCart } =
     useCartStore();
+  const loyaltyReminder = useLoyaltyReminder({
+    userId: user?.id,
+    enrolled: user?.loyaltyEnrolled ?? false,
+    token,
+  });
+  const [loyaltyNotice, setLoyaltyNotice] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
   const [selectedBeverageId, setSelectedBeverageId] = useState('');
+  const [selectedBeverageSize, setSelectedBeverageSize] = useState<string | null>(null);
   const [selectedFoodId, setSelectedFoodId] = useState('');
+  const [selectedPackageId, setSelectedPackageId] = useState('');
 
   const resolveMenuItemPrice = (menuId: string): number => {
     const menuItem = getMenuItemById(menuId);
@@ -27,7 +40,25 @@ export default function OrderPage() {
     return menuItem.price ?? menuItem.metadata?.mediumPrice ?? menuItem.metadata?.largePrice ?? 55;
   };
 
-  const handleQuickAdd = (menuId: string) => {
+  const resolveDefaultSize = (menuId: string) => {
+    const menuItem = getMenuItemById(menuId);
+    if (!menuItem) return null;
+    return menuItem.metadata?.defaultSize ?? menuItem.metadata?.availableSizes?.[0] ?? null;
+  };
+
+  const handleActivateLoyaltyReminder = async () => {
+    const result = await loyaltyReminder.activate();
+    setLoyaltyNotice({
+      type: result.success ? 'success' : 'error',
+      message:
+        result.message ??
+        (result.success
+          ? 'Activamos tu programa de lealtad. Ya puedes acumular sellos.'
+          : 'No pudimos activar tu programa de lealtad. Intenta más tarde.'),
+    });
+  };
+
+  const handleQuickAdd = (menuId: string, options?: { size?: string | null }) => {
     const menuItem = getMenuItemById(menuId);
     if (!menuItem) return;
     const inferredPrice = resolveMenuItemPrice(menuId);
@@ -35,17 +66,38 @@ export default function OrderPage() {
       productId: menuId,
       name: menuItem.label,
       price: inferredPrice,
+      category: menuItem.category,
+      size: options?.size ?? null,
+      packageItems: menuItem.metadata?.items ?? null,
     });
   };
 
   const clearQuickSelections = () => {
     setSelectedBeverageId('');
+    setSelectedBeverageSize(null);
     setSelectedFoodId('');
+    setSelectedPackageId('');
   };
 
   useEffect(() => {
     clearQuickSelections();
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!selectedBeverageId) {
+      setSelectedBeverageSize(null);
+      return;
+    }
+    setSelectedBeverageSize(resolveDefaultSize(selectedBeverageId));
+  }, [selectedBeverageId]);
+
+  useEffect(() => {
+    if (!loyaltyNotice) {
+      return undefined;
+    }
+    const timeout = setTimeout(() => setLoyaltyNotice(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [loyaltyNotice]);
 
   const quickAddSection = (
     <div className="rounded-2xl border border-primary-100 bg-primary-50/40 p-5 shadow-sm dark:border-primary-800/40 dark:bg-primary-900/20">
@@ -71,12 +123,37 @@ export default function OrderPage() {
                 : 'Selecciona tu bebida preferida'
             }
           />
+          {selectedBeverageId && (
+            <div className="mt-2">
+              <label
+                className="block text-xs font-medium text-gray-600 dark:text-gray-300"
+                htmlFor="quick-beverage-size"
+              >
+                Tamaño
+              </label>
+              <select
+                id="quick-beverage-size"
+                value={selectedBeverageSize ?? ''}
+                onChange={(event) => setSelectedBeverageSize(event.target.value)}
+                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              >
+                {(getMenuItemById(selectedBeverageId)?.metadata?.availableSizes ?? ['único']).map(
+                  (size) => (
+                    <option key={size} value={size}>
+                      {size[0].toUpperCase() + size.slice(1)}
+                    </option>
+                  )
+                )}
+              </select>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => {
               if (selectedBeverageId) {
-                handleQuickAdd(selectedBeverageId);
+                handleQuickAdd(selectedBeverageId, { size: selectedBeverageSize });
                 setSelectedBeverageId('');
+                setSelectedBeverageSize(null);
               }
             }}
             disabled={!selectedBeverageId}
@@ -113,6 +190,36 @@ export default function OrderPage() {
             Agregar alimento
           </button>
         </div>
+
+        <div>
+          <SearchableDropdown
+            id="quick-package"
+            label="Paquete"
+            options={packageOptions}
+            value={selectedPackageId}
+            onChange={setSelectedPackageId}
+            helperText={
+              selectedPackageId
+                ? `Incluye: ${
+                    (getMenuItemById(selectedPackageId)?.metadata?.items ?? []).join(', ') || '—'
+                  }`
+                : 'Agrega combos populares'
+            }
+          />
+          <button
+            type="button"
+            onClick={() => {
+              if (selectedPackageId) {
+                handleQuickAdd(selectedPackageId);
+                setSelectedPackageId('');
+              }
+            }}
+            disabled={!selectedPackageId}
+            className="mt-2 w-full rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Agregar paquete
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -128,6 +235,26 @@ export default function OrderPage() {
           envío.
         </p>
       </div>
+
+      {loyaltyNotice && (
+        <div
+          className={`mb-4 rounded-full px-4 py-2 text-sm font-semibold ${
+            loyaltyNotice.type === 'success'
+              ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
+              : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-100'
+          }`}
+        >
+          {loyaltyNotice.message}
+        </div>
+      )}
+
+      {loyaltyReminder.showReminder && (
+        <LoyaltyReminderCard
+          onActivate={handleActivateLoyaltyReminder}
+          isLoading={loyaltyReminder.isActivating}
+          className="mb-8"
+        />
+      )}
 
       <div className="grid gap-8 lg:grid-cols-[1.2fr,0.8fr]">
         <section className="space-y-6">{quickAddSection}</section>
@@ -152,20 +279,30 @@ export default function OrderPage() {
             <div className="space-y-4">
               {items.map((item) => (
                 <div
-                  key={item.productId}
+                  key={item.lineId}
                   className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700"
                 >
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
                       {item.name}
                     </p>
+                    {item.size && (
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                        Tamaño: {item.size}
+                      </p>
+                    )}
+                    {item.category === 'package' && item.packageItems?.length ? (
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                        Incluye: {item.packageItems.join(', ')}
+                      </p>
+                    ) : null}
                     <p className="text-xs text-gray-500">{formatCurrency(item.price)}</p>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => decrement(item.productId)}
+                      onClick={() => decrement(item.lineId)}
                       className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-100"
                     >
                       -
@@ -175,7 +312,7 @@ export default function OrderPage() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => increment(item.productId)}
+                      onClick={() => increment(item.lineId)}
                       className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-100"
                     >
                       +
@@ -188,7 +325,7 @@ export default function OrderPage() {
 
                   <button
                     type="button"
-                    onClick={() => removeItem(item.productId)}
+                    onClick={() => removeItem(item.lineId)}
                     className="text-sm text-red-500 hover:text-red-600"
                     aria-label={`Eliminar ${item.name}`}
                   >

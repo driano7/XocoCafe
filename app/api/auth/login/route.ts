@@ -9,6 +9,7 @@ import {
   logDataRetentionAction,
 } from '@/lib/auth';
 import { decryptUserData } from '@/lib/encryption';
+import { incrementAppCounter } from '@/lib/app-metrics';
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,6 +62,11 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
 
+    // Incrementar contador global de logins
+    const loginCount = await incrementAppCounter('login_successes');
+    const showFeedbackPrompt =
+      typeof loginCount === 'number' && loginCount >= 50 && loginCount % 50 === 0;
+
     // Descifrar datos sensibles
     const decryptedData = decryptUserData(user.email, user);
 
@@ -81,6 +87,8 @@ export async function POST(request: NextRequest) {
         avatarStoragePath: user.avatarStoragePath || undefined,
       },
       token,
+      loginCount,
+      showFeedbackPrompt,
     });
   } catch (error: any) {
     console.error('Error en login:', error);

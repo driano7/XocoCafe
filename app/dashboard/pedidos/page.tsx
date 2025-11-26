@@ -2,17 +2,26 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FaWhatsapp } from 'react-icons/fa';
+import siteMetadata from 'content/siteMetadata';
 import { createBrowserSupabaseClient } from '@/lib/supabase-browser';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import VirtualTicket from '@/components/Orders/VirtualTicket';
+import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
+import { usePagination } from '@/hooks/use-pagination';
+import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
 
 interface Order {
   id: string;
   orderNumber?: string | null;
-  status: 'pending' | 'completed' | 'past';
+  status: 'pending' | 'in_progress' | 'completed' | 'past';
   ticketId?: string | null;
   userEmail?: string | null;
   total?: number | null;
+  tipAmount?: number | null;
+  tipPercent?: number | null;
+  prepStatus?: 'pending' | 'in_progress' | 'completed' | null;
+  prepHandlerName?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
   type?: string | null;
@@ -30,16 +39,333 @@ interface Order {
   } | null;
 }
 
-const STATUS_STYLES: Record<Order['status'], string> = {
-  pending: 'bg-orange-500',
-  completed: 'bg-green-500',
-  past: 'bg-cyan-500',
-};
-
 const STATUS_LABELS: Record<Order['status'], string> = {
   pending: 'Pendiente',
+  in_progress: 'En preparación',
   completed: 'Completado',
   past: 'Histórico',
+};
+
+const getOrderDisplayCode = (order: Order) =>
+  order.ticketId ?? order.orderNumber ?? order.id.slice(0, 6);
+
+const formatOrderCustomer = (order: Order) => order.userEmail ?? 'Público general';
+const getOrderArticles = (order: Order) =>
+  order.items && Array.isArray(order.items) ? order.items.length : 0;
+const getOrderTicketCode = (order: Order) =>
+  (order.ticketId ?? order.orderNumber ?? '').trim().toUpperCase();
+const isClientTicket = (order: Order) => {
+  const code = getOrderTicketCode(order);
+  if (!code) return true;
+  if (code.startsWith('XL-')) return false;
+  if (code.startsWith('C-')) return true;
+  return true;
+};
+
+const formatOrderChannelLabel = (order: Order) => {
+  const code = (order.ticketId ?? order.orderNumber ?? '').toUpperCase();
+  if (code.startsWith('C-')) {
+    return 'Cliente';
+  }
+  if (code.startsWith('XL-')) {
+    return 'Xoco';
+  }
+  return (order.type ?? 'Web').toUpperCase();
+};
+
+const OrderCard = ({ order, onSelect }: { order: Order; onSelect: (order: Order) => void }) => {
+  const effectiveStatusKey = (order.prepStatus as Order['status']) ?? order.status ?? 'pending';
+  const status = STATUS_LABELS[effectiveStatusKey] ?? STATUS_LABELS.pending;
+  const channelLabel = formatOrderChannelLabel(order);
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(order)}
+      className="w-full rounded-[32px] border border-gray-200 bg-white/95 p-5 text-left text-sm text-gray-900 shadow-sm transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-white/10 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-[0.35em] text-primary-500 dark:text-gray-200">
+            {getOrderDisplayCode(order)}
+          </p>
+          <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {channelLabel === 'CLIENTE' ? 'Pedido cliente' : `Pedido ${channelLabel}`}
+            <span className="text-primary-600 dark:text-primary-100"> · {status}</span>
+          </p>
+        </div>
+        <div className="text-right text-xs uppercase tracking-[0.35em] text-gray-400 dark:text-gray-100">
+          {order.createdAt
+            ? new Date(order.createdAt).toLocaleTimeString('es-MX', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : '--:--'}
+        </div>
+      </div>
+      <p className="mt-1 text-sm text-gray-600 dark:text-gray-200">
+        Cliente: {formatOrderCustomer(order)} · Ticket POS: {order.ticketId ?? 'Sin ticket'}
+      </p>
+      <div className="mt-3 flex items-center justify-between text-xs text-gray-600 dark:text-gray-200">
+        <span>Artículos: {getOrderArticles(order)}</span>
+        <span className="text-base font-semibold text-primary-700 dark:text-gray-50">
+          {formatCurrency(order.total)}
+        </span>
+      </div>
+      <div className="mt-3 grid gap-1 text-xs text-gray-500 dark:text-gray-300">
+        <p>Selecciona para ver detalle.</p>
+      </div>
+    </button>
+  );
+};
+
+const ColumnPager = ({
+  page,
+  totalPages,
+  totalItems,
+  onPrev,
+  onNext,
+}: {
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  onPrev: () => void;
+  onNext: () => void;
+}) => (
+  <div className="mt-4 flex items-center justify-between text-xs text-gray-600 dark:text-white/70">
+    <button
+      type="button"
+      onClick={onPrev}
+      className="rounded-full border border-gray-200 px-3 py-1 font-semibold hover:border-primary-400 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:text-white dark:hover:border-primary-400 dark:hover:text-primary-200"
+      disabled={page === 0}
+    >
+      Anterior
+    </button>
+    <span>
+      Página {page + 1} de {totalPages} · {totalItems} registros
+    </span>
+    <button
+      type="button"
+      onClick={onNext}
+      className="rounded-full border border-gray-200 px-3 py-1 font-semibold hover:border-primary-400 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:text-white dark:hover:border-primary-400 dark:hover:text-primary-200"
+      disabled={page + 1 >= totalPages}
+    >
+      Siguiente
+    </button>
+  </div>
+);
+
+const OrdersBoardColumn = ({
+  title,
+  description,
+  orders,
+  emptyLabel,
+  onSelect,
+}: {
+  title: string;
+  description: string;
+  orders: Order[];
+  emptyLabel: string;
+  onSelect: (order: Order) => void;
+}) => {
+  const pagination = usePagination(orders, 3);
+  return (
+    <div className="rounded-3xl border border-[#e8eaef] bg-white p-5 text-gray-900 shadow-sm dark:border-white/10 dark:bg-[#070d1a] dark:text-white">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.35em] text-primary-600 dark:text-primary-200">
+            {title}
+          </p>
+          <p className="text-lg font-semibold text-gray-900 dark:text-white">
+            {orders.length} pedidos
+          </p>
+          <p className="text-xs text-gray-500 dark:text-white/60">{description}</p>
+        </div>
+        <span className="text-xs text-gray-500 dark:text-white/60">
+          {pagination.totalItems > 3
+            ? `Mostrando ${pagination.items.length} de ${pagination.totalItems}`
+            : null}
+        </span>
+      </div>
+      <div className="mt-4 space-y-3">
+        {orders.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-[#e8eaef] bg-gray-50 px-4 py-3 text-sm text-gray-500 dark:border-white/10 dark:bg-[#070d1a] dark:text-white/70">
+            {emptyLabel}
+          </p>
+        ) : (
+          pagination.items.map((order) => (
+            <OrderCard key={order.id} order={order} onSelect={onSelect} />
+          ))
+        )}
+      </div>
+      {pagination.hasPagination && (
+        <ColumnPager
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          onPrev={pagination.prev}
+          onNext={pagination.next}
+        />
+      )}
+    </div>
+  );
+};
+
+const HistoricalModal = ({
+  open,
+  onClose,
+  orders,
+}: {
+  open: boolean;
+  onClose: () => void;
+  orders: Order[];
+}) => {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [onClose]);
+
+  const updateScrollProgress = () => {
+    const container = listRef.current;
+    if (!container) {
+      setScrollProgress(0);
+      return;
+    }
+    const maxScroll = container.scrollHeight - container.clientHeight;
+    if (maxScroll <= 0) {
+      setScrollProgress(0);
+      return;
+    }
+    const nextProgress = (container.scrollTop / maxScroll) * 100;
+    setScrollProgress(nextProgress);
+  };
+
+  const handleSliderChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const container = listRef.current;
+    if (!container) return;
+    const value = Number(event.target.value);
+    setScrollProgress(value);
+    const maxScroll = container.scrollHeight - container.clientHeight;
+    container.scrollTop = (value / 100) * maxScroll;
+  };
+
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center px-3 py-6 sm:px-6"
+      role="presentation"
+    >
+      <div className="relative flex h-full w-full items-center justify-center">
+        <button
+          type="button"
+          className="absolute inset-0 h-full w-full bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          aria-label="Cerrar registros históricos"
+          onClick={onClose}
+        />
+        <div className="relative z-10 mx-auto flex h-full min-h-full max-w-4xl items-center justify-center">
+          <div
+            className="flex h-full min-h-0 w-full max-w-md flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white text-gray-900 shadow-2xl dark:border-white/10 dark:bg-[#070d1a] dark:text-white"
+            style={{ maxHeight: 'calc(100vh - 96px)', height: 'calc(100vh - 96px)' }}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-5 pb-3 pt-5 dark:border-white/10">
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-primary-600 dark:text-primary-200">
+                  Histórico
+                </p>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Pedidos vencidos
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-white/60">
+                  Pedidos que pasaron el corte 23:59 · se depuran cada 48 horas.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/40 dark:bg-white dark:text-gray-900 dark:hover:bg-white/80"
+              >
+                Cerrar
+              </button>
+            </div>
+            <div
+              className="mx-auto mt-2 mb-4 h-1 w-12 rounded-full bg-gray-200 md:hidden"
+              aria-hidden
+            />
+            <div
+              className="scrollable flex-1 min-h-0 space-y-3 overflow-y-scroll overscroll-contain px-5 pb-4 pr-2"
+              ref={listRef}
+              onScroll={updateScrollProgress}
+              role="region"
+              aria-label="Registros históricos"
+              style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
+              onWheelCapture={(event) => event.stopPropagation()}
+              onTouchMoveCapture={(event) => event.stopPropagation()}
+            >
+              {orders.length === 0 ? (
+                <p className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500 dark:border-white/15 dark:bg-[#111b31] dark:text-white/70">
+                  No hay pedidos históricos disponibles.
+                </p>
+              ) : (
+                orders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="rounded-2xl border border-gray-200 p-4 text-sm text-gray-100 shadow-sm !bg-[#111827] dark:border-white/15 dark:!bg-[#111827]"
+                    style={{ backgroundColor: '#111827' }}
+                  >
+                    <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-gray-300 dark:text-white/60">
+                      <span>{getOrderDisplayCode(order)}</span>
+                      <span>
+                        {order.createdAt
+                          ? new Date(order.createdAt).toLocaleString('es-MX')
+                          : '--:--'}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-lg font-semibold text-white dark:text-gray-100">
+                      {formatOrderChannelLabel(order)} · {STATUS_LABELS.past}
+                    </p>
+                    <div className="mt-2 grid gap-1 text-xs text-gray-200 dark:text-gray-300">
+                      <p>Cliente: {formatOrderCustomer(order)}</p>
+                      <p className="font-semibold text-primary-200 dark:text-gray-50">
+                        Total: {formatCurrency(order.total)}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="border-t border-gray-100 px-5 py-3">
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400 dark:text-white/50">
+                  Recorridos
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={scrollProgress}
+                  onChange={handleSliderChange}
+                  className="h-2 flex-1 cursor-pointer appearance-none rounded-full bg-gray-200 accent-primary-500 dark:bg-white/10"
+                  aria-label="Desliza para recorrer los registros históricos"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 function formatCurrency(value?: number | null) {
@@ -55,47 +381,47 @@ export default function OrdersDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showHistoricalModal, setShowHistoricalModal] = useState(false);
+  const [loyaltyNotice, setLoyaltyNotice] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
   const ticketRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
-  // Fetch orders
-  useEffect(() => {
-    if (!user || !token) return;
-    let isMounted = true;
-
-    const fetchOrders = async () => {
-      setIsLoading(true);
-      try {
-        const response = await fetch('/api/orders/history', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        const payload = await response.json();
-        if (!response.ok || !payload.success) {
-          throw new Error(payload.message || 'No pudimos cargar tus pedidos');
-        }
-        if (isMounted) {
-          setOrders(payload.data ?? []);
-        }
-      } catch (err: any) {
-        console.error(err);
-        if (isMounted) {
-          setError(err.message);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+  const loadOrders = useCallback(async () => {
+    if (!token) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/orders/history', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.message || 'No pudimos cargar tus pedidos');
       }
-    };
+      setOrders(payload.data ?? []);
+    } catch (error) {
+      console.error(error);
+      setError(error instanceof Error ? error.message : 'No pudimos cargar tus pedidos');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
 
-    fetchOrders();
-    return () => {
-      isMounted = false;
-    };
-  }, [token, user]);
+  useEffect(() => {
+    if (user && token) {
+      void loadOrders();
+    }
+  }, [loadOrders, token, user]);
+
+  const handleRefreshOrders = useCallback(() => {
+    void loadOrders();
+  }, [loadOrders]);
 
   // Subscribe to realtime updates
   useEffect(() => {
@@ -126,6 +452,7 @@ export default function OrdersDashboardPage() {
             if (!newOrder || typeof newOrder.id !== 'string') {
               return next;
             }
+            const existingRecord = index >= 0 ? next[index] : null;
             const mergedOrder: Order = {
               id: newOrder.id,
               status: (newOrder.status as Order['status']) ?? 'pending',
@@ -133,11 +460,15 @@ export default function OrdersDashboardPage() {
               ticketId: newOrder.ticketId ?? null,
               userEmail: newOrder.userEmail ?? null,
               total: newOrder.total ?? null,
+              tipAmount: typeof newOrder.tipAmount === 'number' ? newOrder.tipAmount : null,
+              tipPercent: typeof newOrder.tipPercent === 'number' ? newOrder.tipPercent : null,
               createdAt: newOrder.createdAt ?? null,
               updatedAt: newOrder.updatedAt ?? null,
               type: newOrder.type ?? null,
               items: newOrder.items,
               shipping: (newOrder.shipping as Order['shipping']) ?? null,
+              prepStatus: existingRecord?.prepStatus ?? null,
+              prepHandlerName: existingRecord?.prepHandlerName ?? null,
             };
 
             if (index >= 0) {
@@ -165,17 +496,116 @@ export default function OrdersDashboardPage() {
     return Date.now() > cutoff.getTime();
   }, []);
 
-  const pendingOrders = useMemo(
-    () => orders.filter((order) => order.status === 'pending' && !isExpiredPending(order)),
-    [orders, isExpiredPending]
+  const shouldAutoCompleteProduction = useCallback((order: Order) => {
+    const productionActive =
+      (order.prepStatus ?? '').toLowerCase() === 'in_progress' || order.status === 'in_progress';
+    if (!productionActive || !order.createdAt) {
+      return false;
+    }
+    const cutoff = new Date(order.createdAt);
+    cutoff.setHours(23, 59, 59, 999);
+    return Date.now() > cutoff.getTime();
+  }, []);
+
+  const getEffectiveStatus = useCallback(
+    (order: Order): Order['status'] => {
+      const normalizedPrep = (order.prepStatus ?? '').toLowerCase();
+      if (normalizedPrep === 'completed') {
+        return 'completed';
+      }
+      if (normalizedPrep === 'in_progress') {
+        return shouldAutoCompleteProduction(order) ? 'completed' : 'in_progress';
+      }
+      if (order.status === 'in_progress') {
+        return shouldAutoCompleteProduction(order) ? 'completed' : 'in_progress';
+      }
+      if (order.status === 'pending') {
+        return isExpiredPending(order) ? 'past' : 'pending';
+      }
+      return order.status;
+    },
+    [isExpiredPending, shouldAutoCompleteProduction]
   );
-  const completedOrders = useMemo(
-    () => orders.filter((order) => order.status !== 'pending' || isExpiredPending(order)),
-    [orders, isExpiredPending]
-  );
+
+  const boardColumns = useMemo(() => {
+    const pendingBucket: Order[] = [];
+    const prepBucket: Order[] = [];
+    const completedBucket: Order[] = [];
+
+    orders.forEach((order) => {
+      const status = getEffectiveStatus(order);
+      if (status === 'pending') {
+        pendingBucket.push(order);
+      } else if (status === 'in_progress') {
+        prepBucket.push(order);
+      } else if (status === 'completed') {
+        completedBucket.push(order);
+      }
+    });
+
+    const pastBucket = orders.filter((order) => getEffectiveStatus(order) === 'past');
+
+    return {
+      columns: [
+        {
+          key: 'pending' as const,
+          label: 'Pendientes',
+          description: 'Pedidos que aún no entran a barra',
+          orders: pendingBucket,
+        },
+        {
+          key: 'in_progress' as const,
+          label: 'En preparación',
+          description: 'Baristas trabajando en el pedido',
+          orders: prepBucket,
+        },
+        {
+          key: 'completed' as const,
+          label: 'Completados',
+          description: 'Listos para entregar o ya recolectados',
+          orders: completedBucket,
+        },
+      ],
+      pastBucket,
+    };
+  }, [getEffectiveStatus, orders]);
+
+  const pendingOrders =
+    boardColumns.columns.find((column) => column.key === 'pending')?.orders ?? [];
+  const prepOrders =
+    boardColumns.columns.find((column) => column.key === 'in_progress')?.orders ?? [];
+  const completedOrdersList =
+    boardColumns.columns.find((column) => column.key === 'completed')?.orders ?? [];
+  const pendingClientOrders = pendingOrders.filter((order) => isClientTicket(order));
   const MAX_ACTIVE_ORDERS = 3;
-  const hasReachedOrderLimit = pendingOrders.length >= MAX_ACTIVE_ORDERS;
+  const hasReachedOrderLimit = pendingClientOrders.length >= MAX_ACTIVE_ORDERS;
   const expiredSelectedOrder = selectedOrder ? isExpiredPending(selectedOrder) : false;
+  const selectedOrderEffectiveStatus = selectedOrder ? getEffectiveStatus(selectedOrder) : null;
+  const shouldShowQr = selectedOrder
+    ? (selectedOrderEffectiveStatus ?? selectedOrder.status) !== 'completed' &&
+      !expiredSelectedOrder
+    : false;
+  const {
+    showReminder: showLoyaltyReminder,
+    isActivating: isActivatingLoyalty,
+    activate: activateLoyaltyProgram,
+  } = useLoyaltyReminder({
+    userId: user?.id,
+    enrolled: user?.loyaltyEnrolled ?? false,
+    token,
+  });
+
+  const handleLoyaltyActivation = useCallback(async () => {
+    const result = await activateLoyaltyProgram();
+    setLoyaltyNotice({
+      type: result.success ? 'success' : 'error',
+      message:
+        result.message ??
+        (result.success
+          ? 'Activamos tu programa de lealtad. Ya puedes acumular sellos.'
+          : 'No pudimos activar tu programa de lealtad. Intenta más tarde.'),
+    });
+  }, [activateLoyaltyProgram]);
 
   const handleDownloadTicket = async () => {
     if (!selectedOrder || !ticketRef.current) return;
@@ -183,6 +613,7 @@ export default function OrdersDashboardPage() {
     const canvas = await html2canvas(ticketRef.current, {
       scale: 2,
       backgroundColor: '#ffffff',
+      useCORS: true,
     });
     const dataUrl = canvas.toDataURL('image/png');
     const link = document.createElement('a');
@@ -199,6 +630,14 @@ export default function OrdersDashboardPage() {
     }
   }, [selectedOrder]);
 
+  useEffect(() => {
+    if (!loyaltyNotice) {
+      return undefined;
+    }
+    const timeout = setTimeout(() => setLoyaltyNotice(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [loyaltyNotice]);
+
   const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) {
       setSelectedOrder(null);
@@ -212,51 +651,24 @@ export default function OrdersDashboardPage() {
     }
   };
 
-  const renderOrdersList = (ordersList: Order[], title: string) => (
-    <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
-        <span className="text-sm text-gray-500">{ordersList.length} pedidos</span>
-      </div>
-
-      {ordersList.length === 0 ? (
-        <p className="text-sm text-gray-500">No hay pedidos en esta categoría.</p>
-      ) : (
-        <div className="divide-y divide-gray-100 dark:divide-gray-800">
-          {ordersList.map((order) => (
-            <button
-              key={order.id}
-              type="button"
-              onClick={() => setSelectedOrder(order)}
-              className="flex w-full items-center justify-between gap-4 py-4 text-left transition hover:bg-gray-50 dark:hover:bg-gray-800/60"
-            >
-              <div className="flex items-center gap-4">
-                <div>
-                  <p className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    <span
-                      className={`h-2.5 w-2.5 rounded-full ${STATUS_STYLES[order.status]}`}
-                      aria-hidden="true"
-                    />
-                    <span>Ticket {order.ticketId ?? order.orderNumber ?? order.id}</span>
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {order.createdAt ? new Date(order.createdAt).toLocaleString('es-MX') : ''}
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  {formatCurrency(order.total)}
-                </p>
-                <p className="text-xs text-gray-500">{STATUS_LABELS[order.status]}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </section>
-  );
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return undefined;
+    }
+    const originalBody = document.body.style.overflow;
+    const originalHtml = document.documentElement.style.overflow;
+    if (selectedOrder || showHistoricalModal) {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = originalBody;
+      document.documentElement.style.overflow = originalHtml;
+    };
+  }, [selectedOrder, showHistoricalModal]);
 
   if (!user || !token) {
     return (
@@ -282,35 +694,77 @@ export default function OrdersDashboardPage() {
           <p className="text-xs uppercase tracking-[0.35em] text-primary-500">Panel</p>
           <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Mis pedidos</h1>
           <p className="text-sm text-gray-500">
-            Visualiza el estado de tus pedidos web o POS en tiempo real.
+            Visualiza el estado de tus pedidos o los que realicemos por ti en tiempo real.
           </p>
         </div>
-        {hasReachedOrderLimit ? (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <button
             type="button"
-            disabled
-            className="inline-flex items-center justify-center rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-400 cursor-not-allowed dark:border-gray-600 dark:text-gray-500"
+            onClick={handleRefreshOrders}
+            disabled={isLoading}
+            className="inline-flex items-center justify-center rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-white/5"
           >
-            Crear nuevo pedido
+            {isLoading ? 'Actualizando...' : 'Actualizar lista'}
           </button>
-        ) : (
-          <Link
-            href="/order"
-            className="inline-flex items-center justify-center rounded-full bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-primary-700"
-          >
-            Crear nuevo pedido
-          </Link>
-        )}
+          {hasReachedOrderLimit ? (
+            <button
+              type="button"
+              disabled
+              className="inline-flex items-center justify-center rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-400 cursor-not-allowed dark:border-gray-600 dark:text-gray-500"
+            >
+              Crear nuevo pedido
+            </button>
+          ) : (
+            <Link
+              href="/order"
+              className="inline-flex items-center justify-center rounded-full bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-primary-700"
+            >
+              Crear nuevo pedido
+            </Link>
+          )}
+        </div>
       </header>
+      {loyaltyNotice && (
+        <div
+          className={`mb-4 rounded-full px-4 py-2 text-sm font-semibold ${
+            loyaltyNotice.type === 'success'
+              ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
+              : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-100'
+          }`}
+        >
+          {loyaltyNotice.message}
+        </div>
+      )}
+      {showLoyaltyReminder && (
+        <LoyaltyReminderCard
+          onActivate={handleLoyaltyActivation}
+          isLoading={isActivatingLoyalty}
+          className="mb-6"
+        />
+      )}
+      <div className="mb-6 flex flex-wrap items-center justify-center gap-2 rounded-3xl bg-primary-50 px-4 py-3 text-sm text-primary-900 shadow-sm dark:bg-primary-900/30 dark:text-primary-100">
+        <span>Si necesitas ayuda, mándanos un</span>
+        <a
+          href={siteMetadata.whats}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-primary-500 shadow dark:bg-[#0f1728]"
+          aria-label="WhatsApp"
+        >
+          <FaWhatsapp />
+        </a>
+        <span>y con todo gusto te ayudamos.</span>
+      </div>
       {hasReachedOrderLimit && (
         <div className="mb-6 rounded-xl bg-amber-100 px-4 py-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">
-          Solo puedes tener 3 pedidos pendientes al mismo tiempo. Finaliza o cancela uno para crear
-          otro.
+          Solo puedes tener 3 pedidos pendientes creados desde la app. Finaliza o cancela un ticket
+          que empiece con C- para generar otro.
         </div>
       )}
       <div className="mb-6 rounded-xl bg-orange-50 px-4 py-3 text-sm text-orange-900 dark:bg-orange-900/30 dark:text-orange-100">
-        Si no acudiste antes del corte (23:59), movemos el ticket a seguimiento en color naranja y
-        eliminamos su QR. El registro se conserva por 7 días.
+        Si no acudiste antes del corte (23:59), movemos el ticket a seguimiento en color naranja,
+        eliminamos su QR y conservamos el registro únicamente durante 48 horas para referencias
+        internas.
       </div>
 
       {error && (
@@ -319,122 +773,200 @@ export default function OrdersDashboardPage() {
         </div>
       )}
 
-      {isLoading ? (
-        <p className="text-sm text-gray-500">Cargando pedidos...</p>
-      ) : (
-        <div className="grid gap-6">
-          {renderOrdersList(pendingOrders, 'Pendientes')}
-          {renderOrdersList(completedOrders, 'Completados / Pasados')}
-        </div>
-      )}
+      <section aria-live="polite" className="space-y-4">
+        {isLoading ? (
+          <div className="grid gap-4 md:grid-cols-3">
+            {[1, 2, 3].map((skeleton) => (
+              <div
+                key={skeleton}
+                className="rounded-3xl border border-gray-200 bg-white p-5 text-gray-500 shadow-sm dark:border-white/10 dark:bg-[#070d1a] dark:text-white/80"
+              >
+                <div className="mb-4 h-5 w-32 animate-pulse rounded-full bg-gray-200 dark:bg-white/10" />
+                <div className="space-y-3">
+                  {[1, 2, 3].map((card) => (
+                    <div
+                      // eslint-disable-next-line react/no-array-index-key
+                      key={card}
+                      className="h-24 rounded-2xl border border-dashed border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#070d1a]"
+                    >
+                      <span className="sr-only">Cargando tarjeta</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div
+              className="grid gap-6 lg:grid-cols-3"
+              aria-live="polite"
+              aria-label="Tablero de pedidos"
+            >
+              <OrdersBoardColumn
+                title="Pendientes"
+                description="Pedidos que aún no entran a barra"
+                orders={pendingOrders}
+                emptyLabel="No hay pedidos en pendientes."
+                onSelect={(value) => setSelectedOrder(value)}
+              />
+              <OrdersBoardColumn
+                title="En producción"
+                description="Baristas trabajando en el pedido"
+                orders={prepOrders}
+                emptyLabel="No hay pedidos en producción."
+                onSelect={(value) => setSelectedOrder(value)}
+              />
+              <OrdersBoardColumn
+                title="Completados"
+                description="Listos para entregar o ya recolectados"
+                orders={completedOrdersList}
+                emptyLabel="No hay pedidos completados recientes."
+                onSelect={(value) => setSelectedOrder(value)}
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowHistoricalModal(true)}
+                className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-5 py-2 text-sm font-semibold text-white shadow transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                Histórico ({boardColumns.pastBucket.length})
+                <span className="text-xs text-white/80 dark:text-white/70">Abrir registros</span>
+              </button>
+            </div>
+          </>
+        )}
+      </section>
 
       {selectedOrder && (
         <div
           ref={overlayRef}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 py-6 sm:px-4"
           onClick={handleOverlayClick}
           onKeyDown={handleOverlayKeyDown}
           role="presentation"
           tabIndex={-1}
         >
           <div
-            className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl dark:bg-gray-900"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="order-detail-title"
+            className="flex w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-gray-900"
+            style={{ maxHeight: 'calc(100vh - 96px)', height: 'calc(100vh - 96px)' }}
           >
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.35em] text-primary-500">Pedido</p>
-                <h3
-                  id="order-detail-title"
-                  className="text-xl font-semibold text-gray-900 dark:text-white"
+            <div
+              className="scrollable flex-1 overscroll-contain px-5 py-5"
+              aria-labelledby="order-detail-title"
+              style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
+              onWheelCapture={(event) => event.stopPropagation()}
+              onTouchMoveCapture={(event) => event.stopPropagation()}
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.35em] text-primary-500">Pedido</p>
+                  <h3
+                    id="order-detail-title"
+                    className="text-xl font-semibold text-gray-900 dark:text-white"
+                  >
+                    Ticket {selectedOrder.ticketId ?? selectedOrder.orderNumber ?? selectedOrder.id}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrder(null)}
+                  className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200"
+                  aria-label="Cerrar modal"
                 >
-                  Ticket {selectedOrder.ticketId ?? selectedOrder.orderNumber ?? selectedOrder.id}
-                </h3>
+                  ×
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedOrder(null)}
-                className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200"
-                aria-label="Cerrar modal"
-              >
-                ×
-              </button>
-            </div>
 
-            <div className="space-y-3 text-sm text-gray-600 dark:text-gray-300">
-              <p>
-                <span className="font-semibold text-gray-800 dark:text-gray-100">Estado:</span>{' '}
-                {STATUS_LABELS[selectedOrder.status]}
-              </p>
-              <p>
-                <span className="font-semibold text-gray-800 dark:text-gray-100">Creado:</span>{' '}
-                {selectedOrder.createdAt
-                  ? new Date(selectedOrder.createdAt).toLocaleString('es-MX')
-                  : '---'}
-              </p>
-              <p>
-                <span className="font-semibold text-gray-800 dark:text-gray-100">Total:</span>{' '}
-                {formatCurrency(selectedOrder.total)}
-              </p>
-            </div>
-
-            {expiredSelectedOrder ? (
-              <div className="mt-6 rounded-2xl border border-dashed border-orange-200 bg-orange-50 p-4 text-sm text-orange-900 dark:border-orange-900/50 dark:bg-orange-900/20 dark:text-orange-100">
-                El ticket ya no está disponible porque no se completó antes del corte del día. Solo
-                conservamos su descripción para referencia.
-              </div>
-            ) : (
-              <div className="mt-6 flex justify-center">
-                <VirtualTicket order={selectedOrder} ref={ticketRef} />
-              </div>
-            )}
-
-            {selectedOrder.shipping?.address && (
-              <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
-                <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-300">
-                  Detalles de entrega
-                </h4>
+              <div className="space-y-3 text-sm text-gray-600 dark:text-gray-300">
                 <p>
-                  {selectedOrder.shipping.address.street}
-                  {selectedOrder.shipping.address.city
-                    ? `, ${selectedOrder.shipping.address.city}`
-                    : ''}
-                  {selectedOrder.shipping.address.state
-                    ? `, ${selectedOrder.shipping.address.state}`
-                    : ''}
-                  {selectedOrder.shipping.address.postalCode
-                    ? ` · CP ${selectedOrder.shipping.address.postalCode}`
-                    : ''}
+                  <span className="font-semibold text-gray-800 dark:text-gray-100">Estado:</span>{' '}
+                  {STATUS_LABELS[selectedOrderEffectiveStatus ?? selectedOrder.status]}
                 </p>
-                {selectedOrder.shipping.address.reference && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Referencia: {selectedOrder.shipping.address.reference}
+                {selectedOrder.prepHandlerName && (
+                  <p>
+                    <span className="font-semibold text-gray-800 dark:text-gray-100">
+                      Preparado por:
+                    </span>{' '}
+                    {selectedOrder.prepHandlerName}
                   </p>
                 )}
-                <p className="mt-2 text-sm font-medium">
-                  Contacto:{' '}
-                  {selectedOrder.shipping.contactPhone
-                    ? selectedOrder.shipping.contactPhone
-                    : 'No especificado'}{' '}
-                  {selectedOrder.shipping.isWhatsapp ? '(WhatsApp)' : ''}
+                <p>
+                  <span className="font-semibold text-gray-800 dark:text-gray-100">Creado:</span>{' '}
+                  {selectedOrder.createdAt
+                    ? new Date(selectedOrder.createdAt).toLocaleString('es-MX')
+                    : '---'}
+                </p>
+                <p>
+                  <span className="font-semibold text-gray-800 dark:text-gray-100">Total:</span>{' '}
+                  {formatCurrency(selectedOrder.total)}
                 </p>
               </div>
-            )}
 
-            {selectedOrder.status === 'pending' && !expiredSelectedOrder && (
-              <button
-                type="button"
-                onClick={() => void handleDownloadTicket()}
-                className="mt-6 w-full rounded-full bg-primary-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-700"
-              >
-                Descargar Ticket
-              </button>
-            )}
+              {expiredSelectedOrder ? (
+                <div className="mt-6 rounded-2xl border border-dashed border-orange-200 bg-orange-50 p-4 text-sm text-orange-900 dark:border-orange-900/50 dark:bg-orange-900/20 dark:text-orange-100">
+                  El ticket ya no está disponible porque no se completó antes del corte del día.
+                  Solo conservamos su descripción para referencia.
+                </div>
+              ) : (
+                <div className="mt-6 flex justify-center">
+                  <VirtualTicket order={selectedOrder} ref={ticketRef} showQr={shouldShowQr} />
+                </div>
+              )}
+
+              {selectedOrder.shipping?.address && (
+                <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
+                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-300">
+                    Detalles de entrega
+                  </h4>
+                  <p>
+                    {selectedOrder.shipping.address.street}
+                    {selectedOrder.shipping.address.city
+                      ? `, ${selectedOrder.shipping.address.city}`
+                      : ''}
+                    {selectedOrder.shipping.address.state
+                      ? `, ${selectedOrder.shipping.address.state}`
+                      : ''}
+                    {selectedOrder.shipping.address.postalCode
+                      ? ` · CP ${selectedOrder.shipping.address.postalCode}`
+                      : ''}
+                  </p>
+                  {selectedOrder.shipping.address.reference && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Referencia: {selectedOrder.shipping.address.reference}
+                    </p>
+                  )}
+                  <p className="mt-2 text-sm font-medium">
+                    Contacto:{' '}
+                    {selectedOrder.shipping.contactPhone
+                      ? selectedOrder.shipping.contactPhone
+                      : 'No especificado'}{' '}
+                    {selectedOrder.shipping.isWhatsapp ? '(WhatsApp)' : ''}
+                  </p>
+                </div>
+              )}
+
+              {selectedOrder.status === 'pending' && !expiredSelectedOrder && (
+                <div className="border-t border-gray-100 pb-2 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => void handleDownloadTicket()}
+                    className="w-full rounded-full bg-primary-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-700"
+                  >
+                    Descargar Ticket
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
+      <HistoricalModal
+        open={showHistoricalModal}
+        onClose={() => setShowHistoricalModal(false)}
+        orders={boardColumns.pastBucket}
+      />
     </div>
   );
 }

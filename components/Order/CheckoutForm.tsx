@@ -18,6 +18,13 @@ const formatCurrency = (value: number) =>
     minimumFractionDigits: 2,
   }).format(value);
 
+const TIP_PRESETS = [5, 10, 15, 20];
+
+const parsePositiveNumber = (value: string) => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+};
+
 export default function CheckoutForm({ token, user }: CheckoutFormProps) {
   const router = useRouter();
   const { items, subtotal, clearCart } = useCartStore();
@@ -29,6 +36,11 @@ export default function CheckoutForm({ token, user }: CheckoutFormProps) {
   const [orderNotes, setOrderNotes] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tipSelection, setTipSelection] = useState<'preset' | 'custom' | null>(null);
+  const [selectedTipPercent, setSelectedTipPercent] = useState<number | null>(null);
+  const [customTipPercent, setCustomTipPercent] = useState('');
+  const [customTipAmount, setCustomTipAmount] = useState('');
+  const [useCustomTipAmount, setUseCustomTipAmount] = useState(false);
   const [shippingForm, setShippingForm] = useState({
     street: '',
     city: '',
@@ -64,6 +76,16 @@ export default function CheckoutForm({ token, user }: CheckoutFormProps) {
     }
   }, [needsShipping]);
 
+  useEffect(() => {
+    if (items.length === 0) {
+      setTipSelection(null);
+      setSelectedTipPercent(null);
+      setCustomTipPercent('');
+      setCustomTipAmount('');
+      setUseCustomTipAmount(false);
+    }
+  }, [items.length]);
+
   const idPrefix = useId();
   const fieldIds = {
     needsShipping: `${idPrefix}-needs-shipping`,
@@ -97,6 +119,47 @@ export default function CheckoutForm({ token, user }: CheckoutFormProps) {
       saveContactPhone: saveNewPhone && !useSavedPhone,
       isWhatsapp,
     };
+
+  const { tipAmount, appliedPercent } = useMemo(() => {
+    if (subtotal <= 0) {
+      return { tipAmount: 0, appliedPercent: null as number | null };
+    }
+    let amount = 0;
+    let percent: number | null = null;
+
+    if (tipSelection === 'preset' && typeof selectedTipPercent === 'number') {
+      percent = selectedTipPercent;
+      amount = subtotal * (percent / 100);
+    } else if (tipSelection === 'custom') {
+      if (useCustomTipAmount) {
+        const parsedAmount = parsePositiveNumber(customTipAmount);
+        if (parsedAmount !== null) {
+          amount = parsedAmount;
+          percent = subtotal > 0 ? (parsedAmount / subtotal) * 100 : null;
+        }
+      } else {
+        const parsedPercent = parsePositiveNumber(customTipPercent);
+        if (parsedPercent !== null) {
+          percent = parsedPercent;
+          amount = subtotal * (parsedPercent / 100);
+        }
+      }
+    }
+
+    return {
+      tipAmount: Number.isFinite(amount) ? Math.max(0, amount) : 0,
+      appliedPercent: percent,
+    };
+  }, [
+    subtotal,
+    tipSelection,
+    selectedTipPercent,
+    customTipPercent,
+    customTipAmount,
+    useCustomTipAmount,
+  ]);
+
+  const totalWithTip = subtotal + tipAmount;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -136,8 +199,18 @@ export default function CheckoutForm({ token, user }: CheckoutFormProps) {
             name: item.name,
             price: item.price,
             quantity: item.quantity,
+            category: item.category ?? null,
+            size: item.size ?? null,
+            packageItems: item.packageItems ?? null,
           })),
-          totalAmount: subtotal,
+          totalAmount: totalWithTip,
+          totals: {
+            subtotal,
+            tip: tipAmount,
+            total: totalWithTip,
+          },
+          tipAmount,
+          tipPercent: appliedPercent,
           notes: orderNotes,
           needsShipping,
           shipping: shippingDetails ?? null,
@@ -164,6 +237,127 @@ export default function CheckoutForm({ token, user }: CheckoutFormProps) {
       onSubmit={handleSubmit}
       className="mt-6 space-y-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900"
     >
+      <div className="space-y-3 rounded-lg border border-primary-100 bg-white p-4 text-sm dark:border-primary-700 dark:bg-primary-900/10">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="font-semibold text-primary-900 dark:text-primary-100">Propina (opcional)</p>
+          <span className="text-xs text-gray-500 dark:text-gray-300">
+            Propina aplicada:{' '}
+            {tipAmount > 0 ? (
+              <>
+                <span className="font-semibold text-primary-700 dark:text-primary-200">
+                  {formatCurrency(tipAmount)}
+                </span>
+                {typeof appliedPercent === 'number' && ` (${appliedPercent.toFixed(1)}%)`}
+              </>
+            ) : (
+              <span className="font-semibold text-gray-500 dark:text-gray-300">Sin propina</span>
+            )}
+          </span>
+        </div>
+        <div className="grid grid-cols-5 gap-2 text-xs">
+          {TIP_PRESETS.map((percent) => {
+            const isActive = tipSelection === 'preset' && selectedTipPercent === percent;
+            return (
+              <button
+                type="button"
+                key={percent}
+                onClick={() => {
+                  if (isActive) {
+                    setTipSelection(null);
+                    setSelectedTipPercent(null);
+                  } else {
+                    setTipSelection('preset');
+                    setSelectedTipPercent(percent);
+                  }
+                  setCustomTipPercent('');
+                  setCustomTipAmount('');
+                  setUseCustomTipAmount(false);
+                }}
+                className={clsx(
+                  'rounded-2xl border px-2 py-1 font-semibold transition',
+                  isActive
+                    ? 'border-primary-500 bg-primary-100 text-primary-700'
+                    : 'border-primary-100 text-primary-700 hover:border-primary-200 dark:border-primary-700 dark:text-primary-100'
+                )}
+              >
+                {percent}%
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => {
+              if (tipSelection === 'custom') {
+                setTipSelection(null);
+                setUseCustomTipAmount(false);
+                setCustomTipPercent('');
+                setCustomTipAmount('');
+              } else {
+                setTipSelection('custom');
+                setSelectedTipPercent(null);
+              }
+            }}
+            className={clsx(
+              'rounded-2xl border px-2 py-1 font-semibold transition',
+              tipSelection === 'custom'
+                ? 'border-primary-500 bg-primary-100 text-primary-700'
+                : 'border-primary-100 text-primary-700 hover:border-primary-200 dark:border-primary-700 dark:text-primary-100'
+            )}
+          >
+            Personalizar
+          </button>
+        </div>
+        {tipSelection === 'custom' && (
+          <div className="space-y-3">
+            <label className="inline-flex items-center gap-2 text-xs font-semibold text-primary-900 dark:text-primary-100">
+              <input
+                type="checkbox"
+                checked={useCustomTipAmount}
+                onChange={(event) => {
+                  setUseCustomTipAmount(event.target.checked);
+                  setCustomTipPercent('');
+                  setCustomTipAmount('');
+                }}
+                className="h-4 w-4 rounded border-primary-300 text-primary-600 focus:ring-primary-500"
+              />
+              Capturar propina como monto fijo
+            </label>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="space-y-1 text-xs uppercase tracking-wide text-primary-800 dark:text-primary-100">
+                Porcentaje
+                <input
+                  type="number"
+                  value={customTipPercent}
+                  onChange={(event) => setCustomTipPercent(event.target.value)}
+                  min="0"
+                  step="0.5"
+                  disabled={useCustomTipAmount}
+                  className="w-full rounded-md border border-primary-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
+                  placeholder="0%"
+                />
+              </label>
+              <label className="space-y-1 text-xs uppercase tracking-wide text-primary-800 dark:text-primary-100">
+                Monto MXN
+                <input
+                  type="number"
+                  value={customTipAmount}
+                  onChange={(event) => setCustomTipAmount(event.target.value)}
+                  min="0"
+                  step="0.5"
+                  disabled={!useCustomTipAmount}
+                  className="w-full rounded-md border border-primary-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
+                  placeholder="$0.00"
+                />
+              </label>
+            </div>
+          </div>
+        )}
+        <p className="text-xs text-gray-500 dark:text-gray-300">
+          Gracias por reconocer al equipo. Tu propina se suma al fondo del mes y se distribuye entre
+          baristas y gerentes.
+        </p>
+      </div>
+
       <div>
         <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
           <input
@@ -378,6 +572,14 @@ export default function CheckoutForm({ token, user }: CheckoutFormProps) {
           <span className="font-semibold text-primary-700 dark:text-primary-300">
             {formatCurrency(subtotal)}
           </span>
+        </div>
+        <div className="mt-2 flex items-center justify-between text-gray-600 dark:text-gray-200">
+          <span>Propina</span>
+          <span className="font-semibold">{formatCurrency(tipAmount)}</span>
+        </div>
+        <div className="mt-3 flex items-center justify-between text-base font-semibold text-primary-900 dark:text-primary-100">
+          <span>Total estimado</span>
+          <span>{formatCurrency(totalWithTip)}</span>
         </div>
         <p className="mt-1 text-xs text-gray-500">
           Los costos de envío se calculan al confirmar tu pedido.

@@ -14,10 +14,34 @@ html::-webkit-scrollbar {
   display: none;
 }
 
+.scrollable {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(190, 75, 12, 0.6) transparent;
+}
+
+.scrollable::-webkit-scrollbar {
+  display: block;
+  width: 8px;
+}
+
+.scrollable::-webkit-scrollbar-track {
+  background-color: rgba(226, 232, 240, 0.6);
+  border-radius: 9999px;
+}
+
+.scrollable::-webkit-scrollbar-thumb {
+  background-color: rgba(190, 75, 12, 0.7);
+  border-radius: 9999px;
+}
+
 /* https://stackoverflow.com/questions/61083813/how-to-avoid-internal-autofill-selected-style-to-be-applied */
 input:-webkit-autofill,
 input:-webkit-autofill:focus {
-  transition: background-color 600000s 0s, color 600000s 0s;
+  transition:
+    background-color 600000s 0s,
+    color 600000s 0s;
 }
 
 .underline-magical {

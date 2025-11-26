@@ -197,6 +197,7 @@ export interface AuthUser {
   favoriteHotDrink?: string | null;
   favoriteFood?: string | null;
   weeklyCoffeeCount?: number;
+  loyaltyEnrolled?: boolean;
   monthlyMetrics?: any;
   termsAccepted: boolean;
   privacyAccepted: boolean;

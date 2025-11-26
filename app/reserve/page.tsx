@@ -1,12 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { DayPicker } from 'react-day-picker';
+import { FaWhatsapp } from 'react-icons/fa';
 import '@/css/react-day-picker.css';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import OrderReserveFlipCard from '@/components/Order/OrderReserveFlipCard';
+import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
+import siteMetadata from 'content/siteMetadata';
 import { DEFAULT_BRANCH_ID } from '@/lib/reservations';
+import { usePagination } from '@/hooks/use-pagination';
+import { cancelReservation } from '@/lib/reservations-client';
+import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
 
 const MAX_PEOPLE = 15;
 const BRANCH_ID = DEFAULT_BRANCH_ID;
@@ -98,6 +104,25 @@ interface FailedReservationRecord extends BaseReservationRecord {
   cleanupAt: string;
 }
 
+interface ReservationQrPayload {
+  reservationId: string;
+  code: string;
+  user: string;
+  date: string;
+  time: string;
+  people: number;
+  branch: string;
+  branchNumber: string | number | null;
+  message: string | null;
+  preOrderItems?: string | null;
+}
+
+type DetailActionState = {
+  isLoading: boolean;
+  message: string | null;
+  error: string | null;
+};
+
 const formatDateForApi = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
     date.getDate()
@@ -107,6 +132,65 @@ const buildSlotDateTime = (reservationDate: string, reservationTime: string) => 
   const [hours, minutes] = reservationTime.split(':').map(Number);
   const [year, month, day] = reservationDate.split('-').map(Number);
   return new Date(year, (month || 1) - 1, day || 1, hours || 0, minutes || 0, 0, 0);
+};
+
+const parseReservationDate = (reservation: ReservationRecord) => {
+  if (!reservation.reservationDate) {
+    return null;
+  }
+  const isoCandidate = `${reservation.reservationDate}T${reservation.reservationTime || '00:00'}`;
+  const parsed = new Date(isoCandidate);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const formatReservationDateTime = (reservation: ReservationRecord) => {
+  const parsed = parseReservationDate(reservation);
+  if (!parsed) {
+    return `${reservation.reservationDate} · ${reservation.reservationTime ?? '--:--'} hrs`;
+  }
+  return parsed.toLocaleString('es-MX', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const buildReservationSearchTerms = (reservation: ReservationRecord) => {
+  return [
+    reservation.id,
+    reservation.reservationCode,
+    reservation.reservationDate,
+    String(reservation.peopleCount),
+  ].filter((value): value is string => Boolean(value && value.trim()));
+};
+
+const groupClientReservations = (reservations: ReservationRecord[]) => {
+  const now = new Date();
+  const pending: ReservationRecord[] = [];
+  const past: ReservationRecord[] = [];
+  const completed: ReservationRecord[] = [];
+
+  reservations.forEach((reservation) => {
+    const status = (reservation.status ?? 'pending').toLowerCase();
+    if (status === 'completed') {
+      completed.push({ ...reservation, status: 'completed' });
+      return;
+    }
+    if (status === 'cancelled' || status === 'past') {
+      past.push({ ...reservation, status: 'past' });
+      return;
+    }
+    const parsed = parseReservationDate(reservation);
+    if (parsed && parsed < now) {
+      past.push({ ...reservation, status: 'past' });
+      return;
+    }
+    pending.push(reservation);
+  });
+
+  return { pending, past, completed };
 };
 
 const formatReservationDate = (
@@ -161,12 +245,45 @@ export default function ReservePage() {
   const [isLoadingReservations, setIsLoadingReservations] = useState(false);
   const [reservationsError, setReservationsError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(() => new Date());
-  const reservationCardRefs = useRef<Record<string, HTMLLIElement | null>>({});
+  const [reservationFilter, setReservationFilter] = useState('');
+  const [selectedReservation, setSelectedReservation] = useState<ReservationRecord | null>(null);
+  const [showReservationHistory, setShowReservationHistory] = useState(false);
+  const [showReservationCompletedHistory, setShowReservationCompletedHistory] = useState(false);
+  const [reservationActionState, setReservationActionState] = useState<DetailActionState>({
+    isLoading: false,
+    message: null,
+    error: null,
+  });
+  const [reservationToast, setReservationToast] = useState<string | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 60 * 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!reservationToast) {
+      return;
+    }
+    const timeout = setTimeout(() => setReservationToast(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [reservationToast]);
+
+  const loyaltyReminder = useLoyaltyReminder({
+    userId: user?.id,
+    enrolled: user?.loyaltyEnrolled ?? false,
+    token,
+  });
+
+  const handleActivateLoyaltyReminder = useCallback(async () => {
+    const result = await loyaltyReminder.activate();
+    const fallback = result.success
+      ? 'Activamos tu programa de lealtad. Ya puedes acumular sellos.'
+      : 'No pudimos activar tu programa de lealtad. Intenta más tarde.';
+    setReservationToast(
+      result.success ? result.message ?? fallback : `⚠️ ${result.message ?? fallback}`
+    );
+  }, [loyaltyReminder, setReservationToast]);
 
   const userDisplayName = useMemo(() => {
     if (!user) return null;
@@ -228,41 +345,41 @@ export default function ReservePage() {
     }
   }, []);
 
-  const categorizedReservations = useMemo(() => {
-    const active: ReservationRecord[] = [];
-    const past: ReservationRecord[] = [];
-
-    reservations.forEach((reservation) => {
-      const slotDateTime = buildSlotDateTime(
-        reservation.reservationDate,
-        reservation.reservationTime
+  const {
+    pendingReservations,
+    completedReservations,
+    basePendingReservations,
+    baseCompletedReservations,
+    basePastReservations,
+  } = useMemo(() => {
+    const grouped = groupClientReservations(reservations);
+    const normalizedFilter = reservationFilter.trim().toLowerCase();
+    const matches = (reservation: ReservationRecord) =>
+      !normalizedFilter ||
+      buildReservationSearchTerms(reservation).some((term) =>
+        term.toLowerCase().includes(normalizedFilter)
       );
-      const slotGraceEnd = new Date(slotDateTime.getTime() + QR_EXPIRATION_MINUTES * 60 * 1000);
-      if (slotGraceEnd.getTime() > currentTime.getTime()) {
-        active.push(reservation);
-      } else {
-        past.push(reservation);
-      }
-    });
+    return {
+      pendingReservations: grouped.pending.filter(matches),
+      completedReservations: grouped.completed.filter(matches),
+      basePendingReservations: grouped.pending,
+      baseCompletedReservations: grouped.completed,
+      basePastReservations: grouped.past,
+    };
+  }, [reservations, reservationFilter]);
 
-    // Ordenar para que las activas más próximas aparezcan primero
-    active.sort((a, b) => {
-      const aTime = buildSlotDateTime(a.reservationDate, a.reservationTime).getTime();
-      const bTime = buildSlotDateTime(b.reservationDate, b.reservationTime).getTime();
-      return aTime - bTime;
+  const completedReservationsLastWeek = useMemo(() => {
+    const threshold = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return baseCompletedReservations.filter((reservation) => {
+      const parsed = parseReservationDate(reservation);
+      return parsed && parsed.getTime() >= threshold;
     });
-    past.sort((a, b) => {
-      const aTime = buildSlotDateTime(a.reservationDate, a.reservationTime).getTime();
-      const bTime = buildSlotDateTime(b.reservationDate, b.reservationTime).getTime();
-      return bTime - aTime;
-    });
+  }, [baseCompletedReservations]);
 
-    return { activeReservations: active, pastReservations: past };
-  }, [reservations, currentTime]);
-
-  const { activeReservations, pastReservations } = categorizedReservations;
   const hasReachedReservationLimit =
-    isAuthenticated && activeReservations.length >= MAX_ACTIVE_RESERVATIONS;
+    isAuthenticated && basePendingReservations.length >= MAX_ACTIVE_RESERVATIONS;
+  const showCompletedHistoryButton = baseCompletedReservations.length > 3;
+  const hasPastReservations = basePastReservations.length > 0;
 
   const getTimeWindowForDate = (date: Date) => {
     const day = date.getDay();
@@ -274,7 +391,7 @@ export default function ReservePage() {
   const formatSlot = (hours: number, minutes: number) =>
     `${String(hours).padStart(2, '0')}:${minutes === 0 ? '00' : '30'}`;
 
-  const getTimeSlotsForDate = (date: Date) => {
+  const getTimeSlotsForDate = useCallback((date: Date) => {
     const { start, end } = getTimeWindowForDate(date);
     const slots: string[] = [];
     for (let hour = start; hour < end; hour += 1) {
@@ -282,7 +399,7 @@ export default function ReservePage() {
       slots.push(formatSlot(hour, 30));
     }
     return slots;
-  };
+  }, []);
 
   const idPrefix = useId();
   const fieldIds = {
@@ -309,7 +426,7 @@ export default function ReservePage() {
       slotDate.setHours(hours || 0, minutes || 0, 0, 0);
       return slotDate.getTime() > currentTime.getTime();
     });
-  }, [selectedDate, bookedSlots, currentTime]);
+  }, [selectedDate, bookedSlots, currentTime, getTimeSlotsForDate]);
 
   const timeSelectPlaceholder = useMemo(() => {
     if (!selectedDate) return 'Selecciona una fecha primero';
@@ -387,7 +504,7 @@ export default function ReservePage() {
   const buildQrPayload = useCallback(
     (reservation: ReservationRecord) => {
       const branchLabel = reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
-      const payload: Record<string, any> = {
+      const payload: ReservationQrPayload = {
         reservationId: reservation.id,
         code: reservation.reservationCode,
         user: userDisplayName || user?.email || 'Cliente Xoco Café',
@@ -436,175 +553,59 @@ export default function ReservePage() {
     [buildQrPayload, setAlert]
   );
 
-  const handleDownloadReservationCard = useCallback(
-    async (reservation: ReservationRecord) => {
-      const cardNode = reservationCardRefs.current[reservation.id];
-      if (!cardNode) {
-        setAlert({
-          type: 'error',
-          text: 'No pudimos preparar la imagen de la reserva. Intenta de nuevo.',
+  const handleReservationAction = useCallback(
+    async (
+      reservation: ReservationRecord,
+      action: 'confirm' | 'cancel',
+      actionLabel: string,
+      apiCall: (token: string, reservationId: string) => Promise<void>
+    ) => {
+      if (!token) {
+        setReservationActionState({
+          isLoading: false,
+          message: null,
+          error: 'Inicia sesión de nuevo para administrar la reservación.',
         });
         return;
       }
+      setReservationActionState({ isLoading: true, message: null, error: null });
       try {
-        const html2canvas = (await import('html2canvas')).default;
-        const canvas = await html2canvas(cardNode, {
-          scale: 2,
-          backgroundColor: '#ffffff',
+        await apiCall(token, reservation.id);
+        await loadReservations();
+        setReservationActionState({
+          isLoading: false,
+          message: `${actionLabel} correctamente`,
+          error: null,
         });
-        const dataUrl = canvas.toDataURL('image/png');
-        const link = document.createElement('a');
-        link.href = dataUrl;
-        link.download = `${reservation.reservationCode}-${reservation.reservationDate}-reserva.png`;
-        link.click();
+        setReservationToast(`${actionLabel}.`);
+        setSelectedReservation(null);
       } catch (error) {
-        console.error('Error descargando la tarjeta de reserva:', error);
-        setAlert({
-          type: 'error',
-          text: 'No pudimos descargar la imagen de la reserva. Intenta de nuevo.',
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'No pudimos actualizar la reservación. Intenta de nuevo.';
+        setReservationActionState({
+          isLoading: false,
+          message: null,
+          error: message,
         });
+        setReservationToast(message);
       }
     },
-    [setAlert]
+    [loadReservations, token]
   );
 
-  const renderReservationCard = (
-    reservation: ReservationRecord,
-    categoryKey: 'active' | 'past'
-  ) => {
-    const slotDateTime = buildSlotDateTime(
-      reservation.reservationDate,
-      reservation.reservationTime
-    );
-    const branchLabel = reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
-    const qrExpiresAt = new Date(slotDateTime.getTime() + QR_EXPIRATION_MINUTES * 60 * 1000);
-    const qrIsActive = currentTime.getTime() < qrExpiresAt.getTime();
-    const qrDataString = JSON.stringify(buildQrPayload(reservation));
-    const qrImageSrc = `${QR_API_URL}?size=${QR_IMAGE_SIZE}&data=${encodeURIComponent(
-      qrDataString
-    )}`;
-    const formattedDate = formatReservationDate(reservation.reservationDate, 'es-MX', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-    });
-    const statusVisuals = getStatusVisuals(reservation.status, categoryKey);
-
-    return (
-      <li
-        key={reservation.id}
-        ref={(element) => {
-          reservationCardRefs.current[reservation.id] = element;
-        }}
-        className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 lg:flex-row lg:items-center lg:justify-between"
-      >
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-gray-500">
-            <span
-              className={`h-2.5 w-2.5 rounded-full ${statusVisuals.dotClass}`}
-              aria-hidden="true"
-            />
-            <span>Código</span>
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 font-semibold text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-              {reservation.reservationCode}
-            </span>
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {formattedDate} · {reservation.reservationTime} hrs
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            {reservation.peopleCount} {reservation.peopleCount === 1 ? 'persona' : 'personas'} ·{' '}
-            {branchLabel}
-            {reservation.branchNumber ? ` (#${reservation.branchNumber})` : ''}
-          </p>
-          {reservation.message && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Mensaje: {reservation.message}
-            </p>
-          )}
-          {reservation.preOrderItems && (
-            <p className="text-sm text-primary-700 dark:text-primary-200">
-              Pre-orden: {reservation.preOrderItems}
-            </p>
-          )}
-          <span
-            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusVisuals.badgeClass}`}
-          >
-            {statusVisuals.label}
-          </span>
-        </div>
-        <div className="flex flex-col items-center gap-2">
-          {qrIsActive ? (
-            <img
-              src={qrImageSrc}
-              alt={`QR de la reservación ${reservation.reservationCode}`}
-              className="h-40 w-40 rounded-2xl border border-dashed border-gray-300 bg-white p-3 dark:border-gray-600"
-            />
-          ) : (
-            <div className="flex h-40 w-40 items-center justify-center rounded-2xl border border-dashed border-gray-300 text-center text-xs text-gray-500 dark:border-gray-600 dark:text-gray-400">
-              QR expirado
-            </div>
-          )}
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {qrIsActive
-              ? `QR válido hasta las ${qrExpiresAt.toLocaleTimeString('es-MX', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}`
-              : `Este QR se eliminó automáticamente ${QR_EXPIRATION_MINUTES} min después de la hora.`}
-          </p>
-          <div className="flex flex-col items-center gap-1">
-            {qrIsActive && (
-              <button
-                type="button"
-                onClick={() => void handleDownloadQr(reservation)}
-                className="text-xs font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-300"
-              >
-                Descargar QR
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => void handleDownloadReservationCard(reservation)}
-              className="text-xs font-semibold text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100"
-            >
-              Descargar pase
-            </button>
-          </div>
-        </div>
-      </li>
-    );
-  };
-
-  const renderReservationGroup = (
-    list: ReservationRecord[],
-    config: {
-      title: string;
-      description: string;
-      emptyState: string;
-      categoryKey: 'active' | 'past';
-    }
-  ) => (
-    <div className="space-y-4 rounded-2xl border border-gray-200 bg-white/60 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
-      <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{config.title}</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">{config.description}</p>
-        </div>
-        <span className="text-xs uppercase tracking-[0.3em] text-gray-400">
-          {list.length} reservas
-        </span>
-      </div>
-      {list.length === 0 ? (
-        <p className="text-sm text-gray-500 dark:text-gray-400">{config.emptyState}</p>
-      ) : (
-        <ul className="space-y-4">
-          {list.map((reservation) => renderReservationCard(reservation, config.categoryKey))}
-        </ul>
-      )}
-    </div>
+  const handleCancelReservation = useCallback(
+    async (reservation: ReservationRecord) => {
+      await handleReservationAction(
+        reservation,
+        'cancel',
+        'Reservación cancelada',
+        cancelReservation
+      );
+    },
+    [handleReservationAction]
   );
-
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAlert(null);
@@ -721,7 +722,27 @@ export default function ReservePage() {
         </div>
       </div>
 
+      {isAuthenticated && loyaltyReminder.showReminder && (
+        <LoyaltyReminderCard
+          onActivate={handleActivateLoyaltyReminder}
+          isLoading={loyaltyReminder.isActivating}
+          className="mb-6"
+        />
+      )}
       <OrderReserveFlipCard variant="reserve" className="mb-8" />
+      <div className="mb-8 flex flex-wrap items-center justify-center gap-2 rounded-3xl bg-primary-50 px-4 py-3 text-sm text-primary-900 shadow-sm dark:bg-primary-900/30 dark:text-primary-100">
+        <span>Si necesitas ayuda, mándanos un</span>
+        <a
+          href={siteMetadata.whats}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-primary-500 shadow dark:bg-[#0f1728]"
+          aria-label="WhatsApp"
+        >
+          <FaWhatsapp />
+        </a>
+        <span>y con todo gusto te ayudamos.</span>
+      </div>
       {isAuthenticated ? (
         <>
           <form
@@ -981,14 +1002,15 @@ export default function ReservePage() {
           </form>
 
           <section className="mt-10 space-y-6 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Mis reservaciones
-                </h2>
+                <p className="text-xs uppercase tracking-[0.35em] text-primary-500">
+                  Reservas compartidas
+                </p>
+                <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Panel</h2>
                 <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Verde = activas, amarillo = ya concluidas. El QR solo aparece mientras el horario
-                  está vigente.
+                  Organiza tus reservaciones en columnas pendientes/completadas, accede al historial
+                  y cancela desde el mismo panel.
                 </p>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
@@ -996,24 +1018,22 @@ export default function ReservePage() {
                   type="button"
                   onClick={handleScrollToForm}
                   disabled={hasReachedReservationLimit}
-                  className={`rounded-full border border-primary-600 px-4 py-2 text-sm font-semibold ${
+                  className={`rounded-full border px-4 py-2 text-sm font-semibold ${
                     hasReachedReservationLimit
-                      ? 'text-gray-400 border-gray-300 cursor-not-allowed'
-                      : 'text-primary-600 hover:bg-primary-50 dark:border-primary-400 dark:text-primary-200'
+                      ? 'border-gray-300 text-gray-400'
+                      : 'border-primary-600 text-primary-600 hover:bg-primary-50 dark:border-primary-400 dark:text-primary-200'
                   }`}
                 >
                   Crear nueva reserva
                 </button>
-                {token && (
-                  <button
-                    type="button"
-                    onClick={handleRefreshReservations}
-                    disabled={isLoadingReservations}
-                    className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isLoadingReservations ? 'Actualizando...' : 'Actualizar lista'}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleRefreshReservations}
+                  disabled={isLoadingReservations}
+                  className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isLoadingReservations ? 'Actualizando...' : 'Actualizar lista'}
+                </button>
               </div>
             </div>
 
@@ -1023,55 +1043,79 @@ export default function ReservePage() {
               </div>
             )}
 
-            {!token ? (
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                Inicia sesión para ver tus reservaciones activas y obtener su código QR.
-              </p>
-            ) : (
-              <>
-                {reservationsError && (
-                  <div className="rounded-xl bg-red-100 px-4 py-3 text-sm text-red-800 dark:bg-red-900/30 dark:text-red-100">
-                    {reservationsError}
-                  </div>
-                )}
+            {reservationsError && (
+              <div className="rounded-xl bg-red-100 px-4 py-3 text-sm text-red-800 dark:bg-red-900/30 dark:text-red-100">
+                {reservationsError}
+              </div>
+            )}
 
-                {isLoadingReservations ? (
-                  <div className="rounded-2xl border border-dashed border-gray-300 px-4 py-10 text-center text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
-                    Cargando tus reservaciones...
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {renderReservationGroup(activeReservations, {
-                      title: 'Reservas activas',
-                      description: 'Próximas visitas con QR disponible.',
-                      emptyState: 'No tienes reservas activas. Agenda una para asegurar tu lugar.',
-                      categoryKey: 'active',
-                    })}
-                    {renderReservationGroup(pastReservations, {
-                      title: 'Reservas pasadas',
-                      description: 'Historial reciente (QR expirado automáticamente).',
-                      emptyState: 'Aún no tienes reservas pasadas en el historial.',
-                      categoryKey: 'past',
-                    })}
-                  </div>
-                )}
-              </>
+            <ReservationsSearchBar
+              onSearch={setReservationFilter}
+              isLoading={isLoadingReservations}
+              onRefresh={handleRefreshReservations}
+              onShowPast={() => setShowReservationHistory(true)}
+              onShowCompleted={
+                showCompletedHistoryButton
+                  ? () => setShowReservationCompletedHistory(true)
+                  : undefined
+              }
+              showCompletedButton={showCompletedHistoryButton}
+              disablePastButton={!hasPastReservations}
+            />
+
+            {reservationToast && (
+              <div
+                role="status"
+                className="rounded-full bg-gray-900 px-4 py-2 text-center text-xs font-semibold text-white dark:bg-gray-800"
+              >
+                {reservationToast}
+              </div>
+            )}
+
+            {isLoadingReservations ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {[1, 2].map((index) => (
+                  <div
+                    key={index}
+                    className="h-60 rounded-3xl border border-dashed border-gray-200 bg-gray-50 animate-pulse dark:border-gray-700 dark:bg-gray-900"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div
+                className="grid gap-6 lg:grid-cols-2"
+                aria-live="polite"
+                aria-label="Tablero de reservas"
+              >
+                <ReservationColumn
+                  title="Pendientes"
+                  highlight="text-white"
+                  reservations={pendingReservations}
+                  emptyLabel="No tienes reservas pendientes. Agenda una para asegurar tu lugar."
+                  onSelect={(reservation) => setSelectedReservation(reservation)}
+                />
+                <ReservationColumn
+                  title="Completadas"
+                  highlight="text-white"
+                  reservations={completedReservations}
+                  emptyLabel="Aún no completas reservaciones recientes."
+                  onSelect={(reservation) => setSelectedReservation(reservation)}
+                />
+              </div>
             )}
           </section>
 
           {token && (
-            <section className="mt-6 space-y-6 rounded-3xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+            <section className="mt-6 space-y-6 rounded-3xl border border-white/10 bg-[#070d1a] p-6 text-white shadow-lg">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Reservas no completadas
-                </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
+                <h2 className="text-xl font-semibold text-white">Reservas no completadas</h2>
+                <p className="text-sm text-white/70">
                   Si no acudiste antes del corte (23:59), movemos la reserva aquí en color naranja y
                   eliminamos su QR. El registro se conserva por 7 días.
                 </p>
               </div>
               {failedReservations.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-white/60">
                   No tienes reservas pendientes de seguimiento. ¡Todo al corriente!
                 </p>
               ) : (
@@ -1143,6 +1187,45 @@ export default function ReservePage() {
               )}
             </section>
           )}
+          {selectedReservation && (
+            <DetailModal onClose={() => setSelectedReservation(null)}>
+              <ReservationDetailContent
+                reservation={selectedReservation}
+                onCancelReservation={handleCancelReservation}
+                onDownloadQr={(reservation) => void handleDownloadQr(reservation)}
+                actionState={reservationActionState}
+                currentUserName={userDisplayName}
+              />
+            </DetailModal>
+          )}
+          {showReservationHistory && (
+            <DetailModal onClose={() => setShowReservationHistory(false)}>
+              <ReservationHistoryContent
+                title="Reservas pasadas"
+                reservations={basePastReservations}
+                onClose={() => setShowReservationHistory(false)}
+                hasFilter={Boolean(reservationFilter.trim())}
+                onSelect={(reservation) => {
+                  setSelectedReservation(reservation);
+                  setShowReservationHistory(false);
+                }}
+              />
+            </DetailModal>
+          )}
+          {showReservationCompletedHistory && (
+            <DetailModal onClose={() => setShowReservationCompletedHistory(false)}>
+              <ReservationHistoryContent
+                title="Reservas completadas"
+                reservations={completedReservationsLastWeek}
+                onClose={() => setShowReservationCompletedHistory(false)}
+                hasFilter={Boolean(reservationFilter.trim())}
+                onSelect={(reservation) => {
+                  setSelectedReservation(reservation);
+                  setShowReservationCompletedHistory(false);
+                }}
+              />
+            </DetailModal>
+          )}
         </>
       ) : (
         <div className="rounded-3xl border border-dashed border-gray-300 bg-white px-6 py-10 text-center text-sm text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
@@ -1158,3 +1241,554 @@ export default function ReservePage() {
     </div>
   );
 }
+
+const RESERVATION_STATUS_STYLES: Record<string, { badge: string; text: string; label: string }> = {
+  pending: {
+    badge: 'bg-white/10 text-white border border-white/15',
+    text: 'text-white',
+    label: 'Pendiente',
+  },
+  completed: {
+    badge: 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30',
+    text: 'text-emerald-100',
+    label: 'Completada',
+  },
+  past: {
+    badge: 'bg-orange-500/20 text-orange-200 border border-orange-400/30',
+    text: 'text-orange-100',
+    label: 'Histórica',
+  },
+  cancelled: {
+    badge: 'bg-red-500/20 text-red-100 border border-red-400/30',
+    text: 'text-red-200',
+    label: 'Cancelada',
+  },
+};
+
+const ReservationColumn = ({
+  title,
+  highlight,
+  reservations,
+  emptyLabel,
+  onSelect,
+}: {
+  title: string;
+  highlight: string;
+  reservations: ReservationRecord[];
+  emptyLabel: string;
+  onSelect: (reservation: ReservationRecord) => void;
+}) => {
+  const pagination = usePagination(reservations, 3);
+  return (
+    <div className="rounded-3xl border border-white/10 bg-[#070d1a] p-5 text-white shadow-lg">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.35em] text-primary-200">{title}</p>
+          <p className={`text-lg font-semibold ${highlight}`}>{reservations.length} reservas</p>
+        </div>
+        <span className="text-xs text-white/60">
+          {pagination.totalItems > 3
+            ? `Mostrando ${pagination.items.length} de ${pagination.totalItems}`
+            : null}
+        </span>
+      </div>
+      <div className="mt-4 space-y-3">
+        {reservations.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-white/15 bg-[#111b31] px-4 py-3 text-sm text-white/70">
+            {emptyLabel}
+          </p>
+        ) : (
+          pagination.items.map((reservation) => (
+            <ReservationCard key={reservation.id} reservation={reservation} onSelect={onSelect} />
+          ))
+        )}
+      </div>
+      {pagination.hasPagination && (
+        <ColumnPager
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          onPrev={pagination.prev}
+          onNext={pagination.next}
+        />
+      )}
+    </div>
+  );
+};
+
+const ColumnPager = ({
+  page,
+  totalPages,
+  totalItems,
+  onPrev,
+  onNext,
+}: {
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  onPrev: () => void;
+  onNext: () => void;
+}) => (
+  <div className="mt-4 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+    <button
+      type="button"
+      onClick={onPrev}
+      className="rounded-full border border-gray-200 px-3 py-1 font-semibold hover:border-primary-400 hover:text-primary-600 dark:border-gray-700"
+      disabled={page === 0}
+    >
+      Anterior
+    </button>
+    <span>
+      Página {page + 1} de {totalPages} · {totalItems} registros
+    </span>
+    <button
+      type="button"
+      onClick={onNext}
+      className="rounded-full border border-gray-200 px-3 py-1 font-semibold hover:border-primary-400 hover:text-primary-600 dark:border-gray-700"
+      disabled={page >= totalPages - 1}
+    >
+      Siguiente
+    </button>
+  </div>
+);
+
+const ReservationCard = ({
+  reservation,
+  onSelect,
+}: {
+  reservation: ReservationRecord;
+  onSelect: (reservation: ReservationRecord) => void;
+}) => {
+  const statusKey = (reservation.status ?? 'pending').toLowerCase();
+  const statusStyles = RESERVATION_STATUS_STYLES[statusKey] ?? RESERVATION_STATUS_STYLES.pending;
+  const branchLabel = reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(reservation)}
+      className="w-full rounded-[32px] border border-white/10 bg-[#0f1728] px-5 py-4 text-left text-white shadow-sm transition hover:bg-[#151f36] focus:outline-none focus:ring-2 focus:ring-primary-500"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-[0.35em] text-primary-300">
+            {reservation.reservationCode}
+          </p>
+          <p className="text-base font-semibold text-white">
+            {formatReservationDateTime(reservation)}
+          </p>
+        </div>
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles.badge}`}>
+          {statusStyles.label}
+        </span>
+      </div>
+      <p className="mt-1 text-sm text-white/80">
+        {reservation.peopleCount} {reservation.peopleCount === 1 ? 'persona' : 'personas'} ·{' '}
+        {branchLabel}
+        {reservation.branchNumber ? ` (#${reservation.branchNumber})` : ''}
+      </p>
+      <div className={`mt-3 text-xs ${statusStyles.text}`}>Selecciona para ver detalle</div>
+    </button>
+  );
+};
+
+const ReservationsSearchBar = ({
+  onSearch,
+  isLoading,
+  onRefresh,
+  onShowPast,
+  onShowCompleted,
+  showCompletedButton,
+  disablePastButton,
+}: {
+  onSearch: (value: string) => void;
+  isLoading: boolean;
+  onRefresh: () => void;
+  onShowPast: () => void;
+  onShowCompleted?: () => void;
+  showCompletedButton?: boolean;
+  disablePastButton?: boolean;
+}) => {
+  const [value, setValue] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = () => {
+    const trimmed = value.trim();
+    const looksLikeEmail = /\S+@\S+\.\S+/.test(trimmed);
+    if (looksLikeEmail) {
+      setError('Ingresa código o fecha (evita correos).');
+      return;
+    }
+    setError(null);
+    onSearch(trimmed);
+  };
+
+  return (
+    <div className="space-y-3 text-xs text-gray-500 dark:text-gray-400">
+      <form
+        className="flex flex-wrap items-center gap-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          handleSubmit();
+        }}
+      >
+        <label className="flex flex-col text-[var(--brand-muted)]">
+          <span className="font-semibold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-300">
+            Buscar código o fecha
+          </span>
+          <input
+            value={value}
+            onChange={(event) => {
+              setValue(event.target.value);
+              if (error) {
+                setError(null);
+              }
+            }}
+            placeholder="Código o fecha (ej. 2024-05-12)"
+            className="mt-1 rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+          />
+        </label>
+        <button
+          type="submit"
+          className="rounded-full bg-primary-600 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-700"
+        >
+          Buscar
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setValue('');
+            setError(null);
+            onSearch('');
+          }}
+          className="rounded-full border border-gray-300 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300"
+        >
+          Limpiar
+        </button>
+        <div className="flex items-center gap-3">
+          {isLoading && <span>Actualizando...</span>}
+          <button
+            type="button"
+            onClick={() => onRefresh()}
+            className="rounded-full border border-primary-200 px-3 py-1 font-semibold text-primary-600 transition hover:bg-primary-50 dark:border-gray-700 dark:text-primary-200"
+          >
+            Refrescar
+          </button>
+        </div>
+      </form>
+      {error && <p className="text-xs font-semibold text-red-600">{error}</p>}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={onShowPast}
+          className="rounded-full bg-primary-600 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
+          disabled={disablePastButton}
+        >
+          Pasadas
+        </button>
+        {showCompletedButton && onShowCompleted && (
+          <button
+            type="button"
+            onClick={onShowCompleted}
+            className="rounded-full bg-primary-600 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-700"
+          >
+            Completadas
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const DetailModal = ({ children, onClose }: { children: ReactNode; onClose: () => void }) => {
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-5">
+      <div
+        className="absolute inset-0 bg-black/70"
+        role="button"
+        tabIndex={-1}
+        onClick={onClose}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onClose();
+          }
+        }}
+      />
+      <div className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[34px] border border-[#462b20] bg-[#2a170f] p-7 text-white shadow-[0_45px_95px_rgba(0,0,0,0.85)]">
+        {children}
+      </div>
+    </div>
+  );
+};
+
+const DetailActionFooter = ({
+  label,
+  onClick,
+  disabled,
+  actionState,
+  variant = 'primary',
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  actionState?: DetailActionState;
+  variant?: 'primary' | 'danger';
+}) => {
+  const baseClasses =
+    variant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-primary-600 hover:bg-primary-700';
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className={`w-full rounded-2xl px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-50 ${baseClasses}`}
+      >
+        {disabled ? 'Procesando…' : label}
+      </button>
+      {actionState?.message && (
+        <p className="text-xs font-semibold text-emerald-600">{actionState.message}</p>
+      )}
+      {actionState?.error && (
+        <p className="text-xs font-semibold text-red-600">{actionState.error}</p>
+      )}
+    </div>
+  );
+};
+
+const ReservationDetailContent = ({
+  reservation,
+  onCancelReservation,
+  onDownloadQr,
+  actionState,
+  currentUserName,
+}: {
+  reservation: ReservationRecord;
+  onCancelReservation?: (reservation: ReservationRecord) => void;
+  onDownloadQr?: (reservation: ReservationRecord) => void;
+  actionState?: DetailActionState;
+  currentUserName?: string | null;
+}) => {
+  const slotDateTime = buildSlotDateTime(reservation.reservationDate, reservation.reservationTime);
+  const qrExpiresAt = new Date(slotDateTime.getTime() + QR_EXPIRATION_MINUTES * 60 * 1000);
+  const qrIsActive = Date.now() < qrExpiresAt.getTime();
+  const branchLabel = reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
+  const qrPayload = {
+    reservationId: reservation.id,
+    code: reservation.reservationCode,
+    user: currentUserName || 'Cliente Xoco Café',
+    date: reservation.reservationDate,
+    time: reservation.reservationTime,
+    people: reservation.peopleCount,
+    branch: branchLabel,
+    branchNumber: reservation.branchNumber || BRANCH_NUMBER,
+    message: reservation.message || null,
+    preOrderItems: reservation.preOrderItems || null,
+  };
+  const qrImageSrc = `${QR_API_URL}?size=${QR_IMAGE_SIZE}&data=${encodeURIComponent(
+    JSON.stringify(qrPayload)
+  )}`;
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-[32px] border border-[#1d2537] bg-[#0f1524] p-6 text-white shadow-[0_25px_60px_rgba(0,0,0,0.55)]">
+        <header className="space-y-1">
+          <p className="text-xs uppercase tracking-[0.35em] text-primary-200">
+            {reservation.reservationCode}
+          </p>
+          <h3 className="text-2xl font-semibold text-white">Reservación</h3>
+          <p className="text-sm text-white/70">{formatReservationDateTime(reservation)}</p>
+        </header>
+        <div className="mt-5 grid gap-3 rounded-3xl border border-white/15 bg-[#1a2134] p-4">
+          <DetailRow
+            label="Personas"
+            value={`${reservation.peopleCount} ${
+              reservation.peopleCount === 1 ? 'persona' : 'personas'
+            }`}
+            variant="dark"
+          />
+          <DetailRow
+            label="Sucursal"
+            value={`${branchLabel}${
+              reservation.branchNumber ? ` (#${reservation.branchNumber})` : ''
+            }`}
+            variant="dark"
+          />
+          <DetailRow
+            label="Estado"
+            value={(reservation.status ?? 'Pendiente').toUpperCase()}
+            variant="dark"
+          />
+        </div>
+        <div className="mt-5 flex flex-wrap gap-4">
+          <div className="flex flex-1 flex-col items-center gap-2 rounded-3xl border border-white/10 bg-white p-4 text-gray-900 shadow-inner">
+            {qrIsActive ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={qrImageSrc}
+                  alt={`QR de la reservación ${reservation.reservationCode}`}
+                  className="h-48 w-48 rounded-2xl bg-white p-3 shadow"
+                />
+              </>
+            ) : (
+              <div className="flex h-48 w-48 items-center justify-center rounded-2xl border border-dashed border-[#c1a391] text-center text-xs text-white/60">
+                QR expirado
+              </div>
+            )}
+            <p className="text-xs text-gray-600">
+              {qrIsActive
+                ? `QR válido hasta las ${qrExpiresAt.toLocaleTimeString('es-MX', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}`
+                : `El QR expira ${QR_EXPIRATION_MINUTES} min después de la hora reservada.`}
+            </p>
+            {qrIsActive && onDownloadQr && (
+              <button
+                type="button"
+                onClick={() => onDownloadQr(reservation)}
+                className="text-xs font-semibold text-primary-600 hover:text-primary-800"
+              >
+                Descargar QR
+              </button>
+            )}
+          </div>
+          {(reservation.preOrderItems || reservation.message) && (
+            <div className="flex-1 space-y-4 text-white">
+              {reservation.preOrderItems && (
+                <div className="rounded-3xl border border-white/10 bg-[#161d30] px-4 py-3 text-sm">
+                  <p className="text-xs uppercase tracking-[0.35em] text-white/70">Pre-orden</p>
+                  <p className="mt-1 whitespace-pre-line">{reservation.preOrderItems}</p>
+                </div>
+              )}
+              {reservation.message && (
+                <div className="rounded-3xl border border-white/10 bg-[#161d30] px-4 py-3 text-sm">
+                  <p className="text-xs uppercase tracking-[0.35em] text-white/70">Mensaje</p>
+                  <p className="mt-1">{reservation.message}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        {onCancelReservation && (
+          <div className="mt-6">
+            <DetailActionFooter
+              label="Cancelar reservación"
+              onClick={() => onCancelReservation(reservation)}
+              disabled={actionState?.isLoading}
+              variant="danger"
+              actionState={actionState}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const DetailRow = ({
+  label,
+  value,
+  variant = 'light',
+}: {
+  label: string;
+  value: ReactNode;
+  variant?: 'light' | 'dark';
+}) => (
+  <div
+    className={`flex items-center justify-between text-sm ${
+      variant === 'dark' ? 'text-white/80' : 'text-gray-600 dark:text-gray-300'
+    }`}
+  >
+    <span
+      className={`font-semibold ${
+        variant === 'dark' ? 'text-white/60' : 'text-gray-500 dark:text-gray-400'
+      }`}
+    >
+      {label}
+    </span>
+    <span className={variant === 'dark' ? 'text-white' : 'text-gray-900 dark:text-gray-100'}>
+      {value}
+    </span>
+  </div>
+);
+
+const ReservationHistoryContent = ({
+  title,
+  reservations,
+  onClose,
+  hasFilter,
+  onSelect,
+}: {
+  title: string;
+  reservations: ReservationRecord[];
+  onClose: () => void;
+  hasFilter: boolean;
+  onSelect: (reservation: ReservationRecord) => void;
+}) => {
+  const [query, setQuery] = useState('');
+  const filtered = useMemo(() => {
+    if (!query.trim()) {
+      return reservations;
+    }
+    const term = query.trim().toLowerCase();
+    return reservations.filter((reservation) =>
+      buildReservationSearchTerms(reservation).some((value) => value.toLowerCase().includes(term))
+    );
+  }, [query, reservations]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.35em] text-primary-500">{title}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {hasFilter
+              ? 'Los filtros se aplican a estos resultados.'
+              : 'Incluye registros de los últimos días.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-xs font-semibold uppercase tracking-[0.3em] text-gray-400 hover:text-gray-600"
+        >
+          Cerrar
+        </button>
+      </div>
+      <label className="flex flex-col text-xs text-gray-500 dark:text-gray-400">
+        Buscar en historial
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Código, fecha o sucursal"
+          className="mt-1 rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+        />
+      </label>
+      {filtered.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900">
+          No encontramos reservaciones con ese criterio.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((reservation) => (
+            <ReservationCard key={reservation.id} reservation={reservation} onSelect={onSelect} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};

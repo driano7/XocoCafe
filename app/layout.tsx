@@ -13,6 +13,7 @@ import Header from '@/components/Header';
 import LenisProvider from '@/components/Providers/LenisProvider';
 import ThemeProvider from '@/components/Providers/ThemeProvider';
 import { SessionProvider } from 'next-auth/react';
+import FeedbackPromptGate from '@/components/Feedback/FeedbackPromptGate';
 
 export const metadata = {
   title: 'Xoco Café',
@@ -67,6 +68,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
                     </LenisProvider>
                     <Footer />
                     <Analytics />
+                    <FeedbackPromptGate />
                   </ThemeProvider>
                 </AuthProvider>
               </AnalyticsProvider>

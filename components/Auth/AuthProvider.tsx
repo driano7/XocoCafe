@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import type { AuthUser } from '@/lib/validations/auth';
 import { useAnalyticsContext } from '@/components/Analytics/AnalyticsProvider';
 
@@ -14,6 +14,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const INACTIVITY_LIMIT_MS = 5 * 60 * 1000;
 
 export function useAuth() {
   const context = useContext(AuthContext);
@@ -93,7 +94,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       if (token) {
         await fetch('/api/auth/me', {
@@ -119,7 +120,55 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(null);
       localStorage.removeItem('authToken');
     }
-  };
+  }, [analyticsContext, token, user]);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      localStorage.removeItem('authToken');
+      setToken(null);
+      setUser(null);
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!token) return undefined;
+
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        void logout();
+      }, INACTIVITY_LIMIT_MS);
+    };
+
+    const handleActivity = () => resetTimer();
+    const activityEvents: (keyof WindowEventMap)[] = [
+      'mousemove',
+      'keydown',
+      'click',
+      'scroll',
+      'touchstart',
+    ];
+
+    activityEvents.forEach((event) => window.addEventListener(event, handleActivity));
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        resetTimer();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    resetTimer();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      activityEvents.forEach((event) => window.removeEventListener(event, handleActivity));
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [logout, token]);
 
   const updateUser = (updatedUser: AuthUser) => {
     setUser(updatedUser);
