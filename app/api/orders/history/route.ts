@@ -1,3 +1,30 @@
+/*
+ * --------------------------------------------------------------------
+ *  Xoco Café — Software Property
+ *  Copyright (c) 2025 Xoco Café
+ *  Principal Developer: Donovan Riaño
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at:
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ *  --------------------------------------------------------------------
+ *  PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
+ *  Copyright (c) 2025 Xoco Café.
+ *  Desarrollador Principal: Donovan Riaño.
+ *
+ *  Este archivo está licenciado bajo la Apache License 2.0.
+ *  Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
+ * --------------------------------------------------------------------
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -56,7 +83,12 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('orders')
-      .select('id,orderNumber,status,total,items,tipAmount,tipPercent,createdAt,updatedAt')
+      .select(
+        `
+          *,
+          order_items(*)
+        `
+      )
       .eq('userId', decoded.userId)
       .order('createdAt', { ascending: false });
 
@@ -66,25 +98,34 @@ export async function GET(request: NextRequest) {
 
     const orders = data ?? [];
     const orderIds = orders
-      .map((order) => order.id)
+      .map((entry: any) => (typeof entry?.id === 'string' ? entry.id : null))
       .filter((value): value is string => Boolean(value));
-
-    let orderItems: Array<{ id: string; orderId: string }> = [];
-    if (orderIds.length) {
-      const { data: orderItemsData, error: orderItemsError } = await supabase
-        .from('order_items')
-        .select('id,orderId')
+    const ticketQrMap = new Map<string, unknown>();
+    if (orderIds.length > 0) {
+      const { data: ticketRows, error: ticketError } = await supabase
+        .from('tickets')
+        .select('orderId,qrPayload')
         .in('orderId', orderIds);
-      if (orderItemsError) {
-        throw new Error(orderItemsError.message);
+      if (ticketError) {
+        throw new Error(ticketError.message);
       }
-      orderItems = (orderItemsData ?? []).filter((item): item is { id: string; orderId: string } =>
-        Boolean(item.id && item.orderId)
-      );
+      (ticketRows ?? []).forEach((row) => {
+        if (row?.orderId) {
+          ticketQrMap.set(row.orderId, row.qrPayload ?? null);
+        }
+      });
     }
-
-    const orderItemsMap = new Map(orderItems.map((entry) => [entry.id, entry.orderId]));
-    const orderItemIds = orderItems.map((item) => item.id);
+    const orderItemIds = orders
+      .flatMap((order: any) => (order.order_items ?? []).map((item: any) => item.id))
+      .filter((value): value is string => Boolean(value));
+    const orderIdByItemId = new Map<string, string>();
+    orders.forEach((order: any) => {
+      (order.order_items ?? []).forEach((item: any) => {
+        if (item?.id) {
+          orderIdByItemId.set(item.id, order.id);
+        }
+      });
+    });
 
     let prepTasks: PrepTaskRecord[] = [];
     if (orderItemIds.length) {
@@ -102,7 +143,7 @@ export async function GET(request: NextRequest) {
     prepTasks.forEach((task) => {
       const orderItemId = task.orderItemId ?? undefined;
       if (!orderItemId) return;
-      const orderId = orderItemsMap.get(orderItemId);
+      const orderId = orderIdByItemId.get(orderItemId);
       if (!orderId) return;
       const collection = tasksByOrder.get(orderId) ?? [];
       collection.push(task);
@@ -161,8 +202,72 @@ export async function GET(request: NextRequest) {
         tasks.find((task) => Boolean(task.handledByStaffId))?.handledByStaffId ?? null;
       const handlerName =
         (handlerId ? staffNames.get(handlerId) : null) ?? normalizeStaffName(handlerId);
+      const { order_items, customer_name, pos_customer_id, ...rest } = entry as any;
+      const fallbackItems = Array.isArray(order_items)
+        ? order_items.map((item) => ({
+            name: String(
+              item.name ??
+                item.productName ??
+                item.displayName ??
+                item.title ??
+                item.product?.name ??
+                item.productId ??
+                'Producto'
+            ),
+            quantity: Number.isFinite(Number(item.quantity ?? item.qty))
+              ? Number(item.quantity ?? item.qty)
+              : 1,
+            price: Number.isFinite(Number(item.price ?? item.unitPrice ?? item.amount))
+              ? Number(item.price ?? item.unitPrice ?? item.amount)
+              : 0,
+            category: String(item.category ?? item.type ?? 'other'),
+            size: typeof item.size === 'string' ? item.size : null,
+            packageItems: Array.isArray(item.packageItems)
+              ? item.packageItems.map((value: any) => String(value))
+              : Array.isArray(item.metadata?.items)
+              ? item.metadata.items.map((value: any) => String(value))
+              : null,
+          }))
+        : [];
+      const rawItems = entry.items;
+      const normalizedItems = Array.isArray(rawItems)
+        ? rawItems
+        : rawItems &&
+          typeof rawItems === 'object' &&
+          Array.isArray((rawItems as { list?: unknown[] }).list)
+        ? (rawItems as { list: unknown[] }).list
+        : fallbackItems;
+      const shippingFromColumn = (entry as { shipping?: any }).shipping ?? null;
+      const shippingDetails =
+        shippingFromColumn ??
+        (rawItems && typeof rawItems === 'object' && !Array.isArray(rawItems)
+          ? (rawItems as { shipping?: any }).shipping ?? null
+          : null);
+      const shippingAddressId =
+        (entry as { shipping_address_id?: string | null }).shipping_address_id ??
+        shippingDetails?.addressId ??
+        null;
+      const enrichedShipping =
+        shippingDetails || shippingAddressId
+          ? {
+              ...(shippingDetails ?? {}),
+              addressId: shippingAddressId ?? shippingDetails?.addressId ?? null,
+            }
+          : null;
+      const normalizedItemsPayload =
+        rawItems && typeof rawItems === 'object' && !Array.isArray(rawItems)
+          ? { ...rawItems, list: normalizedItems }
+          : normalizedItems;
+
       return {
-        ...entry,
+        ...rest,
+        customerName: customer_name ?? null,
+        posCustomerId: pos_customer_id ?? null,
+        items: normalizedItemsPayload,
+        qrPayload: ticketQrMap.get(entry.id) ?? null,
+        shipping: enrichedShipping,
+        deliveryTipAmount: entry.deliveryTipAmount ?? null,
+        deliveryTipPercent: entry.deliveryTipPercent ?? null,
         ticketId:
           (entry as { ticketId?: string }).ticketId ??
           (entry as { ticketCode?: string }).ticketCode ??

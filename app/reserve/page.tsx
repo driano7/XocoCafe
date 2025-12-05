@@ -1,3 +1,30 @@
+/*
+ * --------------------------------------------------------------------
+ *  Xoco Café — Software Property
+ *  Copyright (c) 2025 Xoco Café
+ *  Principal Developer: Donovan Riaño
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at:
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ *  --------------------------------------------------------------------
+ *  PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
+ *  Copyright (c) 2025 Xoco Café.
+ *  Desarrollador Principal: Donovan Riaño.
+ *
+ *  Este archivo está licenciado bajo la Apache License 2.0.
+ *  Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
+ * --------------------------------------------------------------------
+ */
+
 'use client';
 
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
@@ -6,8 +33,8 @@ import { DayPicker } from 'react-day-picker';
 import { FaWhatsapp } from 'react-icons/fa';
 import '@/css/react-day-picker.css';
 import { useAuth } from '@/components/Auth/AuthProvider';
-import OrderReserveFlipCard from '@/components/Order/OrderReserveFlipCard';
 import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
+import SessionTimeoutNotice from '@/components/SessionTimeoutNotice';
 import siteMetadata from 'content/siteMetadata';
 import { DEFAULT_BRANCH_ID } from '@/lib/reservations';
 import { usePagination } from '@/hooks/use-pagination';
@@ -206,8 +233,8 @@ const formatReservationDate = (
   return date.toLocaleDateString(locale, options);
 };
 export default function ReservePage() {
-  const { token, user } = useAuth();
-  const isAuthenticated = Boolean(token);
+  const { token, user, isLoading } = useAuth();
+  const isAuthenticated = Boolean(token && user);
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -237,6 +264,7 @@ export default function ReservePage() {
   const [preOrderItems, setPreOrderItems] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [showReservationForm, setShowReservationForm] = useState(false);
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
@@ -338,11 +366,9 @@ export default function ReservePage() {
     void loadReservations();
   }, [loadReservations]);
 
-  const handleScrollToForm = useCallback(() => {
-    const form = document.getElementById('reservation-form');
-    if (form) {
-      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+  const handleOpenReservationForm = useCallback(() => {
+    setAlert(null);
+    setShowReservationForm((prev) => !prev);
   }, []);
 
   const {
@@ -681,6 +707,280 @@ export default function ReservePage() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20 text-center text-gray-700 dark:text-gray-200">
+        Cargando tus reservaciones...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16 text-center">
+        <SessionTimeoutNotice context="reservations" redirectDelayMs={300000} />
+        <a
+          href="/login"
+          className="mt-6 inline-flex min-w-[280px] items-center justify-center rounded-full bg-primary-600 px-10 py-5 text-2xl font-black uppercase tracking-[0.35em] text-white shadow-2xl transition hover:bg-primary-700"
+        >
+          Iniciar sesión
+        </a>
+      </div>
+    );
+  }
+
+  const ReservationFormContent = () => (
+    <form
+      id="reservation-form"
+      onSubmit={handleSubmit}
+      className="grid gap-8 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900 lg:grid-cols-[1.1fr,0.9fr]"
+    >
+      <div className="space-y-6">
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <p className="mb-3 text-sm font-medium text-gray-800 dark:text-gray-200">Fecha</p>
+            <div className="space-y-3 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 disabled:opacity-40 dark:border-gray-600 dark:text-gray-300"
+                  onClick={() => {
+                    if (!canGoPrev) return;
+                    const prev = new Date(
+                      displayMonth.getFullYear(),
+                      displayMonth.getMonth() - 1,
+                      1
+                    );
+                    setDisplayMonth(prev < minMonth ? minMonth : prev);
+                  }}
+                  disabled={!canGoPrev}
+                >
+                  ← Anterior
+                </button>
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  {displayMonth.toLocaleDateString('es-MX', {
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                </p>
+                <button
+                  type="button"
+                  className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 disabled:opacity-40 dark:border-gray-600 dark:text-gray-300"
+                  onClick={() => {
+                    if (!canGoNext) return;
+                    const next = new Date(
+                      displayMonth.getFullYear(),
+                      displayMonth.getMonth() + 1,
+                      1
+                    );
+                    setDisplayMonth(next > maxMonth ? maxMonth : next);
+                  }}
+                  disabled={!canGoNext}
+                >
+                  Siguiente →
+                </button>
+              </div>
+              <DayPicker
+                mode="single"
+                month={displayMonth}
+                selected={selectedDate}
+                onSelect={setSelectedDate}
+                onMonthChange={(month) => {
+                  const normalized = new Date(month.getFullYear(), month.getMonth(), 1);
+                  if (normalized < minMonth) {
+                    setDisplayMonth(minMonth);
+                    return;
+                  }
+                  if (normalized > maxMonth) {
+                    setDisplayMonth(maxMonth);
+                    return;
+                  }
+                  setDisplayMonth(normalized);
+                }}
+                disabled={{ before: today, after: maxReservationDate }}
+                weekStartsOn={1}
+                fromDate={today}
+                toDate={maxReservationDate}
+                showOutsideDays={false}
+                modifiersClassNames={{
+                  selected: 'bg-primary-600 text-white',
+                  today: 'text-primary-600 font-semibold',
+                }}
+                styles={{
+                  caption: { color: '#1f2937' },
+                }}
+              />
+              <p className="px-4 pb-4 text-xs text-gray-500 dark:text-gray-400">
+                Fechas disponibles desde hoy hasta{' '}
+                {maxReservationDate.toLocaleDateString('es-MX', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                })}
+                .
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-3 text-sm font-medium text-gray-800 dark:text-gray-200">Hora</p>
+            <select
+              value={selectedTime ?? ''}
+              onChange={(event) => setSelectedTime(event.target.value || null)}
+              disabled={!selectedDate || isLoadingSlots || availableTimeSlots.length === 0}
+              className="mt-2 block w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            >
+              <option value="">{timeSelectPlaceholder}</option>
+              {availableTimeSlots.map((slot) => (
+                <option key={slot} value={slot}>
+                  {slot}
+                </option>
+              ))}
+            </select>
+            {availabilityError && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400">{availabilityError}</p>
+            )}
+            {!availabilityError &&
+              selectedDate &&
+              !isLoadingSlots &&
+              availableTimeSlots.length === 0 && (
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Todos los horarios ya están reservados para esta fecha. Intenta con otro día.
+                </p>
+              )}
+          </div>
+        </div>
+
+        <div>
+          <label
+            htmlFor={fieldIds.people}
+            className="block text-sm font-medium text-gray-800 dark:text-gray-200"
+          >
+            Total de asistentes
+          </label>
+          <select
+            id={fieldIds.people}
+            value={selectedPeople}
+            onChange={(event) => setSelectedPeople(Number(event.target.value))}
+            className="mt-2 block w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+          >
+            {Array.from({ length: MAX_PEOPLE }, (_, index) => index + 1).map((value) => (
+              <option key={value} value={value}>
+                {value} {value === 1 ? 'persona' : 'personas'}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+          <p className="font-semibold text-gray-900 dark:text-gray-100">Sucursal</p>
+          <p>{BRANCH_LABEL}</p>
+          <p className="text-xs text-gray-500">
+            Próximamente podrás elegir entre distintas ubicaciones de Xoco Café.
+          </p>
+        </div>
+
+        <div>
+          <label
+            htmlFor={fieldIds.message}
+            className="block text-sm font-medium text-gray-800 dark:text-gray-200"
+          >
+            Mensaje (opcional)
+          </label>
+          <textarea
+            id={fieldIds.message}
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            rows={4}
+            className="mt-2 block w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            placeholder="Cuéntanos si celebras algo especial o si tienes alguna preferencia."
+          />
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <label
+              htmlFor={fieldIds.preOrder}
+              className="block text-sm font-medium text-gray-800 dark:text-gray-200"
+            >
+              Alimentos y bebidas (opcional)
+            </label>
+            <textarea
+              id={fieldIds.preOrder}
+              value={preOrderItems}
+              onChange={(event) => setPreOrderItems(event.target.value)}
+              rows={4}
+              className="mt-2 block w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              placeholder="Ej. 2 capuccinos, 1 croissant, 1 matcha."
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Puedes listar lo que quieres tener preparado; se elaborará hasta que llegues a la
+              sucursal.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-6 rounded-2xl border border-primary-100 bg-primary-50/60 p-5 shadow-inner dark:border-primary-700/40 dark:bg-primary-900/20">
+        <div>
+          <h2 className="text-lg font-semibold text-primary-900 dark:text-primary-100">Resumen</h2>
+          <p className="mt-1 text-sm text-primary-700 dark:text-primary-200">
+            Confirma que los datos sean correctos antes de enviar.
+          </p>
+        </div>
+
+        <ul className="space-y-3 text-sm text-primary-900 dark:text-primary-100">
+          <li>
+            <span className="font-medium">Personas:</span> {selectedPeople}
+          </li>
+          <li>
+            <span className="font-medium">Fecha seleccionada:</span>{' '}
+            {selectedDate ? selectedDate.toLocaleDateString('es-MX') : 'Pendiente'}
+          </li>
+          <li>
+            <span className="font-medium">Hora:</span> {selectedTime ?? 'Pendiente'}
+          </li>
+          <li>
+            <span className="font-medium">Sucursal:</span> {BRANCH_LABEL} (#{BRANCH_NUMBER})
+          </li>
+          {preOrderItems.trim() && (
+            <li>
+              <span className="font-medium">Pre-orden:</span> {preOrderItems.trim()}
+            </li>
+          )}
+        </ul>
+
+        {alert && (
+          <div
+            className={`rounded-xl px-4 py-3 text-sm ${
+              alert.type === 'success'
+                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-100'
+                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-100'
+            }`}
+          >
+            {alert.text}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={isSubmitting || hasReachedReservationLimit}
+          className="w-full rounded-full bg-primary-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isSubmitting ? 'Creando reserva...' : 'Confirmar reserva'}
+        </button>
+        {hasReachedReservationLimit && (
+          <p className="text-xs text-red-600 dark:text-red-400">
+            Solo puedes tener 3 reservas activas. Cancela una o espera a que concluya para crear
+            otra.
+          </p>
+        )}
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Presenta tu código 5 minutos antes; la tolerancia es de 10 minutos para mantener tu mesa.
+        </p>
+      </div>
+    </form>
+  );
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 lg:px-0">
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -698,10 +998,11 @@ export default function ReservePage() {
             <>
               <button
                 type="button"
-                onClick={handleScrollToForm}
+                onClick={handleOpenReservationForm}
                 className="rounded-full bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-primary-700"
+                aria-expanded={showReservationForm}
               >
-                Nueva reservación
+                {showReservationForm ? 'Ocultar formulario' : 'Nueva reservación'}
               </button>
               <button
                 type="button"
@@ -729,14 +1030,16 @@ export default function ReservePage() {
           className="mb-6"
         />
       )}
-      <OrderReserveFlipCard variant="reserve" className="mb-8" />
-      <div className="mb-8 flex flex-wrap items-center justify-center gap-2 rounded-3xl bg-primary-50 px-4 py-3 text-sm text-primary-900 shadow-sm dark:bg-primary-900/30 dark:text-primary-100">
+      <div className="mb-8 rounded-3xl border border-primary-100 bg-white p-5 text-sm text-gray-700 shadow-sm dark:border-primary-900/40 dark:bg-gray-900 dark:text-gray-200">
+        Recibirás un código único para presentarlo a los anfitriones al llegar.
+      </div>
+      <div className="mb-8 flex flex-wrap items-center justify-center gap-2 rounded-3xl bg-primary-600 px-4 py-3 text-sm text-white shadow-lg dark:bg-primary-900/30 dark:text-primary-100">
         <span>Si necesitas ayuda, mándanos un</span>
         <a
           href={siteMetadata.whats}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-primary-500 shadow dark:bg-[#0f1728]"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white shadow transition-colors hover:bg-white/30 dark:bg-[#0f1728]"
           aria-label="WhatsApp"
         >
           <FaWhatsapp />
@@ -745,261 +1048,41 @@ export default function ReservePage() {
       </div>
       {isAuthenticated ? (
         <>
-          <form
-            id="reservation-form"
-            onSubmit={handleSubmit}
-            className="grid gap-8 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900 lg:grid-cols-[1.1fr,0.9fr]"
+          <div
+            className={`transition-all duration-500 ${
+              showReservationForm
+                ? 'max-h-[5000px] scale-100 opacity-100'
+                : 'pointer-events-none max-h-0 scale-[0.98] opacity-0'
+            }`}
+            aria-hidden={!showReservationForm}
           >
-            <div className="space-y-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                <div>
-                  <p className="mb-3 text-sm font-medium text-gray-800 dark:text-gray-200">Fecha</p>
-                  <div className="space-y-3 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                    <div className="flex items-center justify-between">
-                      <button
-                        type="button"
-                        className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 disabled:opacity-40 dark:border-gray-600 dark:text-gray-300"
-                        onClick={() => {
-                          if (!canGoPrev) return;
-                          const prev = new Date(
-                            displayMonth.getFullYear(),
-                            displayMonth.getMonth() - 1,
-                            1
-                          );
-                          setDisplayMonth(prev < minMonth ? minMonth : prev);
-                        }}
-                        disabled={!canGoPrev}
-                      >
-                        ← Anterior
-                      </button>
-                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        {displayMonth.toLocaleDateString('es-MX', {
-                          month: 'long',
-                          year: 'numeric',
-                        })}
-                      </p>
-                      <button
-                        type="button"
-                        className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 disabled:opacity-40 dark:border-gray-600 dark:text-gray-300"
-                        onClick={() => {
-                          if (!canGoNext) return;
-                          const next = new Date(
-                            displayMonth.getFullYear(),
-                            displayMonth.getMonth() + 1,
-                            1
-                          );
-                          setDisplayMonth(next > maxMonth ? maxMonth : next);
-                        }}
-                        disabled={!canGoNext}
-                      >
-                        Siguiente →
-                      </button>
-                    </div>
-                    <DayPicker
-                      mode="single"
-                      month={displayMonth}
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      onMonthChange={(month) => {
-                        const normalized = new Date(month.getFullYear(), month.getMonth(), 1);
-                        if (normalized < minMonth) {
-                          setDisplayMonth(minMonth);
-                          return;
-                        }
-                        if (normalized > maxMonth) {
-                          setDisplayMonth(maxMonth);
-                          return;
-                        }
-                        setDisplayMonth(normalized);
-                      }}
-                      disabled={{ before: today, after: maxReservationDate }}
-                      weekStartsOn={1}
-                      fromDate={today}
-                      toDate={maxReservationDate}
-                      showOutsideDays={false}
-                      modifiersClassNames={{
-                        selected: 'bg-primary-600 text-white',
-                        today: 'text-primary-600 font-semibold',
-                      }}
-                      styles={{
-                        caption: { color: '#1f2937' },
-                      }}
-                    />
-                    <p className="px-4 pb-4 text-xs text-gray-500 dark:text-gray-400">
-                      Fechas disponibles desde hoy hasta{' '}
-                      {maxReservationDate.toLocaleDateString('es-MX', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                      .
+            {showReservationForm && (
+              <div className="mb-8 rounded-3xl border border-primary-100 bg-white p-6 shadow-2xl dark:border-primary-900/40 dark:bg-gray-950">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.35em] text-primary-500">
+                      Crear reservación
+                    </p>
+                    <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-900">
+                      Completa los datos de tu visita
+                    </h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Selecciona fecha, hora, asistentes, agrega mensaje y revisa el resumen antes
+                      de confirmar.
                     </p>
                   </div>
-                </div>
-
-                <div>
-                  <p className="mb-3 text-sm font-medium text-gray-800 dark:text-gray-200">Hora</p>
-                  <select
-                    value={selectedTime ?? ''}
-                    onChange={(event) => setSelectedTime(event.target.value || null)}
-                    disabled={!selectedDate || isLoadingSlots || availableTimeSlots.length === 0}
-                    className="mt-2 block w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  <button
+                    type="button"
+                    onClick={handleOpenReservationForm}
+                    className="rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                   >
-                    <option value="">{timeSelectPlaceholder}</option>
-                    {availableTimeSlots.map((slot) => (
-                      <option key={slot} value={slot}>
-                        {slot}
-                      </option>
-                    ))}
-                  </select>
-                  {availabilityError && (
-                    <p className="mt-2 text-xs text-red-600 dark:text-red-400">
-                      {availabilityError}
-                    </p>
-                  )}
-                  {!availabilityError &&
-                    selectedDate &&
-                    !isLoadingSlots &&
-                    availableTimeSlots.length === 0 && (
-                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        Todos los horarios ya están reservados para esta fecha. Intenta con otro
-                        día.
-                      </p>
-                    )}
+                    Cerrar formulario
+                  </button>
                 </div>
+                <ReservationFormContent />
               </div>
-
-              <div>
-                <label
-                  htmlFor={fieldIds.people}
-                  className="block text-sm font-medium text-gray-800 dark:text-gray-200"
-                >
-                  Total de asistentes
-                </label>
-                <select
-                  id={fieldIds.people}
-                  value={selectedPeople}
-                  onChange={(event) => setSelectedPeople(Number(event.target.value))}
-                  className="mt-2 block w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                >
-                  {Array.from({ length: MAX_PEOPLE }, (_, index) => index + 1).map((value) => (
-                    <option key={value} value={value}>
-                      {value} {value === 1 ? 'persona' : 'personas'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                <p className="font-semibold text-gray-900 dark:text-gray-100">Sucursal</p>
-                <p>{BRANCH_LABEL}</p>
-                <p className="text-xs text-gray-500">
-                  Próximamente podrás elegir entre distintas ubicaciones de Xoco Café.
-                </p>
-              </div>
-
-              <div>
-                <label
-                  htmlFor={fieldIds.message}
-                  className="block text-sm font-medium text-gray-800 dark:text-gray-200"
-                >
-                  Mensaje (opcional)
-                </label>
-                <textarea
-                  id={fieldIds.message}
-                  value={message}
-                  onChange={(event) => setMessage(event.target.value)}
-                  rows={4}
-                  className="mt-2 block w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  placeholder="Cuéntanos si celebras algo especial o si tienes alguna preferencia."
-                />
-              </div>
-              <div className="grid gap-6 md:grid-cols-2">
-                <div>
-                  <label
-                    htmlFor={fieldIds.preOrder}
-                    className="block text-sm font-medium text-gray-800 dark:text-gray-200"
-                  >
-                    Alimentos y bebidas (opcional)
-                  </label>
-                  <textarea
-                    id={fieldIds.preOrder}
-                    value={preOrderItems}
-                    onChange={(event) => setPreOrderItems(event.target.value)}
-                    rows={4}
-                    className="mt-2 block w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                    placeholder="Ej. 2 capuccinos, 1 croissant, 1 matcha."
-                  />
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Puedes listar lo que quieres tener preparado; se elaborará hasta que llegues a
-                    la sucursal.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-6 rounded-2xl border border-primary-100 bg-primary-50/60 p-5 shadow-inner dark:border-primary-700/40 dark:bg-primary-900/20">
-              <div>
-                <h2 className="text-lg font-semibold text-primary-900 dark:text-primary-100">
-                  Resumen
-                </h2>
-                <p className="mt-1 text-sm text-primary-700 dark:text-primary-200">
-                  Confirma que los datos sean correctos antes de enviar.
-                </p>
-              </div>
-
-              <ul className="space-y-3 text-sm text-primary-900 dark:text-primary-100">
-                <li>
-                  <span className="font-medium">Personas:</span> {selectedPeople}
-                </li>
-                <li>
-                  <span className="font-medium">Fecha seleccionada:</span>{' '}
-                  {selectedDate ? selectedDate.toLocaleDateString('es-MX') : 'Pendiente'}
-                </li>
-                <li>
-                  <span className="font-medium">Hora:</span> {selectedTime ?? 'Pendiente'}
-                </li>
-                <li>
-                  <span className="font-medium">Sucursal:</span> {BRANCH_LABEL} (#{BRANCH_NUMBER})
-                </li>
-                {preOrderItems.trim() && (
-                  <li>
-                    <span className="font-medium">Pre-orden:</span> {preOrderItems.trim()}
-                  </li>
-                )}
-              </ul>
-
-              {alert && (
-                <div
-                  className={`rounded-xl px-4 py-3 text-sm ${
-                    alert.type === 'success'
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-100'
-                      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-100'
-                  }`}
-                >
-                  {alert.text}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isSubmitting || hasReachedReservationLimit}
-                className="w-full rounded-full bg-primary-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isSubmitting ? 'Creando reserva...' : 'Confirmar reserva'}
-              </button>
-              {hasReachedReservationLimit && (
-                <p className="text-xs text-red-600 dark:text-red-400">
-                  Solo puedes tener 3 reservas activas. Cancela una o espera a que concluya para
-                  crear otra.
-                </p>
-              )}
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Presenta tu código 5 minutos antes; la tolerancia es de 10 minutos para mantener tu
-                mesa.
-              </p>
-            </div>
-          </form>
+            )}
+          </div>
 
           <section className="mt-10 space-y-6 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -1016,15 +1099,16 @@ export default function ReservePage() {
               <div className="flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
-                  onClick={handleScrollToForm}
+                  onClick={handleOpenReservationForm}
                   disabled={hasReachedReservationLimit}
                   className={`rounded-full border px-4 py-2 text-sm font-semibold ${
                     hasReachedReservationLimit
                       ? 'border-gray-300 text-gray-400'
                       : 'border-primary-600 text-primary-600 hover:bg-primary-50 dark:border-primary-400 dark:text-primary-200'
                   }`}
+                  aria-expanded={showReservationForm}
                 >
-                  Crear nueva reserva
+                  {showReservationForm ? 'Ocultar formulario' : 'Crear nueva reserva'}
                 </button>
                 <button
                   type="button"
@@ -1089,14 +1173,12 @@ export default function ReservePage() {
               >
                 <ReservationColumn
                   title="Pendientes"
-                  highlight="text-white"
                   reservations={pendingReservations}
                   emptyLabel="No tienes reservas pendientes. Agenda una para asegurar tu lugar."
                   onSelect={(reservation) => setSelectedReservation(reservation)}
                 />
                 <ReservationColumn
                   title="Completadas"
-                  highlight="text-white"
                   reservations={completedReservations}
                   emptyLabel="Aún no completas reservaciones recientes."
                   onSelect={(reservation) => setSelectedReservation(reservation)}
@@ -1106,16 +1188,18 @@ export default function ReservePage() {
           </section>
 
           {token && (
-            <section className="mt-6 space-y-6 rounded-3xl border border-white/10 bg-[#070d1a] p-6 text-white shadow-lg">
+            <section className="mt-6 space-y-6 rounded-3xl border border-gray-200 bg-white p-6 text-gray-900 shadow-lg dark:border-white/10 dark:bg-[#070d1a] dark:text-white">
               <div>
-                <h2 className="text-xl font-semibold text-white">Reservas no completadas</h2>
-                <p className="text-sm text-white/70">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Reservas no completadas
+                </h2>
+                <p className="text-sm text-gray-700 dark:text-white">
                   Si no acudiste antes del corte (23:59), movemos la reserva aquí en color naranja y
                   eliminamos su QR. El registro se conserva por 7 días.
                 </p>
               </div>
               {failedReservations.length === 0 ? (
-                <p className="text-sm text-white/60">
+                <p className="text-sm text-gray-600 dark:text-white">
                   No tienes reservas pendientes de seguimiento. ¡Todo al corriente!
                 </p>
               ) : (
@@ -1244,49 +1328,55 @@ export default function ReservePage() {
 
 const RESERVATION_STATUS_STYLES: Record<string, { badge: string; text: string; label: string }> = {
   pending: {
-    badge: 'bg-white/10 text-white border border-white/15',
-    text: 'text-white',
+    badge:
+      'border border-primary-200 bg-primary-50 text-primary-700 dark:border-white/15 dark:bg-white/10 dark:text-white',
+    text: 'text-primary-700 dark:text-white',
     label: 'Pendiente',
   },
   completed: {
-    badge: 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30',
-    text: 'text-emerald-100',
+    badge:
+      'border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/20 dark:text-emerald-200',
+    text: 'text-emerald-700 dark:text-emerald-100',
     label: 'Completada',
   },
   past: {
-    badge: 'bg-orange-500/20 text-orange-200 border border-orange-400/30',
-    text: 'text-orange-100',
+    badge:
+      'border border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-400/30 dark:bg-orange-500/20 dark:text-orange-200',
+    text: 'text-orange-700 dark:text-orange-100',
     label: 'Histórica',
   },
   cancelled: {
-    badge: 'bg-red-500/20 text-red-100 border border-red-400/30',
-    text: 'text-red-200',
+    badge:
+      'border border-red-200 bg-red-50 text-red-700 dark:border-red-400/30 dark:bg-red-500/20 dark:text-red-100',
+    text: 'text-red-700 dark:text-red-200',
     label: 'Cancelada',
   },
 };
 
 const ReservationColumn = ({
   title,
-  highlight,
+  highlight = 'text-primary-700 dark:text-[#d4a373]',
   reservations,
   emptyLabel,
   onSelect,
 }: {
   title: string;
-  highlight: string;
+  highlight?: string;
   reservations: ReservationRecord[];
   emptyLabel: string;
   onSelect: (reservation: ReservationRecord) => void;
 }) => {
   const pagination = usePagination(reservations, 3);
   return (
-    <div className="rounded-3xl border border-white/10 bg-[#070d1a] p-5 text-white shadow-lg">
+    <div className="rounded-3xl border border-gray-200 bg-white p-5 text-gray-900 shadow-lg dark:border-white/10 dark:bg-[#070d1a] dark:text-white">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.35em] text-primary-200">{title}</p>
+          <p className="text-xs uppercase tracking-[0.35em] text-gray-500 dark:text-primary-200">
+            {title}
+          </p>
           <p className={`text-lg font-semibold ${highlight}`}>{reservations.length} reservas</p>
         </div>
-        <span className="text-xs text-white/60">
+        <span className="text-xs text-gray-500 dark:text-white/60">
           {pagination.totalItems > 3
             ? `Mostrando ${pagination.items.length} de ${pagination.totalItems}`
             : null}
@@ -1294,7 +1384,7 @@ const ReservationColumn = ({
       </div>
       <div className="mt-4 space-y-3">
         {reservations.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-white/15 bg-[#111b31] px-4 py-3 text-sm text-white/70">
+          <p className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500 dark:border-white/15 dark:bg-[#111b31] dark:text-white/70">
             {emptyLabel}
           </p>
         ) : (
@@ -1367,14 +1457,14 @@ const ReservationCard = ({
     <button
       type="button"
       onClick={() => onSelect(reservation)}
-      className="w-full rounded-[32px] border border-white/10 bg-[#0f1728] px-5 py-4 text-left text-white shadow-sm transition hover:bg-[#151f36] focus:outline-none focus:ring-2 focus:ring-primary-500"
+      className="w-full rounded-[32px] border border-gray-200 bg-white px-5 py-4 text-left text-gray-900 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-white/10 dark:bg-[#0f1728] dark:text-white dark:hover:bg-[#151f36]"
     >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.35em] text-primary-300">
+          <p className="text-xs uppercase tracking-[0.35em] text-primary-600 dark:text-primary-300">
             {reservation.reservationCode}
           </p>
-          <p className="text-base font-semibold text-white">
+          <p className="text-base font-semibold text-gray-900 dark:text-white">
             {formatReservationDateTime(reservation)}
           </p>
         </div>
@@ -1382,7 +1472,7 @@ const ReservationCard = ({
           {statusStyles.label}
         </span>
       </div>
-      <p className="mt-1 text-sm text-white/80">
+      <p className="mt-1 text-sm text-gray-600 dark:text-white/80">
         {reservation.peopleCount} {reservation.peopleCount === 1 ? 'persona' : 'personas'} ·{' '}
         {branchLabel}
         {reservation.branchNumber ? ` (#${reservation.branchNumber})` : ''}

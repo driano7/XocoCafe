@@ -20,18 +20,42 @@ export interface VirtualTicketProps {
     orderNumber?: string | null;
     ticketId?: string | null;
     userEmail?: string | null;
+    customerName?: string | null;
     createdAt?: string | null;
     total?: number | null;
     tipAmount?: number | null;
     tipPercent?: number | null;
+    subtotal?: number | null;
+    vatAmount?: number | null;
+    vatPercent?: number | null;
+    deliveryTipAmount?: number | null;
+    deliveryTipPercent?: number | null;
     items?: any;
+    qrPayload?: any;
     type?: string | null;
+    shipping?: {
+      address?: {
+        street?: string;
+        city?: string;
+        state?: string;
+        postalCode?: string;
+        reference?: string;
+      };
+      contactPhone?: string | null;
+      isWhatsapp?: boolean | null;
+      addressId?: string | null;
+      deliveryTip?: {
+        amount?: number | null;
+        percent?: number | null;
+      } | null;
+    } | null;
   };
   showQr?: boolean;
 }
 
 const QR_API_URL = 'https://api.qrserver.com/v1/create-qr-code/';
-const QR_IMAGE_SIZE = '150x150';
+const QR_IMAGE_SIZE = '320x320';
+const FISCAL_ADDRESS = 'Escolar 04360, C.U., Coyoacán, 04510 Ciudad de México, CDMX';
 const BEVERAGE_KEYWORDS = [
   'bebida',
   'beverage',
@@ -65,6 +89,12 @@ const FOOD_KEYWORDS = [
   'croissant',
 ];
 const PACKAGE_KEYWORDS = ['paquete', 'combo'];
+const CATEGORY_LABELS: Record<ItemCategory, string> = {
+  beverage: 'Bebidas',
+  food: 'Alimentos',
+  package: 'Paquetes',
+  other: 'Otros',
+};
 
 const normalizeText = (value?: string | null) =>
   (value ?? '').toString().toLowerCase().normalize('NFD');
@@ -124,60 +154,194 @@ const summarizeItems = (items: OrderItem[]) =>
     { beverages: 0, foods: 0, packages: 0, other: 0, total: 0 }
   );
 
+const parseMaybeJson = (value: any) => {
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch (error) {
+      console.warn('No pudimos parsear items del ticket:', error);
+      return null;
+    }
+  }
+  return value;
+};
+
+const parseTextItem = (value: string): OrderItem | null => {
+  const normalized = value.trim();
+  if (!normalized) return null;
+  const match = normalized.match(/^[^\d]*(?<qty>\d+)\s*[x×]\s*(?<name>.+)$/i);
+  const quantity = match?.groups?.qty ? Number(match.groups.qty) : 1;
+  const name = (match?.groups?.name ?? normalized).trim();
+  return {
+    name,
+    quantity: normalizeQuantity(quantity),
+    price: 0,
+    category: classifyItemCategory({ name }),
+    size: null,
+    packageItems: null,
+  };
+};
+
+const buildOrderItem = (item: any): OrderItem => {
+  if (typeof item === 'string') {
+    const parsed = parseTextItem(item);
+    if (parsed) return parsed;
+    return {
+      name: item.trim() || 'Producto',
+      quantity: 1,
+      price: 0,
+      category: 'other',
+      size: null,
+      packageItems: null,
+    };
+  }
+  return {
+    name: String(
+      item?.name ??
+        item?.productName ??
+        item?.product?.name ??
+        item?.product?.displayName ??
+        item?.productId ??
+        item?.n ??
+        'Producto'
+    ),
+    quantity: normalizeQuantity(item?.quantity ?? item?.qty ?? item?.q),
+    price: Number.isFinite(Number(item?.price ?? item?.amount ?? item?.p))
+      ? Number(item?.price ?? item?.amount ?? item?.p)
+      : 0,
+    category:
+      typeof item?.category === 'string'
+        ? (item.category as ItemCategory)
+        : typeof item?.c === 'string'
+        ? (item.c as ItemCategory)
+        : classifyItemCategory(item),
+    size: typeof item?.size === 'string' ? item.size : typeof item?.s === 'string' ? item.s : null,
+    packageItems: Array.isArray(item?.packageItems)
+      ? item.packageItems.map((entry: any) => String(entry))
+      : null,
+  };
+};
+
+const isPotentialItemEntry = (value: any) => {
+  if (typeof value === 'string') {
+    return /\d+\s*[x×]/i.test(value);
+  }
+  if (typeof value === 'object' && value !== null) {
+    return (
+      'name' in value ||
+      'productName' in value ||
+      'productId' in value ||
+      'n' in value ||
+      'description' in value ||
+      'text' in value
+    );
+  }
+  return false;
+};
+
+const findNestedItemArray = (value: any): any[] | null => {
+  if (!value) return null;
+  if (Array.isArray(value)) {
+    return value.some(isPotentialItemEntry) ? value : null;
+  }
+  if (typeof value === 'object') {
+    for (const key of Object.keys(value)) {
+      const nested = findNestedItemArray((value as Record<string, unknown>)[key]);
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+  return null;
+};
+
+const extractItemsFromSource = (source: any): OrderItem[] => {
+  if (!source) return [];
+  const parsedSource = parseMaybeJson(source) ?? source;
+
+  const mapEntries = (entries: any[]) => entries.map((entry) => buildOrderItem(entry));
+
+  if (Array.isArray(parsedSource)) {
+    return mapEntries(parsedSource);
+  }
+  if (typeof parsedSource === 'object') {
+    if (Array.isArray(parsedSource.list)) {
+      return mapEntries(parsedSource.list);
+    }
+    if (Array.isArray(parsedSource.items)) {
+      return mapEntries(parsedSource.items);
+    }
+    if (typeof parsedSource.body === 'string') {
+      const entries = parsedSource.body
+        .split(/\r?\n/)
+        .map((line: string) => line.trim())
+        .filter(Boolean);
+      if (entries.length) {
+        return entries.map((entry: string) => buildOrderItem(entry));
+      }
+    }
+    if (Array.isArray(parsedSource.body)) {
+      return mapEntries(parsedSource.body);
+    }
+    if (
+      Array.isArray(parsedSource.beverages) ||
+      Array.isArray(parsedSource.foods) ||
+      Array.isArray(parsedSource.others)
+    ) {
+      const beverages = Array.isArray(parsedSource.beverages) ? parsedSource.beverages : [];
+      const foods = Array.isArray(parsedSource.foods) ? parsedSource.foods : [];
+      const others = Array.isArray(parsedSource.others) ? parsedSource.others : [];
+      return mapEntries([...beverages, ...foods, ...others]);
+    }
+    if (Array.isArray(parsedSource.i)) {
+      return parsedSource.i.map((entry: any) => ({
+        name: String(entry?.n ?? 'Producto'),
+        quantity: normalizeQuantity(entry?.q),
+        price: Number.isFinite(Number(entry?.p)) ? Number(entry?.p) : 0,
+        category: typeof entry?.c === 'string' ? (entry.c as ItemCategory) : 'other',
+        size: typeof entry?.s === 'string' ? entry.s : null,
+      }));
+    }
+    const nested = findNestedItemArray(parsedSource);
+    if (nested) {
+      return mapEntries(nested);
+    }
+  }
+  return [];
+};
+
 const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
   ({ order, showQr = true }, ref) => {
     const [qrSrc, setQrSrc] = useState<string | null>(null);
 
     const items = useMemo<OrderItem[]>(() => {
-      if (!order.items) return [];
-      const normalizeItem = (item: any): OrderItem => ({
-        name: String(
-          item.name ??
-            item.productName ??
-            item.product?.name ??
-            item.product?.displayName ??
-            item.productId ??
-            'Producto'
-        ),
-        quantity: normalizeQuantity(item.quantity),
-        price: Number.isFinite(Number(item.price ?? item.amount))
-          ? Number(item.price ?? item.amount)
-          : 0,
-        category: classifyItemCategory(item),
-        size: typeof item.size === 'string' ? item.size : null,
-        packageItems: Array.isArray(item.packageItems)
-          ? item.packageItems.map((entry: any) => String(entry))
-          : null,
-      });
-
-      if (Array.isArray(order.items)) {
-        return order.items.map(normalizeItem);
+      const fromOrder = extractItemsFromSource(order.items);
+      if (fromOrder.length > 0) {
+        return fromOrder;
       }
-      if (
-        typeof order.items === 'object' &&
-        order.items !== null &&
-        Array.isArray((order.items as any).list)
-      ) {
-        return (order.items as any).list.map(normalizeItem);
-      }
-      if (
-        typeof order.items === 'object' &&
-        order.items !== null &&
-        (Array.isArray((order.items as any).beverages) ||
-          Array.isArray((order.items as any).foods) ||
-          Array.isArray((order.items as any).others))
-      ) {
-        const beverages = Array.isArray((order.items as any).beverages)
-          ? (order.items as any).beverages
-          : [];
-        const foods = Array.isArray((order.items as any).foods) ? (order.items as any).foods : [];
-        const others = Array.isArray((order.items as any).others)
-          ? (order.items as any).others
-          : [];
-        return [...beverages, ...foods, ...others].map(normalizeItem);
+      if (order.qrPayload) {
+        const parsedQr = parseMaybeJson(order.qrPayload) ?? order.qrPayload;
+        const fromQr = extractItemsFromSource(parsedQr);
+        if (fromQr.length > 0) {
+          return fromQr;
+        }
       }
       return [];
-    }, [order.items]);
+    }, [order.items, order.qrPayload]);
+
+    const groupedItems = useMemo(() => {
+      const groups: Record<ItemCategory, OrderItem[]> = {
+        beverage: [],
+        food: [],
+        package: [],
+        other: [],
+      };
+      items.forEach((item) => {
+        groups[item.category ?? 'other'].push(item);
+      });
+      return groups;
+    }, [items]);
+    const categoryOrder: ItemCategory[] = ['beverage', 'food', 'package', 'other'];
 
     const formatCurrency = (value?: number | null) =>
       new Intl.NumberFormat('es-MX', {
@@ -222,64 +386,12 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
       return null;
     }, [order.items, order.tipPercent, order.total, tipAmount]);
 
-    const qrValue = useMemo(() => {
-      const itemsCount = items.reduce((acc, item) => acc + item.quantity, 0);
-      const beveragePayload = items
-        .filter((item) => (item.category ?? 'beverage') === 'beverage')
-        .map((item) => ({
-          name: item.name,
-          quantity: item.quantity,
-          unitPrice: item.price,
-          size: item.size ?? null,
-        }));
-      const foodPayload = items
-        .filter((item) => item.category === 'food')
-        .map((item) => ({
-          name: item.name,
-          quantity: item.quantity,
-          unitPrice: item.price,
-        }));
-      const packagePayload = items
-        .filter((item) => item.category === 'package')
-        .map((item) => ({
-          name: item.name,
-          quantity: item.quantity,
-          unitPrice: item.price,
-          contents: item.packageItems ?? [],
-        }));
-      const payload = {
-        ticketId: order.ticketId ?? order.orderNumber ?? order.id,
-        clientEmail: order.userEmail ?? 'desconocido',
-        issuedAt: order.createdAt ?? new Date().toISOString(),
-        orders: {
-          beverages: beveragePayload,
-          foods: foodPayload,
-          packages: packagePayload,
-        },
-        totals: {
-          itemsCount,
-          totalAmount: order.total ?? 0,
-          tipAmount,
-        },
-        items: items.map((item) => ({
-          name: item.name,
-          quantity: item.quantity,
-          category: item.category,
-          size: item.size ?? null,
-          packageItems: item.packageItems ?? null,
-        })),
-      };
-      return JSON.stringify(payload);
-    }, [
-      items,
-      order.createdAt,
-      order.id,
-      order.orderNumber,
-      order.ticketId,
-      order.total,
-      order.userEmail,
-      tipAmount,
-    ]);
+    const totalsSnapshot = useMemo(() => {
+      if (order.items && typeof order.items === 'object' && (order.items as any)?.totals) {
+        return (order.items as any).totals;
+      }
+      return null;
+    }, [order.items]);
 
     const summary = useMemo(() => summarizeItems(items), [items]);
     const packageDetails = useMemo(
@@ -293,6 +405,169 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
           })),
       [items]
     );
+
+    const deliveryTipAmount = useMemo(() => {
+      if (typeof order.deliveryTipAmount === 'number') {
+        return Math.max(order.deliveryTipAmount, 0);
+      }
+      if (
+        order.shipping?.deliveryTip &&
+        typeof order.shipping.deliveryTip.amount === 'number' &&
+        order.shipping.deliveryTip.amount > 0
+      ) {
+        return order.shipping.deliveryTip.amount;
+      }
+      if (
+        order.items &&
+        typeof order.items === 'object' &&
+        (order.items as any)?.deliveryTip &&
+        typeof (order.items as any).deliveryTip.amount === 'number'
+      ) {
+        return (order.items as any).deliveryTip.amount;
+      }
+      if (totalsSnapshot && typeof totalsSnapshot.deliveryTip === 'number') {
+        return totalsSnapshot.deliveryTip;
+      }
+      return 0;
+    }, [order.deliveryTipAmount, order.items, order.shipping?.deliveryTip, totalsSnapshot]);
+
+    const deliveryTipPercent = useMemo(() => {
+      if (typeof order.deliveryTipPercent === 'number') {
+        return order.deliveryTipPercent;
+      }
+      if (order.shipping?.deliveryTip && typeof order.shipping.deliveryTip.percent === 'number') {
+        return order.shipping.deliveryTip.percent;
+      }
+      if (
+        order.items &&
+        typeof order.items === 'object' &&
+        (order.items as any)?.deliveryTip &&
+        typeof (order.items as any).deliveryTip.percent === 'number'
+      ) {
+        return (order.items as any).deliveryTip.percent;
+      }
+      return null;
+    }, [order.deliveryTipPercent, order.items, order.shipping?.deliveryTip]);
+
+    const lineItemsTotal = useMemo(
+      () => items.reduce((total, item) => total + item.price * item.quantity, 0),
+      [items]
+    );
+
+    const totalWithVatBeforeTips = useMemo(() => {
+      if (typeof order.total === 'number') {
+        return Math.max(order.total - tipAmount - deliveryTipAmount, 0);
+      }
+      return Math.max(lineItemsTotal, 0);
+    }, [deliveryTipAmount, lineItemsTotal, order.total, tipAmount]);
+
+    const totalWithoutTips = totalWithVatBeforeTips;
+
+    const explicitSubtotal =
+      typeof order.subtotal === 'number'
+        ? order.subtotal
+        : typeof totalsSnapshot?.subtotal === 'number'
+        ? totalsSnapshot.subtotal
+        : null;
+    const explicitVatAmount =
+      typeof order.vatAmount === 'number'
+        ? order.vatAmount
+        : typeof totalsSnapshot?.vat === 'number'
+        ? totalsSnapshot.vat
+        : null;
+    const derivedVatPercent =
+      typeof order.vatPercent === 'number'
+        ? order.vatPercent
+        : typeof totalsSnapshot?.vatPercent === 'number'
+        ? totalsSnapshot.vatPercent
+        : 16;
+
+    const subtotalBeforeVat = useMemo(() => {
+      if (typeof explicitSubtotal === 'number') {
+        return Math.max(explicitSubtotal, 0);
+      }
+      if (typeof explicitVatAmount === 'number') {
+        return Math.max(totalWithoutTips - explicitVatAmount, 0);
+      }
+      const vatFactor = (derivedVatPercent ?? 0) / 100;
+      if (vatFactor > 0 && totalWithoutTips > 0) {
+        return Math.max(totalWithoutTips / (1 + vatFactor), 0);
+      }
+      return Math.max(totalWithoutTips, 0);
+    }, [derivedVatPercent, explicitSubtotal, explicitVatAmount, totalWithoutTips]);
+
+    const vatAmount = useMemo(() => {
+      if (typeof explicitVatAmount === 'number') {
+        return Math.max(explicitVatAmount, 0);
+      }
+      return Math.max(totalWithoutTips - subtotalBeforeVat, 0);
+    }, [explicitVatAmount, subtotalBeforeVat, totalWithoutTips]);
+
+    const grandTotal = useMemo(() => {
+      if (typeof order.total === 'number') {
+        return order.total;
+      }
+      return totalWithVatBeforeTips + tipAmount + deliveryTipAmount;
+    }, [deliveryTipAmount, order.total, tipAmount, totalWithVatBeforeTips]);
+
+    const qrValue = useMemo(() => {
+      const payload: Record<string, unknown> = {
+        t: (order.ticketId ?? order.orderNumber ?? order.id).trim().toUpperCase(),
+        c: (order.customerName ?? order.userEmail ?? 'n/a').trim(),
+        a: Math.round(grandTotal * 100) / 100,
+        tip: {
+          a: Math.round(tipAmount * 100) / 100,
+          p: tipPercent ?? null,
+        },
+        i: items.slice(0, 20).map((item) => {
+          const entry: Record<string, string | number> = {
+            n: item.name,
+            q: item.quantity,
+            c: item.category,
+          };
+          if (item.size) entry.s = item.size;
+          return entry;
+        }),
+        addr: order.shipping?.addressId ?? undefined,
+        dt:
+          deliveryTipAmount > 0
+            ? {
+                a: Math.round(deliveryTipAmount * 100) / 100,
+                p: deliveryTipPercent ?? null,
+              }
+            : undefined,
+        ts: (() => {
+          const date = order.createdAt ? new Date(order.createdAt) : new Date();
+          if (Number.isNaN(date.getTime())) {
+            return new Date().toISOString().slice(0, 16);
+          }
+          const day = String(date.getDate()).padStart(2, '0');
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const year = date.getFullYear();
+          const hours = String(date.getHours()).padStart(2, '0');
+          const minutes = String(date.getMinutes()).padStart(2, '0');
+          return `${day}/${month}/${year}-${hours}:${minutes}`;
+        })(),
+        o: order.id,
+      };
+      if (!payload.addr) delete payload.addr;
+      if (!payload.dt) delete payload.dt;
+      return JSON.stringify(payload);
+    }, [
+      deliveryTipAmount,
+      deliveryTipPercent,
+      grandTotal,
+      items,
+      order.customerName,
+      order.id,
+      order.orderNumber,
+      order.shipping?.addressId,
+      order.ticketId,
+      order.userEmail,
+      tipAmount,
+      tipPercent,
+      order.createdAt,
+    ]);
 
     const qrRequestUrl = useMemo(() => {
       return `${QR_API_URL}?size=${QR_IMAGE_SIZE}&data=${encodeURIComponent(qrValue)}`;
@@ -337,13 +612,17 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
     return (
       <div
         ref={ref}
-        className="w-[320px] rounded-3xl border border-dashed border-primary-200 bg-white p-5 text-sm text-gray-800 shadow-2xl"
+        className="w-[360px] rounded-3xl border border-dashed border-primary-200 bg-white p-5 text-sm text-gray-800 shadow-2xl"
       >
         <div className="text-center">
           <p className="text-xs uppercase tracking-[0.35em] text-primary-500">Xoco Café</p>
           <h3 className="mt-2 text-xl font-semibold text-gray-900">Ticket de pedido</h3>
           <p className="text-xs text-gray-500">
             {order.createdAt ? new Date(order.createdAt).toLocaleString('es-MX') : ''}
+          </p>
+          <p className="text-[11px] text-gray-500">{FISCAL_ADDRESS}</p>
+          <p className="mt-1 text-xs font-medium text-gray-600">
+            Cliente: {(order.customerName ?? order.userEmail ?? 'Público general').trim()}
           </p>
         </div>
 
@@ -367,32 +646,103 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
 
         <div className="my-3 border-t border-dashed border-gray-200" />
 
-        <ul className="space-y-2">
+        <div className="space-y-4">
           {items.length === 0 ? (
-            <li className="text-gray-500">Sin artículos registrados.</li>
+            <p className="text-sm text-gray-500">Sin artículos registrados.</p>
           ) : (
-            items.map((item, index) => (
-              <li key={`${item.name}-${index}`} className="text-sm">
-                <div className="flex justify-between">
-                  <span>
-                    {item.quantity} × {item.name}
-                    {item.size ? (
-                      <span className="ml-1 text-xs uppercase text-gray-500">({item.size})</span>
-                    ) : null}
-                  </span>
-                  <span className="font-semibold">
-                    {formatCurrency(item.price * item.quantity)}
-                  </span>
+            categoryOrder.map((category) => {
+              const list = groupedItems[category];
+              if (!list.length) return null;
+              return (
+                <div key={category}>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-primary-500">
+                    {CATEGORY_LABELS[category]}
+                  </p>
+                  <ul className="mt-1 space-y-1">
+                    {list.map((item, index) => (
+                      <li key={`${category}-${item.name}-${index}`} className="text-sm">
+                        <div className="flex justify-between">
+                          <span>
+                            {item.quantity} × {item.name}
+                            {item.size ? (
+                              <span className="ml-1 text-xs uppercase text-gray-500">
+                                ({item.size})
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="font-semibold">
+                            {formatCurrency(item.price * item.quantity)}
+                          </span>
+                        </div>
+                        {item.category === 'package' && item.packageItems?.length ? (
+                          <p className="text-xs text-gray-500">
+                            Incluye: {item.packageItems.join(', ')}
+                          </p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                {item.category === 'package' && item.packageItems?.length ? (
-                  <p className="text-xs text-gray-500">Incluye: {item.packageItems.join(', ')}</p>
-                ) : null}
-              </li>
-            ))
+              );
+            })
           )}
-        </ul>
+        </div>
+
+        {(() => {
+          const address = order.shipping?.address;
+          const hasAddressDetails =
+            !!address &&
+            [address.street, address.city, address.state, address.postalCode, address.reference]
+              .filter((value) => typeof value === 'string')
+              .some((value) => Boolean((value as string).trim().length));
+          const contactPhone = order.shipping?.contactPhone?.trim();
+          if (!hasAddressDetails) {
+            return null;
+          }
+          return (
+            <div className="mt-4 rounded-2xl border border-dashed border-primary-100 bg-primary-50/40 p-3 text-xs text-primary-900">
+              <p className="font-semibold uppercase tracking-[0.35em] text-[10px] text-primary-600">
+                Entrega
+              </p>
+              <p className="mt-1">
+                {address?.street}
+                {address?.city ? `, ${address.city}` : ''}
+                {address?.state ? `, ${address.state}` : ''}
+                {address?.postalCode ? ` · CP ${address.postalCode}` : ''}
+              </p>
+              {address?.reference && (
+                <p className="text-[11px] text-primary-700">Referencia: {address.reference}</p>
+              )}
+              {contactPhone && (
+                <p className="mt-1 text-[11px] font-medium">
+                  Contacto: {contactPhone} {order.shipping?.isWhatsapp ? '(WhatsApp)' : ''}
+                </p>
+              )}
+            </div>
+          );
+        })()}
 
         {summary.total > 0 && <TicketOrderSummary stats={summary} packages={packageDetails} />}
+
+        <div className="my-3 border-t border-dashed border-gray-200" />
+
+        <div className="space-y-1 text-sm text-gray-600">
+          <div className="flex items-center justify-between">
+            <span>Subtotal (sin IVA)</span>
+            <span className="font-semibold text-gray-900">{formatCurrency(subtotalBeforeVat)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>
+              IVA ({Number.isFinite(derivedVatPercent) ? Number(derivedVatPercent).toFixed(2) : '0'}
+              %)
+            </span>
+            <span className="font-semibold text-gray-900">{formatCurrency(vatAmount)}</span>
+          </div>
+          <div className="flex items-center justify-between text-base font-semibold text-gray-900">
+            <span>Total con IVA</span>
+            <span>{formatCurrency(totalWithoutTips)}</span>
+          </div>
+        </div>
 
         <div className="my-3 border-t border-dashed border-gray-200" />
 
@@ -411,19 +761,25 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
         <div className="my-3 border-t border-dashed border-gray-200" />
 
         <div className="flex items-center justify-between text-base font-semibold text-gray-900">
-          <span>Total</span>
-          <span>{formatCurrency(order.total)}</span>
+          <span>Total general</span>
+          <span>{formatCurrency(grandTotal)}</span>
         </div>
         {showQr && (
           <div className="mt-4 flex flex-col items-center space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary-600">
+              Gracias por su compra
+            </p>
             <img
               src={qrSrc ?? qrRequestUrl}
               alt="Código QR del ticket"
-              className="h-36 w-36 rounded-lg border border-gray-200 bg-white p-2"
+              className="h-44 w-44 rounded-2xl border border-gray-200 bg-white p-2"
               loading="lazy"
             />
             <p className="text-center text-xs text-gray-500">
               Escanea este código para facilitar la entrega.
+            </p>
+            <p className="text-center text-[11px] text-gray-500">
+              Este documento no es un comprobante fiscal.
             </p>
           </div>
         )}

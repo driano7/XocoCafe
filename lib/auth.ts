@@ -1,8 +1,36 @@
+/*
+ * --------------------------------------------------------------------
+ *  Xoco Café — Software Property
+ *  Copyright (c) 2025 Xoco Café
+ *  Principal Developer: Donovan Riaño
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at:
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ *  --------------------------------------------------------------------
+ *  PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
+ *  Copyright (c) 2025 Xoco Café.
+ *  Desarrollador Principal: Donovan Riaño.
+ *
+ *  Este archivo está licenciado bajo la Apache License 2.0.
+ *  Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
+ * --------------------------------------------------------------------
+ */
+
 import { randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { supabase } from '@/lib/supabase';
 import { decryptUserData } from '@/lib/encryption';
+import { decryptAddressRow, type AddressRow } from '@/lib/address-vault';
 import type { AuthUser } from './validations/auth';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
@@ -137,7 +165,7 @@ export async function getUserById(id: string) {
   const { data: user, error } = await supabase
     .from('users')
     .select(
-      'id,email,clientId,firstNameEncrypted,firstNameIv,firstNameTag,firstNameSalt,lastNameEncrypted,lastNameIv,lastNameTag,lastNameSalt,phoneEncrypted,phoneIv,phoneTag,phoneSalt,walletAddress,city,country,favoriteColdDrink,favoriteHotDrink,favoriteFood,termsAccepted,privacyAccepted,marketingEmail,marketingSms,marketingPush,createdAt,lastLoginAt,avatarUrl'
+      'id,email,clientId,firstNameEncrypted,firstNameIv,firstNameTag,firstNameSalt,lastNameEncrypted,lastNameIv,lastNameTag,lastNameSalt,phoneEncrypted,phoneIv,phoneTag,phoneSalt,walletAddress,city,country,favoriteColdDrink,favoriteHotDrink,favoriteFood,termsAccepted,privacyAccepted,marketingEmail,marketingSms,marketingPush,createdAt,lastLoginAt,avatarUrl,loyaltyActivatedAt'
     )
     .eq('id', id)
     .maybeSingle();
@@ -149,13 +177,15 @@ export async function getUserById(id: string) {
   if (!user) return null;
 
   const [
-    { data: addresses, error: addressesError },
+    { data: addressRows, error: addressesError },
     { data: loyaltyPoints, error: loyaltyError },
     { data: orders, error: ordersError },
   ] = await Promise.all([
     supabase
       .from('addresses')
-      .select('id,type,street,city,state,postalCode,country,isDefault')
+      .select(
+        'id,userId,label,nickname,type,street,city,state,postalCode,country,reference,additionalInfo,isDefault,payload,payloadIv,payloadTag,payloadSalt,createdAt,updatedAt'
+      )
       .eq('userId', id),
     supabase.from('loyalty_points').select('*').eq('userId', id),
     supabase
@@ -177,6 +207,8 @@ export async function getUserById(id: string) {
   // Descifrar datos sensibles
   const decryptedData = decryptUserData(user.email, user);
   const avatarSignedUrl = await getSignedAvatarUrl(user.avatarUrl as string | null);
+  const addresses =
+    addressRows?.map((row) => decryptAddressRow(user.email, row as AddressRow)) ?? [];
 
   // Convertir null a undefined para campos opcionales
   return {
@@ -192,6 +224,7 @@ export async function getUserById(id: string) {
     favoriteFood: user.favoriteFood || undefined,
     avatarUrl: avatarSignedUrl,
     avatarStoragePath: (user.avatarUrl as string | null) || null,
+    loyaltyActivatedAt: user.loyaltyActivatedAt || null,
     addresses,
     loyaltyPoints,
     orders,
@@ -228,7 +261,12 @@ export async function logDataRetentionAction(
 export async function exportUserData(userId: string) {
   const [userResult, addressesResult, ordersResult, loyaltyPointsResult] = await Promise.all([
     supabase.from('users').select('*').eq('id', userId).maybeSingle(),
-    supabase.from('addresses').select('*').eq('userId', userId),
+    supabase
+      .from('addresses')
+      .select(
+        'id,userId,label,nickname,type,street,city,state,postalCode,country,reference,additionalInfo,isDefault,payload,payloadIv,payloadTag,payloadSalt,createdAt,updatedAt'
+      )
+      .eq('userId', userId),
     supabase.from('orders').select('*, items:order_items(*)').eq('userId', userId),
     supabase.from('loyalty_points').select('*').eq('userId', userId),
   ]);
@@ -240,7 +278,9 @@ export async function exportUserData(userId: string) {
 
   return {
     ...userResult.data,
-    addresses: addressesResult.data,
+    addresses: (addressesResult.data ?? []).map((row) =>
+      userResult.data?.email ? decryptAddressRow(userResult.data.email, row as AddressRow) : row
+    ),
     orders: ordersResult.data,
     loyaltyPoints: loyaltyPointsResult.data,
     avatarUrl: userResult.data?.avatarUrl ?? null,

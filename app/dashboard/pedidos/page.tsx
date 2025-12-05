@@ -1,3 +1,30 @@
+/*
+ * --------------------------------------------------------------------
+ *  Xoco Café — Software Property
+ *  Copyright (c) 2025 Xoco Café
+ *  Principal Developer: Donovan Riaño
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at:
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ *  --------------------------------------------------------------------
+ *  PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
+ *  Copyright (c) 2025 Xoco Café.
+ *  Desarrollador Principal: Donovan Riaño.
+ *
+ *  Este archivo está licenciado bajo la Apache License 2.0.
+ *  Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
+ * --------------------------------------------------------------------
+ */
+
 'use client';
 
 import Link from 'next/link';
@@ -17,15 +44,20 @@ interface Order {
   status: 'pending' | 'in_progress' | 'completed' | 'past';
   ticketId?: string | null;
   userEmail?: string | null;
+  customerName?: string | null;
+  posCustomerId?: string | null;
   total?: number | null;
   tipAmount?: number | null;
   tipPercent?: number | null;
+  deliveryTipAmount?: number | null;
+  deliveryTipPercent?: number | null;
   prepStatus?: 'pending' | 'in_progress' | 'completed' | null;
   prepHandlerName?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
   type?: string | null;
   items?: unknown;
+  qrPayload?: unknown;
   shipping?: {
     address?: {
       street?: string;
@@ -36,6 +68,11 @@ interface Order {
     };
     contactPhone?: string;
     isWhatsapp?: boolean;
+    addressId?: string | null;
+    deliveryTip?: {
+      amount?: number | null;
+      percent?: number | null;
+    } | null;
   } | null;
 }
 
@@ -49,9 +86,79 @@ const STATUS_LABELS: Record<Order['status'], string> = {
 const getOrderDisplayCode = (order: Order) =>
   order.ticketId ?? order.orderNumber ?? order.id.slice(0, 6);
 
-const formatOrderCustomer = (order: Order) => order.userEmail ?? 'Público general';
+const formatOrderCustomer = (order: Order) => {
+  const preferred = (order.customerName ?? '').trim();
+  if (preferred.length > 0) return preferred;
+  const fallback = (order.userEmail ?? '').trim();
+  if (fallback.length > 0) return fallback;
+  return 'Público general';
+};
+const normalizeQuantity = (value: unknown) => {
+  const numberValue = Number(value);
+  if (Number.isFinite(numberValue) && numberValue > 0) {
+    return numberValue;
+  }
+  return 1;
+};
+
+const parseTextQuantity = (value: string) => {
+  const match = value.trim().match(/^[^\d]*(?<qty>\d+)\s*[x×]/i);
+  return match?.groups?.qty ? Number(match.groups.qty) : 1;
+};
+
+const extractOrderItems = (items: unknown) => {
+  if (!items) return [];
+  const normalizeItem = (item: any) => ({ quantity: normalizeQuantity(item?.quantity ?? 1) });
+  if (Array.isArray(items)) {
+    return items.map(normalizeItem);
+  }
+  if (
+    typeof items === 'object' &&
+    items !== null &&
+    Array.isArray((items as { list?: unknown[] }).list)
+  ) {
+    return ((items as { list: unknown[] }).list ?? []).map(normalizeItem);
+  }
+  if (
+    typeof items === 'object' &&
+    items !== null &&
+    (Array.isArray((items as { beverages?: unknown[] }).beverages) ||
+      Array.isArray((items as { foods?: unknown[] }).foods) ||
+      Array.isArray((items as { others?: unknown[] }).others))
+  ) {
+    const beverages = Array.isArray((items as { beverages?: unknown[] }).beverages)
+      ? (items as { beverages: unknown[] }).beverages
+      : [];
+    const foods = Array.isArray((items as { foods?: unknown[] }).foods)
+      ? (items as { foods: unknown[] }).foods
+      : [];
+    const others = Array.isArray((items as { others?: unknown[] }).others)
+      ? (items as { others: unknown[] }).others
+      : [];
+    return [...beverages, ...foods, ...others].map(normalizeItem);
+  }
+  if (typeof items === 'object' && items !== null) {
+    const body = (items as { body?: unknown }).body;
+    if (typeof body === 'string') {
+      return body
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => /\d+\s*[x×]/i.test(line))
+        .map((line) => ({ quantity: normalizeQuantity(parseTextQuantity(line)) }));
+    }
+    if (Array.isArray(body)) {
+      return body.map((entry) =>
+        typeof entry === 'string'
+          ? { quantity: normalizeQuantity(parseTextQuantity(entry)) }
+          : normalizeItem(entry)
+      );
+    }
+  }
+  return [];
+};
+
 const getOrderArticles = (order: Order) =>
-  order.items && Array.isArray(order.items) ? order.items.length : 0;
+  extractOrderItems(order.items).reduce((total, item) => total + item.quantity, 0);
 const getOrderTicketCode = (order: Order) =>
   (order.ticketId ?? order.orderNumber ?? '').trim().toUpperCase();
 const isClientTicket = (order: Order) => {
@@ -376,7 +483,7 @@ function formatCurrency(value?: number | null) {
 }
 
 export default function OrdersDashboardPage() {
-  const { user, token } = useAuth();
+  const { user, token, isLoading: isAuthLoading } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -389,9 +496,14 @@ export default function OrdersDashboardPage() {
   const ticketRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const isAuthenticated = Boolean(user && token);
 
   const loadOrders = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      setOrders([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
@@ -399,6 +511,7 @@ export default function OrdersDashboardPage() {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        cache: 'no-store',
       });
       const payload = await response.json();
       if (!response.ok || !payload.success) {
@@ -414,10 +527,11 @@ export default function OrdersDashboardPage() {
   }, [token]);
 
   useEffect(() => {
-    if (user && token) {
-      void loadOrders();
+    if (isAuthLoading) {
+      return;
     }
-  }, [loadOrders, token, user]);
+    void loadOrders();
+  }, [isAuthLoading, loadOrders]);
 
   const handleRefreshOrders = useCallback(() => {
     void loadOrders();
@@ -453,20 +567,56 @@ export default function OrdersDashboardPage() {
               return next;
             }
             const existingRecord = index >= 0 ? next[index] : null;
+            const rawItems = newOrder.items;
+            const realtimeShipping =
+              (newOrder.shipping as Order['shipping']) ??
+              (rawItems && typeof rawItems === 'object' && !Array.isArray(rawItems)
+                ? (rawItems as { shipping?: Order['shipping'] }).shipping ?? null
+                : null);
+            const shippingAddressIdFromRow =
+              (newOrder as { shipping_address_id?: string | null }).shipping_address_id ??
+              (newOrder as { shippingAddressId?: string | null }).shippingAddressId ??
+              null ??
+              realtimeShipping?.addressId ??
+              null;
+            const previousShipping = existingRecord?.shipping ?? null;
+            const normalizedShippingSource = realtimeShipping ?? previousShipping ?? null;
+            const shippingWithId =
+              normalizedShippingSource || shippingAddressIdFromRow
+                ? {
+                    ...(normalizedShippingSource ?? {}),
+                    addressId:
+                      shippingAddressIdFromRow ?? normalizedShippingSource?.addressId ?? null,
+                  }
+                : null;
             const mergedOrder: Order = {
               id: newOrder.id,
               status: (newOrder.status as Order['status']) ?? 'pending',
               orderNumber: newOrder.orderNumber ?? null,
               ticketId: newOrder.ticketId ?? null,
               userEmail: newOrder.userEmail ?? null,
+              customerName: newOrder.customerName ?? existingRecord?.customerName ?? null,
+              posCustomerId: newOrder.posCustomerId ?? existingRecord?.posCustomerId ?? null,
               total: newOrder.total ?? null,
               tipAmount: typeof newOrder.tipAmount === 'number' ? newOrder.tipAmount : null,
               tipPercent: typeof newOrder.tipPercent === 'number' ? newOrder.tipPercent : null,
+              deliveryTipAmount:
+                typeof (newOrder as { deliveryTipAmount?: number }).deliveryTipAmount === 'number'
+                  ? (newOrder as { deliveryTipAmount?: number }).deliveryTipAmount
+                  : existingRecord?.deliveryTipAmount ?? null,
+              deliveryTipPercent:
+                typeof (newOrder as { deliveryTipPercent?: number }).deliveryTipPercent === 'number'
+                  ? (newOrder as { deliveryTipPercent?: number }).deliveryTipPercent
+                  : existingRecord?.deliveryTipPercent ?? null,
               createdAt: newOrder.createdAt ?? null,
               updatedAt: newOrder.updatedAt ?? null,
               type: newOrder.type ?? null,
-              items: newOrder.items,
-              shipping: (newOrder.shipping as Order['shipping']) ?? null,
+              items: newOrder.items ?? existingRecord?.items,
+              shipping: shippingWithId,
+              qrPayload:
+                (newOrder as { qrPayload?: unknown }).qrPayload ??
+                existingRecord?.qrPayload ??
+                null,
               prepStatus: existingRecord?.prepStatus ?? null,
               prepHandlerName: existingRecord?.prepHandlerName ?? null,
             };
@@ -578,13 +728,10 @@ export default function OrdersDashboardPage() {
     boardColumns.columns.find((column) => column.key === 'completed')?.orders ?? [];
   const pendingClientOrders = pendingOrders.filter((order) => isClientTicket(order));
   const MAX_ACTIVE_ORDERS = 3;
-  const hasReachedOrderLimit = pendingClientOrders.length >= MAX_ACTIVE_ORDERS;
+  const hasReachedOrderLimit = isAuthenticated && pendingClientOrders.length >= MAX_ACTIVE_ORDERS;
   const expiredSelectedOrder = selectedOrder ? isExpiredPending(selectedOrder) : false;
   const selectedOrderEffectiveStatus = selectedOrder ? getEffectiveStatus(selectedOrder) : null;
-  const shouldShowQr = selectedOrder
-    ? (selectedOrderEffectiveStatus ?? selectedOrder.status) !== 'completed' &&
-      !expiredSelectedOrder
-    : false;
+  const shouldShowQr = selectedOrder ? !expiredSelectedOrder : false;
   const {
     showReminder: showLoyaltyReminder,
     isActivating: isActivatingLoyalty,
@@ -670,7 +817,15 @@ export default function OrdersDashboardPage() {
     };
   }, [selectedOrder, showHistoricalModal]);
 
-  if (!user || !token) {
+  if (isAuthLoading) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-12 text-center text-gray-600 dark:text-gray-300">
+        Cargando información de tu cuenta...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-12 text-center">
         <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Mis pedidos</h1>
@@ -698,33 +853,25 @@ export default function OrdersDashboardPage() {
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <button
-            type="button"
-            onClick={handleRefreshOrders}
-            disabled={isLoading}
-            className="inline-flex items-center justify-center rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-white/5"
-          >
-            {isLoading ? 'Actualizando...' : 'Actualizar lista'}
-          </button>
           {hasReachedOrderLimit ? (
             <button
               type="button"
               disabled
-              className="inline-flex items-center justify-center rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-400 cursor-not-allowed dark:border-gray-600 dark:text-gray-500"
+              className="inline-flex items-center justify-center rounded-full border border-gray-300 px-6 py-3 text-base font-semibold text-gray-400 cursor-not-allowed dark:border-gray-600 dark:text-gray-500"
             >
               Crear nuevo pedido
             </button>
           ) : (
             <Link
               href="/order"
-              className="inline-flex items-center justify-center rounded-full bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-primary-700"
+              className="inline-flex items-center justify-center rounded-full bg-primary-600 px-6 py-3 text-base font-semibold text-white shadow hover:bg-primary-700"
             >
               Crear nuevo pedido
             </Link>
           )}
         </div>
       </header>
-      {loyaltyNotice && (
+      {isAuthenticated && loyaltyNotice && (
         <div
           className={`mb-4 rounded-full px-4 py-2 text-sm font-semibold ${
             loyaltyNotice.type === 'success'
@@ -735,20 +882,20 @@ export default function OrdersDashboardPage() {
           {loyaltyNotice.message}
         </div>
       )}
-      {showLoyaltyReminder && (
+      {isAuthenticated && showLoyaltyReminder && (
         <LoyaltyReminderCard
           onActivate={handleLoyaltyActivation}
           isLoading={isActivatingLoyalty}
           className="mb-6"
         />
       )}
-      <div className="mb-6 flex flex-wrap items-center justify-center gap-2 rounded-3xl bg-primary-50 px-4 py-3 text-sm text-primary-900 shadow-sm dark:bg-primary-900/30 dark:text-primary-100">
+      <div className="mb-6 flex flex-wrap items-center justify-center gap-2 rounded-3xl bg-primary-600 px-4 py-3 text-sm text-white shadow-lg dark:bg-primary-900/20 dark:text-primary-200">
         <span>Si necesitas ayuda, mándanos un</span>
         <a
           href={siteMetadata.whats}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-primary-500 shadow dark:bg-[#0f1728]"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white shadow-sm transition-colors hover:bg-white/30 dark:bg-[#222c44] dark:text-primary-200 dark:hover:bg-[#2b3650]"
           aria-label="WhatsApp"
         >
           <FaWhatsapp />
@@ -765,6 +912,16 @@ export default function OrdersDashboardPage() {
         Si no acudiste antes del corte (23:59), movemos el ticket a seguimiento en color naranja,
         eliminamos su QR y conservamos el registro únicamente durante 48 horas para referencias
         internas.
+      </div>
+      <div className="mb-6 flex justify-end">
+        <button
+          type="button"
+          onClick={handleRefreshOrders}
+          disabled={isLoading}
+          className="inline-flex items-center justify-center rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-white/5"
+        >
+          {isLoading ? 'Actualizando...' : 'Actualizar lista'}
+        </button>
       </div>
 
       {error && (
@@ -893,6 +1050,10 @@ export default function OrdersDashboardPage() {
                   </p>
                 )}
                 <p>
+                  <span className="font-semibold text-gray-800 dark:text-gray-100">Cliente:</span>{' '}
+                  {formatOrderCustomer(selectedOrder)}
+                </p>
+                <p>
                   <span className="font-semibold text-gray-800 dark:text-gray-100">Creado:</span>{' '}
                   {selectedOrder.createdAt
                     ? new Date(selectedOrder.createdAt).toLocaleString('es-MX')
@@ -902,6 +1063,17 @@ export default function OrdersDashboardPage() {
                   <span className="font-semibold text-gray-800 dark:text-gray-100">Total:</span>{' '}
                   {formatCurrency(selectedOrder.total)}
                 </p>
+                {selectedOrder.deliveryTipAmount ? (
+                  <p>
+                    <span className="font-semibold text-gray-800 dark:text-gray-100">
+                      Propina de entrega:
+                    </span>{' '}
+                    {formatCurrency(selectedOrder.deliveryTipAmount)}
+                    {typeof selectedOrder.deliveryTipPercent === 'number'
+                      ? ` (${selectedOrder.deliveryTipPercent}%)`
+                      : ''}
+                  </p>
+                ) : null}
               </div>
 
               {expiredSelectedOrder ? (
@@ -915,39 +1087,50 @@ export default function OrdersDashboardPage() {
                 </div>
               )}
 
-              {selectedOrder.shipping?.address && (
-                <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
-                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-300">
-                    Detalles de entrega
-                  </h4>
-                  <p>
-                    {selectedOrder.shipping.address.street}
-                    {selectedOrder.shipping.address.city
-                      ? `, ${selectedOrder.shipping.address.city}`
-                      : ''}
-                    {selectedOrder.shipping.address.state
-                      ? `, ${selectedOrder.shipping.address.state}`
-                      : ''}
-                    {selectedOrder.shipping.address.postalCode
-                      ? ` · CP ${selectedOrder.shipping.address.postalCode}`
-                      : ''}
-                  </p>
-                  {selectedOrder.shipping.address.reference && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Referencia: {selectedOrder.shipping.address.reference}
+              {(() => {
+                const address = selectedOrder.shipping?.address;
+                const contactPhone = selectedOrder.shipping?.contactPhone?.trim();
+                const hasAddressDetails =
+                  !!address &&
+                  [
+                    address.street,
+                    address.city,
+                    address.state,
+                    address.postalCode,
+                    address.reference,
+                  ]
+                    .filter((value) => typeof value === 'string')
+                    .some((value) => Boolean((value as string).trim().length));
+                if (!hasAddressDetails) {
+                  return null;
+                }
+                return (
+                  <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
+                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-300">
+                      Detalles de entrega
+                    </h4>
+                    <p>
+                      {address?.street}
+                      {address?.city ? `, ${address.city}` : ''}
+                      {address?.state ? `, ${address.state}` : ''}
+                      {address?.postalCode ? ` · CP ${address.postalCode}` : ''}
                     </p>
-                  )}
-                  <p className="mt-2 text-sm font-medium">
-                    Contacto:{' '}
-                    {selectedOrder.shipping.contactPhone
-                      ? selectedOrder.shipping.contactPhone
-                      : 'No especificado'}{' '}
-                    {selectedOrder.shipping.isWhatsapp ? '(WhatsApp)' : ''}
-                  </p>
-                </div>
-              )}
+                    {address?.reference && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Referencia: {address.reference}
+                      </p>
+                    )}
+                    {contactPhone && (
+                      <p className="mt-2 text-sm font-medium">
+                        Contacto: {contactPhone}{' '}
+                        {selectedOrder.shipping?.isWhatsapp ? '(WhatsApp)' : ''}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
 
-              {selectedOrder.status === 'pending' && !expiredSelectedOrder && (
+              {!expiredSelectedOrder && (
                 <div className="border-t border-gray-100 pb-2 pt-3">
                   <button
                     type="button"

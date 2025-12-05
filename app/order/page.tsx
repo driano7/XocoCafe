@@ -1,6 +1,35 @@
+/*
+ * --------------------------------------------------------------------
+ *  Xoco Café — Software Property
+ *  Copyright (c) 2025 Xoco Café
+ *  Principal Developer: Donovan Riaño
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at:
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ *  --------------------------------------------------------------------
+ *  PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
+ *  Copyright (c) 2025 Xoco Café.
+ *  Desarrollador Principal: Donovan Riaño.
+ *
+ *  Este archivo está licenciado bajo la Apache License 2.0.
+ *  Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
+ * --------------------------------------------------------------------
+ */
+
 'use client';
 
-import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import CheckoutForm from '@/components/Order/CheckoutForm';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import { useCartStore } from '@/hooks/useCartStore';
@@ -8,6 +37,7 @@ import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
 import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
 import SearchableDropdown from '@/components/SearchableDropdown';
 import { beverageOptions, foodOptions, getMenuItemById, packageOptions } from '@/lib/menuData';
+import type { AddressInput } from '@/lib/validations/auth';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-MX', {
@@ -17,7 +47,8 @@ const formatCurrency = (value: number) =>
   }).format(value);
 
 export default function OrderPage() {
-  const { user, token } = useAuth();
+  const { user, token, isLoading, updateUser } = useAuth();
+  const router = useRouter();
   const { items, addItem, increment, decrement, removeItem, subtotal, itemCount, clearCart } =
     useCartStore();
   const loyaltyReminder = useLoyaltyReminder({
@@ -33,12 +64,25 @@ export default function OrderPage() {
   const [selectedBeverageSize, setSelectedBeverageSize] = useState<string | null>(null);
   const [selectedFoodId, setSelectedFoodId] = useState('');
   const [selectedPackageId, setSelectedPackageId] = useState('');
+  const selectedBeverage = selectedBeverageId ? getMenuItemById(selectedBeverageId) : null;
+  const beverageSizeList = selectedBeverage?.metadata?.availableSizes;
+  const selectedBeverageSizes =
+    Array.isArray(beverageSizeList) && beverageSizeList.length > 0 ? beverageSizeList : ['único'];
+  const hasSingleBeverageSize = selectedBeverageSizes.length <= 1;
 
   const resolveMenuItemPrice = (menuId: string): number => {
     const menuItem = getMenuItemById(menuId);
     if (!menuItem) return 55;
     return menuItem.price ?? menuItem.metadata?.mediumPrice ?? menuItem.metadata?.largePrice ?? 55;
   };
+
+  const handleAddressesUpdate = useCallback(
+    (addresses: AddressInput[]) => {
+      if (!user) return;
+      updateUser({ ...user, addresses });
+    },
+    [updateUser, user]
+  );
 
   const resolveDefaultSize = (menuId: string) => {
     const menuItem = getMenuItemById(menuId);
@@ -99,6 +143,36 @@ export default function OrderPage() {
     return () => clearTimeout(timeout);
   }, [loyaltyNotice]);
 
+  useEffect(() => {
+    router.prefetch('/dashboard/pedidos');
+  }, [router]);
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20 text-center text-gray-700 dark:text-gray-200">
+        Cargando tus datos...
+      </div>
+    );
+  }
+
+  if (!user || !token) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-20 text-center text-gray-700 dark:text-gray-200">
+        <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Inicia sesión</h1>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          Necesitas una cuenta activa para crear o programar pedidos online. Inicia sesión o crea tu
+          cuenta para continuar.
+        </p>
+        <Link
+          href="/login"
+          className="mt-6 inline-flex items-center justify-center rounded-full bg-primary-600 px-6 py-2.5 text-sm font-semibold uppercase tracking-[0.35em] text-white shadow hover:bg-primary-700"
+        >
+          Ir a iniciar sesión
+        </Link>
+      </div>
+    );
+  }
+
   const quickAddSection = (
     <div className="rounded-2xl border border-primary-100 bg-primary-50/40 p-5 shadow-sm dark:border-primary-800/40 dark:bg-primary-900/20">
       <div className="mb-4">
@@ -135,16 +209,20 @@ export default function OrderPage() {
                 id="quick-beverage-size"
                 value={selectedBeverageSize ?? ''}
                 onChange={(event) => setSelectedBeverageSize(event.target.value)}
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                disabled={hasSingleBeverageSize}
+                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:disabled:bg-gray-800/70 dark:disabled:text-gray-500"
               >
-                {(getMenuItemById(selectedBeverageId)?.metadata?.availableSizes ?? ['único']).map(
-                  (size) => (
-                    <option key={size} value={size}>
-                      {size[0].toUpperCase() + size.slice(1)}
-                    </option>
-                  )
-                )}
+                {selectedBeverageSizes.map((size) => (
+                  <option key={size} value={size}>
+                    {size[0].toUpperCase() + size.slice(1)}
+                  </option>
+                ))}
               </select>
+              {hasSingleBeverageSize && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Esta bebida solo se ofrece en un tamaño.
+                </p>
+              )}
             </div>
           )}
           <button
@@ -341,7 +419,7 @@ export default function OrderPage() {
             </div>
           )}
 
-          <CheckoutForm token={token} user={user} />
+          <CheckoutForm token={token} user={user} onAddressesUpdate={handleAddressesUpdate} />
         </aside>
       </div>
     </div>

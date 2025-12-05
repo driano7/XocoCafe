@@ -1,3 +1,30 @@
+/*
+ * --------------------------------------------------------------------
+ *  Xoco Café — Software Property
+ *  Copyright (c) 2025 Xoco Café
+ *  Principal Developer: Donovan Riaño
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at:
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ *  --------------------------------------------------------------------
+ *  PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
+ *  Copyright (c) 2025 Xoco Café.
+ *  Desarrollador Principal: Donovan Riaño.
+ *
+ *  Este archivo está licenciado bajo la Apache License 2.0.
+ *  Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
+ * --------------------------------------------------------------------
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -42,6 +69,23 @@ export async function GET(request: NextRequest) {
     const monthlyMap = new Map<string, any>();
     const yearlyMap = new Map<string, any>();
 
+    const detectCategory = (record: any): 'beverage' | 'food' | 'package' => {
+      const rawValues = [record.category, record.productId]
+        .filter(Boolean)
+        .map((value: string) => value.toLowerCase());
+      const matches = (needle: string) => rawValues.some((value) => value.includes(needle));
+      if (matches('package') || matches('paquete')) {
+        return 'package';
+      }
+      if (matches('food') || matches('alimento') || matches('comida')) {
+        return 'food';
+      }
+      if (matches('bebida') || matches('drink') || matches('coffee') || matches('cafe')) {
+        return 'beverage';
+      }
+      return 'beverage';
+    };
+
     (data ?? []).forEach((item) => {
       const order = (item as any).orders;
       if (!order) return;
@@ -51,7 +95,7 @@ export async function GET(request: NextRequest) {
         '0'
       )}`;
       const yearKey = `${createdAt.getFullYear()}`;
-      const category = item.productId?.toLowerCase().includes('food') ? 'food' : 'beverage';
+      const category = detectCategory(item);
       const targetMap = (map: Map<string, any>, key: string, period: 'month' | 'year') => {
         if (!map.has(key)) {
           map.set(key, {
@@ -59,10 +103,16 @@ export async function GET(request: NextRequest) {
             label: buildBucketLabel(createdAt, period === 'month' ? 'month' : 'year'),
             beverages: new Map<string, number>(),
             foods: new Map<string, number>(),
+            packages: new Map<string, number>(),
           });
         }
         const bucket = map.get(key);
-        const target = category === 'food' ? bucket.foods : bucket.beverages;
+        const target =
+          category === 'food'
+            ? bucket.foods
+            : category === 'package'
+            ? bucket.packages
+            : bucket.beverages;
         const current = target.get(item.productId) ?? 0;
         target.set(item.productId, current + item.quantity);
       };
@@ -75,6 +125,7 @@ export async function GET(request: NextRequest) {
       Array.from(map.values()).map((bucket) => {
         const beverageEntries = Array.from(bucket.beverages.entries()) as Array<[string, number]>;
         const foodEntries = Array.from(bucket.foods.entries()) as Array<[string, number]>;
+        const packageEntries = Array.from(bucket.packages.entries()) as Array<[string, number]>;
         return {
           key: bucket.key,
           label: bucket.label,
@@ -83,6 +134,10 @@ export async function GET(request: NextRequest) {
             .sort((a, b) => b.total - a.total)
             .slice(0, 5),
           foods: foodEntries
+            .map(([name, total]) => ({ name, total }))
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 5),
+          packages: packageEntries
             .map(([name, total]) => ({ name, total }))
             .sort((a, b) => b.total - a.total)
             .slice(0, 5),

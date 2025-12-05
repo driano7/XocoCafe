@@ -1,3 +1,30 @@
+/*
+ * --------------------------------------------------------------------
+ *  Xoco Café — Software Property
+ *  Copyright (c) 2025 Xoco Café
+ *  Principal Developer: Donovan Riaño
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at:
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ *  --------------------------------------------------------------------
+ *  PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
+ *  Copyright (c) 2025 Xoco Café.
+ *  Desarrollador Principal: Donovan Riaño.
+ *
+ *  Este archivo está licenciado bajo la Apache License 2.0.
+ *  Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
+ * --------------------------------------------------------------------
+ */
+
 'use client';
 
 import { useEffect, useId, useMemo, useState } from 'react';
@@ -13,6 +40,7 @@ interface ConsumptionBucket {
   label: string;
   beverages: ProductStat[];
   foods: ProductStat[];
+  packages: ProductStat[];
 }
 
 interface ConsumptionPayload {
@@ -28,6 +56,7 @@ interface ConsumptionResponse {
 
 const BEVERAGE_COLOR = '#5c3025';
 const FOOD_COLOR = '#b46f3c';
+const PACKAGE_COLOR = '#b45309';
 const CARD_BG = '#f8f1e4';
 
 type Period = 'monthly' | 'yearly';
@@ -41,7 +70,12 @@ function buildBars(bucket: ConsumptionBucket) {
     ...item,
     type: 'food' as const,
   }));
-  return [...beverages, ...foods];
+  const packages = bucket.packages.map((item) => ({
+    ...item,
+    type: 'package' as const,
+  }));
+  const combined = [...beverages, ...foods, ...packages];
+  return combined.sort((a, b) => b.total - a.total).slice(0, 5);
 }
 
 export default function ConsumptionChart() {
@@ -109,7 +143,7 @@ export default function ConsumptionChart() {
 
   const bars = useMemo(() => {
     if (!currentBucket)
-      return [] as Array<{ name: string; total: number; type: 'beverage' | 'food' }>;
+      return [] as Array<{ name: string; total: number; type: 'beverage' | 'food' | 'package' }>;
     return buildBars(currentBucket);
   }, [currentBucket]);
 
@@ -125,7 +159,7 @@ export default function ConsumptionChart() {
             Consumo de favoritos
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Bebidas y alimentos más pedidos según tu historial.
+            Bebidas, alimentos y paquetes más pedidos según tu historial.
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -179,6 +213,10 @@ export default function ConsumptionChart() {
           <span className="h-3 w-3 rounded-full" style={{ backgroundColor: FOOD_COLOR }} />
           Alimentos
         </div>
+        <div className="flex items-center gap-2">
+          <span className="h-3 w-3 rounded-full" style={{ backgroundColor: PACKAGE_COLOR }} />
+          Paquetes
+        </div>
       </div>
 
       <div className="mt-6 min-h-[220px]">
@@ -195,8 +233,14 @@ export default function ConsumptionChart() {
             {bars.map((bar) => {
               const percentage = maxTotal === 0 ? 0 : Math.round((bar.total / maxTotal) * 100);
               const height = `${Math.max(percentage, 6)}%`;
-              const color = bar.type === 'beverage' ? BEVERAGE_COLOR : FOOD_COLOR;
-              const background = bar.type === 'beverage' ? CARD_BG : '#f3ded0';
+              const color =
+                bar.type === 'beverage'
+                  ? BEVERAGE_COLOR
+                  : bar.type === 'food'
+                  ? FOOD_COLOR
+                  : PACKAGE_COLOR;
+              const background =
+                bar.type === 'beverage' ? CARD_BG : bar.type === 'food' ? '#f3ded0' : '#fee2c5';
               return (
                 <div
                   key={`${bar.type}-${bar.name}`}
@@ -219,7 +263,11 @@ export default function ConsumptionChart() {
                     {bar.name}
                   </span>
                   <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                    {bar.type === 'beverage' ? 'Bebida' : 'Alimento'}
+                    {bar.type === 'beverage'
+                      ? 'Bebida'
+                      : bar.type === 'food'
+                      ? 'Alimento'
+                      : 'Paquete'}
                   </span>
                 </div>
               );

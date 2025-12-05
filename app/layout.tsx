@@ -1,9 +1,35 @@
+/*
+ * --------------------------------------------------------------------
+ *  Xoco Café — Software Property
+ *  Copyright (c) 2025 Xoco Café
+ *  Principal Developer: Donovan Riaño
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at:
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ *  --------------------------------------------------------------------
+ *  PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
+ *  Copyright (c) 2025 Xoco Café.
+ *  Desarrollador Principal: Donovan Riaño.
+ *
+ *  Este archivo está licenciado bajo la Apache License 2.0.
+ *  Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
+ * --------------------------------------------------------------------
+ */
+
 import '@/css/prism.css';
 import '@/css/tailwind.css';
-import '@/css/flip-card.css';
-import '@fontsource/mukta';
 
 import { Suspense } from 'react';
+import { Lato } from 'next/font/google';
 import Analytics from '@/components/Analytics';
 import { AnalyticsProvider } from '@/components/Analytics/AnalyticsProvider';
 import { AuthProvider } from '@/components/Auth/AuthProvider';
@@ -14,6 +40,14 @@ import LenisProvider from '@/components/Providers/LenisProvider';
 import ThemeProvider from '@/components/Providers/ThemeProvider';
 import { SessionProvider } from 'next-auth/react';
 import FeedbackPromptGate from '@/components/Feedback/FeedbackPromptGate';
+
+const lato = Lato({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  display: 'swap',
+  variable: '--font-lato',
+  preload: true,
+});
 
 export const metadata = {
   title: 'Xoco Café',
@@ -35,13 +69,11 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <meta name="msapplication-TileColor" content="#000000" />
         <meta name="theme-color" content="#000000" />
         <link rel="alternate" type="application/rss+xml" href="/feed.xml" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap"
-          rel="stylesheet"
-        />
+        <link rel="preload" as="image" href="/static/images/Xoco.jpeg" />
       </head>
-      <body className="bg-white text-black antialiased dark:bg-black dark:text-white">
+      <body
+        className={`${lato.className} ${lato.variable} bg-white text-black antialiased dark:bg-black dark:text-white`}
+      >
         <SessionProvider>
           <LanguageProvider fallbackLanguage="es">
             <Suspense fallback={null}>

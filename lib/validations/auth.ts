@@ -1,3 +1,30 @@
+/*
+ * --------------------------------------------------------------------
+ *  Xoco Café — Software Property
+ *  Copyright (c) 2025 Xoco Café
+ *  Principal Developer: Donovan Riaño
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at:
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ *  --------------------------------------------------------------------
+ *  PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
+ *  Copyright (c) 2025 Xoco Café.
+ *  Desarrollador Principal: Donovan Riaño.
+ *
+ *  Este archivo está licenciado bajo la Apache License 2.0.
+ *  Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
+ * --------------------------------------------------------------------
+ */
+
 import { z } from 'zod';
 
 // Esquemas de validación para registro
@@ -124,13 +151,26 @@ export const changePasswordSchema = z
 
 // Esquema para dirección
 export const addressSchema = z.object({
+  id: z.string().uuid().optional(),
+  label: z
+    .string()
+    .min(3, 'Agrega un nombre para reconocer la dirección')
+    .max(60, 'El nombre no debe superar 60 caracteres'),
+  nickname: z.string().max(60).optional(),
   type: z.enum(['shipping', 'billing']),
-  street: z.string().min(1, 'La dirección es requerida'),
-  city: z.string().min(1, 'La ciudad es requerida'),
+  street: z.string().min(3, 'La dirección es requerida'),
+  city: z.string().min(2, 'La ciudad es requerida'),
   state: z.string().optional(),
-  postalCode: z.string().min(1, 'El código postal es requerido'),
-  country: z.string().min(1, 'El país es requerido'),
+  postalCode: z.string().min(4, 'El código postal es requerido'),
+  country: z.string().min(2, 'El país es requerido'),
+  reference: z.string().max(160).optional(),
+  additionalInfo: z.string().max(200).optional(),
   isDefault: z.boolean().optional(),
+  contactPhone: z
+    .string()
+    .min(10, 'Agrega un teléfono de al menos 10 dígitos')
+    .max(20, 'El teléfono no debe superar 20 caracteres'),
+  isWhatsapp: z.boolean().optional(),
 });
 
 // Tipos TypeScript derivados de los esquemas
@@ -198,10 +238,12 @@ export interface AuthUser {
   favoriteFood?: string | null;
   weeklyCoffeeCount?: number;
   loyaltyEnrolled?: boolean;
+  loyaltyActivatedAt?: string | null;
   monthlyMetrics?: any;
   termsAccepted: boolean;
   privacyAccepted: boolean;
   marketingEmail: boolean;
   marketingSms: boolean;
   marketingPush: boolean;
+  addresses?: AddressInput[];
 }

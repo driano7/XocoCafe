@@ -1,3 +1,30 @@
+/*
+ * --------------------------------------------------------------------
+ *  Xoco Café — Software Property
+ *  Copyright (c) 2025 Xoco Café
+ *  Principal Developer: Donovan Riaño
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at:
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ *  --------------------------------------------------------------------
+ *  PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
+ *  Copyright (c) 2025 Xoco Café.
+ *  Desarrollador Principal: Donovan Riaño.
+ *
+ *  Este archivo está licenciado bajo la Apache License 2.0.
+ *  Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
+ * --------------------------------------------------------------------
+ */
+
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -11,8 +38,9 @@ import FavoritesSelect from '@/components/FavoritesSelect';
 import ConsumptionChart from '@/components/ConsumptionChart';
 import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
 import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
+import SessionTimeoutNotice from '@/components/SessionTimeoutNotice';
+import AddressManager from '@/components/Auth/AddressManager';
 import { useAuth } from './AuthProvider';
-import ClientActionsFlipCard from '@/components/ClientActionsFlipCard';
 import ShareExperienceForm from '@/components/Feedback/ShareExperienceForm';
 import {
   updateProfileSchema,
@@ -24,7 +52,7 @@ import {
 } from '@/lib/validations/auth';
 
 export default function UserProfile() {
-  const { user, token, updateUser } = useAuth();
+  const { user, token, updateUser, isLoading } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [message, setMessage] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
@@ -297,7 +325,27 @@ export default function UserProfile() {
     }
   };
 
-  if (!user) return null;
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20 text-center text-gray-700 dark:text-gray-200">
+        Cargando tu perfil...
+      </div>
+    );
+  }
+
+  if (!user || !token) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16 text-center">
+        <SessionTimeoutNotice context="profile" />
+        <a
+          href="/login"
+          className="mt-6 inline-flex min-w-[280px] items-center justify-center rounded-full bg-primary-600 px-10 py-5 text-2xl font-black uppercase tracking-[0.35em] text-white shadow-2xl transition hover:bg-primary-700"
+        >
+          Iniciar sesión
+        </a>
+      </div>
+    );
+  }
 
   const isGoogleOnly = user.authProvider === 'google';
 
@@ -522,28 +570,16 @@ export default function UserProfile() {
                   </p>
                 </div>
               )}
-
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Cuenta creada
-                </p>
-                <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                  {new Date(user.createdAt ?? Date.now()).toLocaleDateString('es-MX', {
-                    year: 'numeric',
-                    month: 'long',
-                  })}
-                </p>
-              </div>
             </div>
           )}
 
-          <div className="mt-8 flex flex-wrap items-center gap-2 rounded-3xl bg-primary-50 px-4 py-3 text-sm text-primary-900 shadow-sm dark:bg-primary-900/30 dark:text-primary-100">
+          <div className="mt-8 flex flex-wrap items-center gap-2 rounded-3xl bg-primary-600 px-4 py-3 text-sm text-white shadow-lg dark:bg-primary-900/30 dark:text-primary-100">
             <span>¿Necesitas ayuda? Mándanos un</span>
             <a
               href={siteMetadata.whats}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-primary-500 shadow dark:bg-[#0f1728]"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white shadow transition-colors hover:bg-white/30 dark:bg-[#0f1728]"
               aria-label="WhatsApp"
             >
               <FaWhatsapp />
@@ -551,110 +587,125 @@ export default function UserProfile() {
             <span>y con todo gusto te ayudamos.</span>
           </div>
 
-          <div className="mt-8 border-t border-gray-100 pt-6 dark:border-gray-700">
-            <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
-              Seguridad de la cuenta
-            </h3>
-            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-              Actualiza tu contraseña para mantener tu cuenta protegida.
-            </p>
+          <div className="mt-8 space-y-8 border-t border-gray-100 pt-6 dark:border-gray-700">
+            <section>
+              <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
+                Seguridad de la cuenta
+              </h3>
+              <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+                Actualiza tu contraseña para mantener tu cuenta protegida.
+              </p>
 
-            {passwordAlert && (
-              <div
-                className={`mb-4 rounded-md px-4 py-3 text-sm ${
-                  passwordAlert.type === 'success'
-                    ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-200'
-                    : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200'
-                }`}
-              >
-                {passwordAlert.message}
-              </div>
-            )}
-
-            {isGoogleOnly ? (
-              <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
-                Esta cuenta se administra con Google. Usa &ldquo;Continuar con Google&rdquo; para
-                gestionar tu acceso.
-              </div>
-            ) : (
-              <form onSubmit={handleSubmitPassword(onChangePassword)} className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="current-password"
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    Contraseña actual
-                  </label>
-                  <input
-                    id="current-password"
-                    type="password"
-                    autoComplete="current-password"
-                    {...registerPassword('currentPassword')}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  />
-                  {passwordErrors.currentPassword && (
-                    <p className="mt-1 text-sm text-red-600">
-                      {passwordErrors.currentPassword.message}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="new-password"
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    Nueva contraseña
-                  </label>
-                  <input
-                    id="new-password"
-                    type="password"
-                    autoComplete="new-password"
-                    {...registerPassword('newPassword')}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  />
-                  {passwordErrors.newPassword && (
-                    <p className="mt-1 text-sm text-red-600">
-                      {passwordErrors.newPassword.message}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="confirm-password"
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    Confirmar nueva contraseña
-                  </label>
-                  <input
-                    id="confirm-password"
-                    type="password"
-                    autoComplete="new-password"
-                    {...registerPassword('confirmPassword')}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  />
-                  {passwordErrors.confirmPassword && (
-                    <p className="mt-1 text-sm text-red-600">
-                      {passwordErrors.confirmPassword.message}
-                    </p>
-                  )}
-                </div>
-
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Debe contener al menos 8 caracteres, incluir mayúsculas, minúsculas, un número y
-                  un caracter especial.
-                </p>
-
-                <button
-                  type="submit"
-                  disabled={isChangingPassword}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              {passwordAlert && (
+                <div
+                  className={`mb-4 rounded-md px-4 py-3 text-sm ${
+                    passwordAlert.type === 'success'
+                      ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-200'
+                      : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200'
+                  }`}
                 >
-                  {isChangingPassword ? 'Actualizando...' : 'Actualizar contraseña'}
-                </button>
-              </form>
-            )}
+                  {passwordAlert.message}
+                </div>
+              )}
+
+              {isGoogleOnly ? (
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+                  Esta cuenta se administra con Google. Usa &ldquo;Continuar con Google&rdquo; para
+                  gestionar tu acceso.
+                </div>
+              ) : (
+                <form onSubmit={handleSubmitPassword(onChangePassword)} className="space-y-4">
+                  <div>
+                    <label
+                      htmlFor="current-password"
+                      className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      Contraseña actual
+                    </label>
+                    <input
+                      id="current-password"
+                      type="password"
+                      autoComplete="current-password"
+                      {...registerPassword('currentPassword')}
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    />
+                    {passwordErrors.currentPassword && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {passwordErrors.currentPassword.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="new-password"
+                      className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      Nueva contraseña
+                    </label>
+                    <input
+                      id="new-password"
+                      type="password"
+                      autoComplete="new-password"
+                      {...registerPassword('newPassword')}
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    />
+                    {passwordErrors.newPassword && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {passwordErrors.newPassword.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="confirm-password"
+                      className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      Confirmar nueva contraseña
+                    </label>
+                    <input
+                      id="confirm-password"
+                      type="password"
+                      autoComplete="new-password"
+                      {...registerPassword('confirmPassword')}
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    />
+                    {passwordErrors.confirmPassword && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {passwordErrors.confirmPassword.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Debe contener al menos 8 caracteres, incluir mayúsculas, minúsculas, un número y
+                    un caracter especial.
+                  </p>
+
+                  <button
+                    type="submit"
+                    disabled={isChangingPassword}
+                    className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isChangingPassword ? 'Actualizando...' : 'Actualizar contraseña'}
+                  </button>
+                </form>
+              )}
+            </section>
+
+            <section className="border-t border-gray-100 pt-6 dark:border-gray-700">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Mis direcciones
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Administra tus domicilios guardados y asigna un nombre para identificarlos al
+                  pedir.
+                </p>
+              </div>
+              <AddressManager showIntro={false} />
+            </section>
           </div>
         </div>
 
@@ -683,13 +734,12 @@ export default function UserProfile() {
               className="w-full"
             />
           )}
-          <ClientActionsFlipCard />
           <UserQrCard />
           <LoyaltyFlipCard className="w-full" />
           <ConsumptionChart />
         </div>
 
-        {/* 6. Déjanos tus comentarios */}
+        {/* 4. Déjanos tus comentarios */}
         <div className="order-4 lg:order-3 lg:col-start-1 lg:row-start-3 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
           <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
             Déjanos tus comentarios
@@ -701,7 +751,7 @@ export default function UserProfile() {
           <ShareExperienceForm />
         </div>
 
-        {/* 7. Preferencias de marketing */}
+        {/* 5. Preferencias de marketing */}
         <div className="order-5 lg:order-4 lg:col-start-1 lg:row-start-4 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
           <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
             Preferencias de Marketing
@@ -758,8 +808,8 @@ export default function UserProfile() {
           </div>
         </div>
 
-        {/* 8. Gestión de datos (GDPR) */}
-        <div className="order-6 lg:order-5 lg:col-start-1 lg:row-start-5 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+        {/* 7. Gestión de datos (GDPR) */}
+        <div className="order-7 lg:order-6 lg:col-start-1 lg:row-start-6 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
           <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
             Gestión de Datos (GDPR)
           </h3>
