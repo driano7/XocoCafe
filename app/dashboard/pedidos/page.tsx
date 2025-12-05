@@ -28,12 +28,12 @@
 'use client';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FaWhatsapp } from 'react-icons/fa';
 import siteMetadata from 'content/siteMetadata';
 import { createBrowserSupabaseClient } from '@/lib/supabase-browser';
 import { useAuth } from '@/components/Auth/AuthProvider';
-import VirtualTicket from '@/components/Orders/VirtualTicket';
 import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
 import { usePagination } from '@/hooks/use-pagination';
 import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
@@ -179,6 +179,15 @@ const formatOrderChannelLabel = (order: Order) => {
   }
   return (order.type ?? 'Web').toUpperCase();
 };
+
+const VirtualTicket = dynamic(() => import('@/components/Orders/VirtualTicket'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-72 w-full items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-gray-50 text-sm text-gray-500 dark:border-white/10 dark:bg-gray-900/40 dark:text-gray-300">
+      Generando ticket digital...
+    </div>
+  ),
+}) as typeof import('@/components/Orders/VirtualTicket').default;
 
 const OrderCard = ({ order, onSelect }: { order: Order; onSelect: (order: Order) => void }) => {
   const effectiveStatusKey = (order.prepStatus as Order['status']) ?? order.status ?? 'pending';

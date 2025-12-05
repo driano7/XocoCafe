@@ -27,6 +27,7 @@
 
 'use client';
 
+import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import { useAuth } from './AuthProvider';
 
@@ -96,9 +97,11 @@ export default function UserQrCard() {
         Escanea este código para identificar tu cuenta rápidamente en sucursal.
       </p>
       <div className="mt-4 flex justify-center">
-        <img
+        <Image
           src={qrUrl}
           alt={`QR del cliente ${user.clientId}`}
+          width={220}
+          height={220}
           className="h-48 w-48 rounded-lg border border-gray-200 bg-white object-contain p-2 dark:border-gray-700"
         />
       </div>

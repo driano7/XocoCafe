@@ -27,6 +27,7 @@
 
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from './Auth/AuthProvider';
 import type { AuthUser } from '@/lib/validations/auth';
@@ -121,7 +122,14 @@ export default function AvatarUpload({
         aria-label="Cambiar avatar"
       >
         {previewUrl ? (
-          <img src={previewUrl} alt="Avatar" className="h-full w-full object-cover" />
+          <Image
+            src={previewUrl}
+            alt="Avatar"
+            width={96}
+            height={96}
+            className="h-full w-full object-cover"
+            unoptimized
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gray-300">
             <svg

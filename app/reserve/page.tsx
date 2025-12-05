@@ -27,6 +27,7 @@
 
 'use client';
 
+import Image from 'next/image';
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { DayPicker } from 'react-day-picker';
@@ -1725,14 +1726,13 @@ const ReservationDetailContent = ({
         <div className="mt-5 flex flex-wrap gap-4">
           <div className="flex flex-1 flex-col items-center gap-2 rounded-3xl border border-white/10 bg-white p-4 text-gray-900 shadow-inner">
             {qrIsActive ? (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={qrImageSrc}
-                  alt={`QR de la reservación ${reservation.reservationCode}`}
-                  className="h-48 w-48 rounded-2xl bg-white p-3 shadow"
-                />
-              </>
+              <Image
+                src={qrImageSrc}
+                alt={`QR de la reservación ${reservation.reservationCode}`}
+                width={220}
+                height={220}
+                className="h-48 w-48 rounded-2xl bg-white p-3 shadow"
+              />
             ) : (
               <div className="flex h-48 w-48 items-center justify-center rounded-2xl border border-dashed border-[#c1a391] text-center text-xs text-white/60">
                 QR expirado

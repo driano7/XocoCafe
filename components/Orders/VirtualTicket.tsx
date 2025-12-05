@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { forwardRef, useEffect, useMemo, useState } from 'react';
 import TicketOrderSummary from '@/components/Orders/TicketOrderSummary';
 
@@ -769,11 +770,13 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary-600">
               Gracias por su compra
             </p>
-            <img
+            <Image
               src={qrSrc ?? qrRequestUrl}
               alt="Código QR del ticket"
+              width={176}
+              height={176}
               className="h-44 w-44 rounded-2xl border border-gray-200 bg-white p-2"
-              loading="lazy"
+              unoptimized={(qrSrc ?? qrRequestUrl).startsWith('data:')}
             />
             <p className="text-center text-xs text-gray-500">
               Escanea este código para facilitar la entrega.

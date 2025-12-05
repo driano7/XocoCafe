@@ -39,6 +39,15 @@ module.exports = withContentlayer({
     dirs: ['app', 'components', 'lib', 'layouts', 'scripts'],
   },
   swcMinify: true,
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'api.qrserver.com',
+        pathname: '/v1/create-qr-code/**',
+      },
+    ],
+  },
   experimental: {
     esmExternals: 'loose',
   },
