@@ -25,36 +25,34 @@
  * --------------------------------------------------------------------
  */
 
-/* eslint-disable react/display-name */
 'use client';
-import { coreContent } from '@/lib/utils/contentlayer';
-import type { Authors, Blog } from 'contentlayer/generated';
-import type { MDXComponents } from 'mdx/types';
-import { useMDXComponent } from 'next-contentlayer/hooks';
-import Image from './Image';
-import CustomLink from './Link';
-import LinkButton from './LinkButton';
-import Pre from './Pre';
-import TOCInline from './TOCInline';
-import WhatsAppCTA from './WhatsAppCTA';
 
-interface MDXLayout {
-  content: Blog | Authors;
-  [key: string]: unknown;
+import siteMetadata from 'content/siteMetadata';
+import Link from 'next/link';
+import { FaWhatsapp } from 'react-icons/fa';
+
+interface WhatsAppCTAProps {
+  prefix?: string;
+  suffix?: string;
 }
 
-export const components: MDXComponents = {
-  Image,
-  TOCInline,
-  a: CustomLink,
-  pre: Pre,
-  LinkButton,
-  WhatsAppCTA,
-};
-
-export const MDXLayoutRenderer = ({ content, ...rest }: MDXLayout) => {
-  const MDXLayout = useMDXComponent(content.body.code);
-  const mainContent = coreContent(content);
-
-  return <MDXLayout content={mainContent} components={components} {...rest} />;
-};
+export default function WhatsAppCTA({
+  prefix = 'Si necesitas ayuda, mándanos un',
+  suffix = 'y con gusto te atendemos.',
+}: WhatsAppCTAProps) {
+  return (
+    <div className="my-8 flex flex-wrap items-center justify-center gap-2 rounded-3xl bg-primary-600 px-4 py-3 text-sm text-white shadow-lg dark:bg-primary-900/30 dark:text-primary-100">
+      <span>{prefix}</span>
+      <Link
+        href={siteMetadata.whats}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white shadow transition-colors hover:bg-white/30 dark:bg-[#0f1728]"
+        aria-label="WhatsApp"
+      >
+        <FaWhatsapp />
+      </Link>
+      <span>{suffix}</span>
+    </div>
+  );
+}

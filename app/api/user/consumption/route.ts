@@ -28,6 +28,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { sqlite } from '@/lib/sqlite';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -66,16 +67,29 @@ type OrderItemRecord = {
   title?: string | null;
   orders?:
     | {
+        id?: string;
         userId: string;
         createdAt: string;
         total: number | null;
       }
     | {
+        id?: string;
         userId: string;
         createdAt: string;
         total: number | null;
       }[]
     | null;
+};
+
+type SqliteOrderItemRow = {
+  quantity: number;
+  price: number;
+  itemCreatedAt: string;
+  productId: string | null;
+  orderId: string;
+  orderCreatedAt: string;
+  userId: string;
+  orderTotal: number | null;
 };
 
 export async function GET(request: NextRequest) {
@@ -100,7 +114,7 @@ export async function GET(request: NextRequest) {
         price,
         createdAt,
         productId,
-        orders!inner(userId,createdAt,total)
+        orders!inner(id,userId,createdAt,total)
       `
       )
       .eq('orders.userId', decoded.userId)
@@ -110,6 +124,67 @@ export async function GET(request: NextRequest) {
     if (error) {
       throw new Error(error.message);
     }
+
+    const sqliteRows = await sqlite.all<SqliteOrderItemRow>(
+      `
+      SELECT
+        oi.quantity,
+        oi.price,
+        oi.createdAt AS itemCreatedAt,
+        oi.productId,
+        o.id AS orderId,
+        o.createdAt AS orderCreatedAt,
+        o.userId,
+        o.total AS orderTotal
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.orderId
+      WHERE o.userId = ?
+      ORDER BY oi.createdAt DESC
+      LIMIT 500
+    `,
+      [decoded.userId]
+    );
+
+    const dedupeKey = (record: OrderItemRecord, orderId?: string) => {
+      const order = Array.isArray(record.orders) ? record.orders[0] : record.orders;
+      const createdAt = order?.createdAt ?? record.createdAt ?? '';
+      const baseOrderId = orderId ?? (order as { id?: string } | undefined)?.id ?? 'local';
+      return `${baseOrderId}:${record.productId ?? 'product'}:${createdAt}:${record.quantity ?? 0}`;
+    };
+
+    const combinedRecords: OrderItemRecord[] = [];
+    const seenKeys = new Set<string>();
+
+    for (const record of data ?? []) {
+      const order = Array.isArray(record.orders) ? record.orders[0] : record.orders;
+      const key = dedupeKey(record as OrderItemRecord, order?.id);
+      if (seenKeys.has(key)) continue;
+      seenKeys.add(key);
+      combinedRecords.push(record as OrderItemRecord);
+    }
+
+    sqliteRows.forEach((row) => {
+      const sqliteRecord: OrderItemRecord = {
+        quantity: row.quantity,
+        price: row.price,
+        productId: row.productId,
+        createdAt: row.itemCreatedAt ?? row.orderCreatedAt,
+        orders: [
+          {
+            id: row.orderId,
+            userId: row.userId,
+            createdAt: row.orderCreatedAt,
+            total: row.orderTotal,
+          },
+        ],
+      };
+      const key = dedupeKey(sqliteRecord, row.orderId);
+      if (seenKeys.has(key)) {
+        return;
+      }
+      seenKeys.add(key);
+      combinedRecords.push(sqliteRecord);
+    });
 
     const monthlyMap = new Map<string, ConsumptionBucket>();
     const yearlyMap = new Map<string, ConsumptionBucket>();
@@ -133,8 +208,7 @@ export async function GET(request: NextRequest) {
       return 'beverage';
     };
 
-    (data ?? []).forEach((itemRaw) => {
-      const item = itemRaw as OrderItemRecord;
+    combinedRecords.forEach((item) => {
       const orderArray = Array.isArray(item.orders)
         ? item.orders
         : item.orders
