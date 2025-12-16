@@ -82,7 +82,9 @@ export default function MobileNav() {
           exit="exit"
           variants={variants}
           className={classNames(
-            'fixed inset-0 z-20 h-full w-full bg-gradient-to-b from-black/70 via-black/60 to-black/50 text-white backdrop-blur-[28px] dark:from-black/80 dark:via-black/80 dark:to-black/80'
+            'fixed inset-0 z-20 h-full w-full backdrop-blur-[28px]',
+            'bg-black/95 text-white',
+            'dark:bg-white/95 dark:text-gray-900'
           )}
         >
           <header className="flex justify-end py-5 px-4">
@@ -106,42 +108,33 @@ export default function MobileNav() {
               </svg>
             </button>
           </header>
-          <div className="flex h-full w-full justify-center px-5 pb-12">
-            <nav className="mt-6 flex w-full max-w-sm flex-col overflow-y-auto rounded-3xl border border-white/30 bg-gray-900/90 px-8 py-10 text-white shadow-2xl backdrop-blur-2xl dark:border-white/20 dark:bg-white/95 dark:text-gray-900">
-              <div className="mb-6 text-xs font-semibold uppercase tracking-[0.35em] text-white/70 dark:text-gray-500">
-                Navega
-              </div>
-              <div key="Home" className="py-3">
-                <Link
-                  href="/"
-                  onClick={() => setNavShow(!navShow)}
-                  className={classNames('horizontal-underline font-bold tracking-[0.2em]', {
-                    'horizontal-underline-active': pathName === '/',
-                  })}
-                >
-                  Home
-                </Link>
-              </div>
-              {headerNavLinks.map(({ title, href }) => {
-                const active = pathName?.includes(href);
-
-                return (
-                  <div key={title} className="py-3">
-                    <Link
-                      href={href}
-                      onClick={() => setNavShow(!navShow)}
-                      className={classNames('horizontal-underline font-semibold tracking-[0.2em]', {
-                        'horizontal-underline-active': active,
-                      })}
-                      aria-label={title}
-                    >
-                      {title}
-                    </Link>
-                  </div>
-                );
+          <nav className="flex h-full flex-col justify-center space-y-8 px-10 text-center text-3xl font-semibold tracking-[0.25em]">
+            <Link
+              href="/"
+              onClick={() => setNavShow(!navShow)}
+              className={classNames('horizontal-underline', {
+                'horizontal-underline-active': pathName === '/',
               })}
-            </nav>
-          </div>
+            >
+              Home
+            </Link>
+            {headerNavLinks.map(({ title, href }) => {
+              const active = pathName?.includes(href);
+              return (
+                <Link
+                  key={title}
+                  href={href}
+                  onClick={() => setNavShow(!navShow)}
+                  className={classNames('horizontal-underline', {
+                    'horizontal-underline-active': active,
+                  })}
+                  aria-label={title}
+                >
+                  {title}
+                </Link>
+              );
+            })}
+          </nav>
         </motion.div>
       </AnimatePresence>
     </div>
