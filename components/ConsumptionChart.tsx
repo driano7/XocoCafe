@@ -58,6 +58,8 @@ const BEVERAGE_COLOR = '#5c3025';
 const FOOD_COLOR = '#b46f3c';
 const PACKAGE_COLOR = '#b45309';
 const CARD_BG = '#f8f1e4';
+const MAX_DESKTOP_ITEMS = 5;
+const MAX_MOBILE_ITEMS = 3;
 
 type Period = 'monthly' | 'yearly';
 
@@ -75,7 +77,7 @@ function buildBars(bucket: ConsumptionBucket) {
     type: 'package' as const,
   }));
   const combined = [...beverages, ...foods, ...packages];
-  return combined.sort((a, b) => b.total - a.total).slice(0, 5);
+  return combined.sort((a, b) => b.total - a.total).slice(0, MAX_DESKTOP_ITEMS);
 }
 
 export default function ConsumptionChart() {
@@ -150,12 +152,16 @@ export default function ConsumptionChart() {
     yearly: `${periodToggleId}-yearly`,
   };
 
-  const bars = useMemo(() => {
-    const limit = isMobile ? 3 : 5;
-    if (!currentBucket)
+  const combinedBars = useMemo(() => {
+    if (!currentBucket) {
       return [] as Array<{ name: string; total: number; type: 'beverage' | 'food' | 'package' }>;
-    return buildBars(currentBucket).slice(0, limit);
-  }, [currentBucket, isMobile]);
+    }
+    return buildBars(currentBucket);
+  }, [currentBucket]);
+
+  const displayLimit = isMobile ? MAX_MOBILE_ITEMS : MAX_DESKTOP_ITEMS;
+  const bars = useMemo(() => combinedBars.slice(0, displayLimit), [combinedBars, displayLimit]);
+  const isShowingSubset = isMobile && combinedBars.length > bars.length;
 
   const maxTotal = useMemo(() => {
     return bars.reduce((max, bar) => (bar.total > max ? bar.total : max), 0);
@@ -228,6 +234,11 @@ export default function ConsumptionChart() {
           Paquetes
         </div>
       </div>
+      {isShowingSubset && (
+        <p className="mt-2 text-xs font-semibold text-primary-700 dark:text-primary-300 sm:hidden">
+          Mostrando top {MAX_MOBILE_ITEMS} (en desktop se muestran {MAX_DESKTOP_ITEMS}).
+        </p>
+      )}
 
       <div className="mt-6 min-h-[220px]">
         {isLoading ? (

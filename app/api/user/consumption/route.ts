@@ -106,44 +106,55 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Token inválido' }, { status: 401 });
     }
 
-    const { data, error } = await supabase
-      .from('order_items')
-      .select(
+    let supabaseRecords: OrderItemRecord[] = [];
+    try {
+      const { data, error } = await supabase
+        .from('order_items')
+        .select(
+          `
+          quantity,
+          price,
+          createdAt,
+          productId,
+          orders!inner(id,userId,createdAt,total)
         `
-        quantity,
-        price,
-        createdAt,
-        productId,
-        orders!inner(id,userId,createdAt,total)
-      `
-      )
-      .eq('orders.userId', decoded.userId)
-      .order('createdAt', { ascending: false })
-      .limit(500);
+        )
+        .eq('orders.userId', decoded.userId)
+        .order('createdAt', { ascending: false })
+        .limit(500);
 
-    if (error) {
-      throw new Error(error.message);
+      if (error) {
+        throw new Error(error.message);
+      }
+      supabaseRecords = (data ?? []) as OrderItemRecord[];
+    } catch (supabaseError) {
+      console.error('Error consultando consumo en Supabase:', supabaseError);
     }
 
-    const sqliteRows = await sqlite.all<SqliteOrderItemRow>(
-      `
-      SELECT
-        oi.quantity,
-        oi.price,
-        oi.createdAt AS itemCreatedAt,
-        oi.productId,
-        o.id AS orderId,
-        o.createdAt AS orderCreatedAt,
-        o.userId,
-        o.total AS orderTotal
-      FROM order_items oi
-      JOIN orders o ON o.id = oi.orderId
-      WHERE o.userId = ?
-      ORDER BY oi.createdAt DESC
-      LIMIT 500
-    `,
-      [decoded.userId]
-    );
+    let sqliteRows: SqliteOrderItemRow[] = [];
+    try {
+      sqliteRows = await sqlite.all<SqliteOrderItemRow>(
+        `
+        SELECT
+          oi.quantity,
+          oi.price,
+          oi.createdAt AS itemCreatedAt,
+          oi.productId,
+          o.id AS orderId,
+          o.createdAt AS orderCreatedAt,
+          o.userId,
+          o.total AS orderTotal
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.orderId
+        WHERE o.userId = ?
+        ORDER BY oi.createdAt DESC
+        LIMIT 500
+      `,
+        [decoded.userId]
+      );
+    } catch (sqliteError) {
+      console.error('Error consultando consumo en SQLite:', sqliteError);
+    }
 
     const dedupeKey = (record: OrderItemRecord, orderId?: string) => {
       const order = Array.isArray(record.orders) ? record.orders[0] : record.orders;
@@ -155,7 +166,7 @@ export async function GET(request: NextRequest) {
     const combinedRecords: OrderItemRecord[] = [];
     const seenKeys = new Set<string>();
 
-    for (const record of data ?? []) {
+    for (const record of supabaseRecords) {
       const order = Array.isArray(record.orders) ? record.orders[0] : record.orders;
       const key = dedupeKey(record as OrderItemRecord, order?.id);
       if (seenKeys.has(key)) continue;
