@@ -28,7 +28,6 @@
 'use client';
 
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FaWhatsapp } from 'react-icons/fa';
 import siteMetadata from 'content/siteMetadata';
@@ -37,6 +36,7 @@ import { useAuth } from '@/components/Auth/AuthProvider';
 import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
 import { usePagination } from '@/hooks/use-pagination';
 import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
+import VirtualTicket from '@/components/Orders/VirtualTicket';
 
 interface Order {
   id: string;
@@ -106,9 +106,19 @@ const parseTextQuantity = (value: string) => {
   return match?.groups?.qty ? Number(match.groups.qty) : 1;
 };
 
+type ItemWithQuantity = {
+  quantity?: unknown;
+};
+
 const extractOrderItems = (items: unknown) => {
   if (!items) return [];
-  const normalizeItem = (item: any) => ({ quantity: normalizeQuantity(item?.quantity ?? 1) });
+  const normalizeItem = (item: unknown) => {
+    const quantity =
+      item && typeof item === 'object' && 'quantity' in item
+        ? (item as ItemWithQuantity).quantity
+        : undefined;
+    return { quantity: normalizeQuantity(quantity ?? 1) };
+  };
   if (Array.isArray(items)) {
     return items.map(normalizeItem);
   }
@@ -179,15 +189,6 @@ const formatOrderChannelLabel = (order: Order) => {
   }
   return (order.type ?? 'Web').toUpperCase();
 };
-
-const VirtualTicket = dynamic(() => import('@/components/Orders/VirtualTicket'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-72 w-full items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-gray-50 text-sm text-gray-500 dark:border-white/10 dark:bg-gray-900/40 dark:text-gray-300">
-      Generando ticket digital...
-    </div>
-  ),
-}) as typeof import('@/components/Orders/VirtualTicket').default;
 
 const OrderCard = ({ order, onSelect }: { order: Order; onSelect: (order: Order) => void }) => {
   const effectiveStatusKey = (order.prepStatus as Order['status']) ?? order.status ?? 'pending';
@@ -502,10 +503,26 @@ export default function OrdersDashboardPage() {
     type: 'success' | 'error';
     message: string;
   } | null>(null);
+  const [deviceInfo, setDeviceInfo] = useState({
+    isMobile: false,
+    isAndroid: false,
+    isIOS: false,
+    isIPadOS: false,
+  });
+  const [isShareSupported, setIsShareSupported] = useState(false);
+  const canShareTicket = isShareSupported && (deviceInfo.isAndroid || deviceInfo.isIOS);
   const ticketRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const isAuthenticated = Boolean(user && token);
+  const [, setStatusTick] = useState(() => Date.now());
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setStatusTick(Date.now()), 60_000);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   const loadOrders = useCallback(async () => {
     if (!token) {
@@ -738,8 +755,14 @@ export default function OrdersDashboardPage() {
   const pendingClientOrders = pendingOrders.filter((order) => isClientTicket(order));
   const MAX_ACTIVE_ORDERS = 3;
   const hasReachedOrderLimit = isAuthenticated && pendingClientOrders.length >= MAX_ACTIVE_ORDERS;
-  const expiredSelectedOrder = selectedOrder ? isExpiredPending(selectedOrder) : false;
-  const selectedOrderEffectiveStatus = selectedOrder ? getEffectiveStatus(selectedOrder) : null;
+  const expiredSelectedOrder = useMemo(
+    () => (selectedOrder ? isExpiredPending(selectedOrder) : false),
+    [selectedOrder, isExpiredPending]
+  );
+  const selectedOrderEffectiveStatus = useMemo(
+    () => (selectedOrder ? getEffectiveStatus(selectedOrder) : null),
+    [selectedOrder, getEffectiveStatus]
+  );
   const shouldShowQr = selectedOrder ? !expiredSelectedOrder : false;
   const {
     showReminder: showLoyaltyReminder,
@@ -763,22 +786,271 @@ export default function OrdersDashboardPage() {
     });
   }, [activateLoyaltyProgram]);
 
-  const handleDownloadTicket = async () => {
-    if (!selectedOrder || !ticketRef.current) return;
+  const [isProcessingTicket, setIsProcessingTicket] = useState(false);
+  const [ticketActionError, setTicketActionError] = useState<string | null>(null);
+
+  const detectDevice = useCallback(() => {
+    if (typeof navigator === 'undefined' || typeof window === 'undefined') {
+      return;
+    }
+    type WindowWithOpera = Window & { opera?: string };
+    const ua =
+      navigator.userAgent ||
+      navigator.vendor ||
+      ((window as WindowWithOpera).opera ? String((window as WindowWithOpera).opera) : '');
+    const isAndroid = /android/i.test(ua);
+    const isIPad =
+      /ipad/i.test(ua) ||
+      (/macintosh/i.test(ua) &&
+        typeof navigator.maxTouchPoints === 'number' &&
+        navigator.maxTouchPoints > 1);
+    const isIPhone = /iphone|ipod/i.test(ua);
+    setDeviceInfo({
+      isMobile: isAndroid || isIPad || isIPhone,
+      isAndroid,
+      isIOS: isIPhone,
+      isIPadOS: isIPad,
+    });
+    const supportsShare = typeof navigator.share === 'function';
+    setIsShareSupported(supportsShare && (isAndroid || isIPhone));
+  }, []);
+
+  useEffect(() => {
+    detectDevice();
+  }, [detectDevice]);
+
+  const waitForTicketAssets = useCallback(async () => {
+    if (!ticketRef.current) return;
+    const images = Array.from(ticketRef.current.querySelectorAll('img'));
+    await Promise.all(
+      images.map(
+        (image) =>
+          new Promise<void>((resolve) => {
+            if (image.complete && image.naturalWidth > 0) {
+              resolve();
+              return;
+            }
+            const handleResolve = () => {
+              image.removeEventListener('load', handleResolve);
+              image.removeEventListener('error', handleResolve);
+              resolve();
+            };
+            image.addEventListener('load', handleResolve);
+            image.addEventListener('error', handleResolve);
+          })
+      )
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }, [ticketRef]);
+
+  const dataUrlToBlob = (dataUrl: string): Blob => {
+    const [metadata, content] = dataUrl.split(',');
+    const mimeMatch = metadata.match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+    const byteString = atob(content);
+    const length = byteString.length;
+    const arrayBuffer = new ArrayBuffer(length);
+    const uintArray = new Uint8Array(arrayBuffer);
+    for (let i = 0; i < length; i += 1) {
+      uintArray[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([uintArray], { type: mime });
+  };
+
+  const captureTicketAsBlob = useCallback(async () => {
+    if (!ticketRef.current) return null;
+    await waitForTicketAssets();
     const html2canvas = (await import('html2canvas')).default;
     const canvas = await html2canvas(ticketRef.current, {
       scale: 2,
       backgroundColor: '#ffffff',
       useCORS: true,
     });
-    const dataUrl = canvas.toDataURL('image/png');
-    const link = document.createElement('a');
-    link.href = dataUrl;
-    link.download = `${
-      selectedOrder.ticketId ?? selectedOrder.orderNumber ?? selectedOrder.id
-    }.png`;
-    link.click();
-  };
+    if (typeof canvas.toBlob !== 'function') {
+      try {
+        const dataUrl = canvas.toDataURL('image/png', 1);
+        return dataUrlToBlob(dataUrl);
+      } catch (error) {
+        console.error('No pudimos convertir el ticket en imagen (fallback).', error);
+        return null;
+      }
+    }
+    return new Promise<Blob | null>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('No pudimos generar la imagen del ticket.'));
+            return;
+          }
+          resolve(blob);
+        },
+        'image/png',
+        1
+      );
+    });
+  }, [waitForTicketAssets]);
+
+  const buildTicketFileName = useCallback(() => {
+    if (!selectedOrder) return 'ticket-xoco-cafe';
+    return (selectedOrder.ticketId ?? selectedOrder.orderNumber ?? selectedOrder.id).toString();
+  }, [selectedOrder]);
+
+  const triggerDownload = useCallback(
+    (blob: Blob, filename: string) => {
+      const objectUrl = URL.createObjectURL(blob);
+      if (deviceInfo.isMobile) {
+        const newTab = window.open(objectUrl, '_blank');
+        if (!newTab) {
+          const mobileLink = document.createElement('a');
+          mobileLink.href = objectUrl;
+          mobileLink.download = `${filename}.png`;
+          mobileLink.rel = 'noopener';
+          document.body.appendChild(mobileLink);
+          mobileLink.click();
+          document.body.removeChild(mobileLink);
+        }
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `${filename}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
+    },
+    [deviceInfo.isMobile]
+  );
+
+  const saveTicketToGallery = useCallback(
+    async (blob: Blob, filename: string) => {
+      if (
+        !canShareTicket ||
+        typeof navigator === 'undefined' ||
+        typeof navigator.share !== 'function'
+      ) {
+        throw new Error('gallery_not_supported');
+      }
+      const file = new File([blob], `${filename}.png`, { type: 'image/png' });
+      if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+        throw new Error('gallery_not_supported');
+      }
+      try {
+        await navigator.share({
+          files: [file],
+          title: 'Ticket digital Xoco Café',
+          text: 'Guardaremos tu ticket en tu galería.',
+        });
+      } catch (error) {
+        console.error('Error guardando ticket en galería:', error);
+        if (
+          error instanceof DOMException &&
+          (error.name === 'AbortError' || error.name === 'NotAllowedError')
+        ) {
+          throw new Error('gallery_permission_denied');
+        }
+        throw new Error('gallery_share_failed');
+      }
+    },
+    [canShareTicket]
+  );
+
+  const handleDownloadTicket = useCallback(async () => {
+    if (!selectedOrder) return;
+    setTicketActionError(null);
+    setIsProcessingTicket(true);
+    try {
+      const blob = await captureTicketAsBlob();
+      if (!blob) {
+        throw new Error('No pudimos generar el ticket');
+      }
+      const filename = buildTicketFileName();
+      if (deviceInfo.isMobile && canShareTicket) {
+        try {
+          await saveTicketToGallery(blob, filename);
+        } catch (mobileError) {
+          if (mobileError instanceof Error && mobileError.message === 'gallery_permission_denied') {
+            throw mobileError;
+          }
+          console.warn(
+            'Fallo guardando ticket en galería, aplicando descarga estándar:',
+            mobileError
+          );
+          triggerDownload(blob, filename);
+          setTicketActionError(
+            'No pudimos guardar tu ticket en la galería, pero lo enviamos a tu carpeta de descargas.'
+          );
+        }
+        return;
+      }
+      triggerDownload(blob, filename);
+    } catch (error) {
+      console.error('Error descargando ticket:', error);
+      if (error instanceof Error && error.message === 'gallery_permission_denied') {
+        setTicketActionError(
+          'Necesitamos permiso para guardar el ticket en tu galería. Intenta aceptarlo o usa el botón Compartir.'
+        );
+      } else if (error instanceof Error && error.message?.startsWith('gallery_')) {
+        setTicketActionError(
+          'No pudimos guardar tu ticket en la galería. Revisa los permisos o usa Compartir.'
+        );
+      } else {
+        setTicketActionError('No pudimos descargar el ticket. Intenta de nuevo.');
+      }
+    } finally {
+      setIsProcessingTicket(false);
+    }
+  }, [
+    buildTicketFileName,
+    canShareTicket,
+    captureTicketAsBlob,
+    deviceInfo.isMobile,
+    saveTicketToGallery,
+    selectedOrder,
+    triggerDownload,
+  ]);
+
+  const handleShareTicket = useCallback(async () => {
+    if (
+      !selectedOrder ||
+      typeof navigator === 'undefined' ||
+      typeof navigator.share !== 'function' ||
+      !(deviceInfo.isAndroid || deviceInfo.isIOS) ||
+      !isShareSupported
+    ) {
+      return;
+    }
+    setTicketActionError(null);
+    setIsProcessingTicket(true);
+    try {
+      const blob = await captureTicketAsBlob();
+      if (!blob) {
+        throw new Error('No pudimos generar el ticket');
+      }
+      const file = new File([blob], `${buildTicketFileName()}.png`, { type: 'image/png' });
+      if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+        throw new Error('El dispositivo no soporta compartir archivos');
+      }
+      await navigator.share({
+        files: [file],
+        title: 'Ticket digital Xoco Café',
+        text: 'Comparte tu ticket con otra persona o guárdalo en tu galería.',
+      });
+    } catch (error) {
+      console.error('Error compartiendo ticket:', error);
+      setTicketActionError('No pudimos compartir el ticket en este dispositivo.');
+    } finally {
+      setIsProcessingTicket(false);
+    }
+  }, [
+    buildTicketFileName,
+    captureTicketAsBlob,
+    deviceInfo.isAndroid,
+    deviceInfo.isIOS,
+    selectedOrder,
+    isShareSupported,
+  ]);
 
   useEffect(() => {
     if (selectedOrder) {
@@ -1015,7 +1287,7 @@ export default function OrdersDashboardPage() {
           tabIndex={-1}
         >
           <div
-            className="flex w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-gray-900"
+            className="flex w-full max-w-md flex-col overflow-hidden rounded-3xl border border-white/30 bg-white/90 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-gray-900/80"
             style={{ maxHeight: 'calc(100vh - 96px)', height: 'calc(100vh - 96px)' }}
           >
             <div
@@ -1140,14 +1412,30 @@ export default function OrdersDashboardPage() {
               })()}
 
               {!expiredSelectedOrder && (
-                <div className="border-t border-gray-100 pb-2 pt-3">
+                <div className="border-t border-gray-100 pb-2 pt-3 space-y-2">
                   <button
                     type="button"
                     onClick={() => void handleDownloadTicket()}
-                    className="w-full rounded-full bg-primary-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-700"
+                    disabled={isProcessingTicket}
+                    className="w-full rounded-full bg-primary-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    Descargar Ticket
+                    {isProcessingTicket ? 'Generando ticket…' : 'Descargar Ticket'}
                   </button>
+                  {canShareTicket && (
+                    <button
+                      type="button"
+                      onClick={() => void handleShareTicket()}
+                      disabled={isProcessingTicket}
+                      className="w-full rounded-full border border-primary-200 px-4 py-3 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-primary-500/60 dark:text-primary-200 dark:hover:bg-primary-500/10"
+                    >
+                      Compartir ticket
+                    </button>
+                  )}
+                  {ticketActionError && (
+                    <p className="text-center text-xs text-red-600 dark:text-red-400">
+                      {ticketActionError}
+                    </p>
+                  )}
                 </div>
               )}
             </div>

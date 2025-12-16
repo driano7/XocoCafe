@@ -27,10 +27,10 @@
 
 //'use client';
 
-import { MDXLayoutRenderer } from '@/components/MDXComponents';
-import UsesLayout from '@/layouts/MDX/UsesLayout';
 import MainLayout from '@/layouts/MainLayout';
+import MenuExperience from '@/components/menu/MenuExperience';
 import { allAuthors } from 'contentlayer/generated';
+import { coreContent } from '@/lib/utils/contentlayer';
 
 /*
 import React from 'react';
@@ -98,11 +98,13 @@ export default function Uses() {
     return null;
   }
 
+  const simpleContent = coreContent(author);
+
   return (
     <MainLayout>
-      <UsesLayout>
-        <MDXLayoutRenderer content={author} />
-      </UsesLayout>
+      <div className="min-h-screen bg-[#05070f]">
+        <MenuExperience simpleCode={author.body.code} simpleContent={simpleContent} />
+      </div>
     </MainLayout>
   );
 }

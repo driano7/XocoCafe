@@ -30,7 +30,14 @@ const colors = require('tailwindcss/colors');
 
 module.exports = {
   mode: 'jit',
-  content: ['./pages/**/*.tsx', './components/**/*.tsx', './layouts/**/*.tsx', './lib/**/*.ts'],
+  content: [
+    './app/**/*.{ts,tsx}',
+    './pages/**/*.tsx',
+    './components/**/*.tsx',
+    './layouts/**/*.tsx',
+    './lib/**/*.ts',
+    './data/**/*.{ts,tsx}',
+  ],
   darkMode: 'class',
   theme: {
     extend: {

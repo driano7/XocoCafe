@@ -130,7 +130,7 @@ export async function getUserByEmail(email: string) {
   const { data: user, error } = await supabase
     .from('users')
     .select(
-      'id,email,passwordHash,clientId,authProvider,firstNameEncrypted,firstNameIv,firstNameTag,firstNameSalt,lastNameEncrypted,lastNameIv,lastNameTag,lastNameSalt,phoneEncrypted,phoneIv,phoneTag,phoneSalt,walletAddress,city,country,favoriteColdDrink,favoriteHotDrink,favoriteFood,termsAccepted,privacyAccepted,marketingEmail,marketingSms,marketingPush,createdAt,lastLoginAt,avatarUrl'
+      'id,email,passwordHash,clientId,authProvider,firstNameEncrypted,firstNameIv,firstNameTag,firstNameSalt,lastNameEncrypted,lastNameIv,lastNameTag,lastNameSalt,phoneEncrypted,phoneIv,phoneTag,phoneSalt,walletAddress,city,country,favoriteColdDrink,favoriteHotDrink,favoriteFood,weeklyCoffeeCount,termsAccepted,privacyAccepted,marketingEmail,marketingSms,marketingPush,createdAt,lastLoginAt,avatarUrl'
     )
     .eq('email', email)
     .maybeSingle();
@@ -154,6 +154,7 @@ export async function getUserByEmail(email: string) {
     favoriteColdDrink: user.favoriteColdDrink || undefined,
     favoriteHotDrink: user.favoriteHotDrink || undefined,
     favoriteFood: user.favoriteFood || undefined,
+    weeklyCoffeeCount: user.weeklyCoffeeCount ?? 0,
     avatarUrl: avatarSignedUrl,
     avatarStoragePath: (user.avatarUrl as string | null) || null,
     passwordHash,
@@ -165,7 +166,7 @@ export async function getUserById(id: string) {
   const { data: user, error } = await supabase
     .from('users')
     .select(
-      'id,email,clientId,firstNameEncrypted,firstNameIv,firstNameTag,firstNameSalt,lastNameEncrypted,lastNameIv,lastNameTag,lastNameSalt,phoneEncrypted,phoneIv,phoneTag,phoneSalt,walletAddress,city,country,favoriteColdDrink,favoriteHotDrink,favoriteFood,termsAccepted,privacyAccepted,marketingEmail,marketingSms,marketingPush,createdAt,lastLoginAt,avatarUrl,loyaltyActivatedAt'
+      'id,email,clientId,firstNameEncrypted,firstNameIv,firstNameTag,firstNameSalt,lastNameEncrypted,lastNameIv,lastNameTag,lastNameSalt,phoneEncrypted,phoneIv,phoneTag,phoneSalt,walletAddress,city,country,favoriteColdDrink,favoriteHotDrink,favoriteFood,weeklyCoffeeCount,termsAccepted,privacyAccepted,marketingEmail,marketingSms,marketingPush,createdAt,lastLoginAt,avatarUrl,loyaltyActivatedAt'
     )
     .eq('id', id)
     .maybeSingle();
@@ -184,7 +185,7 @@ export async function getUserById(id: string) {
     supabase
       .from('addresses')
       .select(
-        'id,userId,label,nickname,type,street,city,state,postalCode,country,reference,additionalInfo,isDefault,payload,payloadIv,payloadTag,payloadSalt,createdAt,updatedAt'
+        'id,userId,label,nickname,type,street,city,state,postalCode,country,isDefault,payload,payloadIv,payloadTag,payloadSalt,createdAt,updatedAt'
       )
       .eq('userId', id),
     supabase.from('loyalty_points').select('*').eq('userId', id),
@@ -222,6 +223,7 @@ export async function getUserById(id: string) {
     favoriteColdDrink: user.favoriteColdDrink || undefined,
     favoriteHotDrink: user.favoriteHotDrink || undefined,
     favoriteFood: user.favoriteFood || undefined,
+    weeklyCoffeeCount: user.weeklyCoffeeCount ?? 0,
     avatarUrl: avatarSignedUrl,
     avatarStoragePath: (user.avatarUrl as string | null) || null,
     loyaltyActivatedAt: user.loyaltyActivatedAt || null,
@@ -287,11 +289,132 @@ export async function exportUserData(userId: string) {
   };
 }
 
+async function deleteByUserId(table: string, userId: string) {
+  const { error } = await supabase.from(table).delete().eq('userId', userId);
+  if (error && error.code !== 'PGRST116') {
+    throw new Error(`Error al eliminar registros en ${table}: ${error.message}`);
+  }
+}
+
 // Eliminar datos del usuario (GDPR)
 export async function deleteUserData(userId: string): Promise<void> {
-  // Eliminar en cascada debido a las relaciones definidas
+  const [{ data: profile, error: profileError }, { data: orders, error: ordersLookupError }] =
+    await Promise.all([
+      supabase.from('users').select('avatarUrl').eq('id', userId).maybeSingle(),
+      supabase.from('orders').select('id').eq('userId', userId),
+    ]);
+
+  if (profileError && profileError.code !== 'PGRST116') {
+    throw new Error(`Error al consultar perfil antes de eliminar usuario: ${profileError.message}`);
+  }
+
+  if (ordersLookupError && ordersLookupError.code !== 'PGRST116') {
+    throw new Error(`Error al consultar órdenes del usuario: ${ordersLookupError.message}`);
+  }
+
+  const orderIds = (orders ?? []).map((order) => order.id).filter(Boolean);
+  if (orderIds.length > 0) {
+    const { error: orderItemsError } = await supabase
+      .from('order_items')
+      .delete()
+      .in('orderId', orderIds);
+    if (orderItemsError && orderItemsError.code !== 'PGRST116') {
+      throw new Error(`Error al eliminar artículos del pedido: ${orderItemsError.message}`);
+    }
+    const { error: ticketError } = await supabase.from('tickets').delete().in('orderId', orderIds);
+    if (ticketError && ticketError.code !== 'PGRST116') {
+      throw new Error(`Error al eliminar tickets asociados: ${ticketError.message}`);
+    }
+    const { error: ordersDeleteError } = await supabase.from('orders').delete().in('id', orderIds);
+    if (ordersDeleteError) {
+      throw new Error(`Error al eliminar órdenes del usuario: ${ordersDeleteError.message}`);
+    }
+  }
+
+  const relatedTables = [
+    'sessions',
+    'addresses',
+    'loyalty_points',
+    'page_analytics',
+    'conversion_events',
+    'reservations',
+    'reservation_failures',
+  ];
+
+  for (const table of relatedTables) {
+    await deleteByUserId(table, userId);
+  }
+
+  if (profile?.avatarUrl) {
+    const { error: avatarDeleteError } = await supabase.storage
+      .from('avatars')
+      .remove([profile.avatarUrl]);
+    if (avatarDeleteError) {
+      console.warn('No se pudo eliminar el avatar del usuario:', avatarDeleteError);
+    }
+  }
+
   const { error } = await supabase.from('users').delete().eq('id', userId);
   if (error) {
     throw new Error(`Error al eliminar usuario: ${error.message}`);
   }
+}
+
+type CleanupOptions = {
+  inactivityDays?: number;
+  batchSize?: number;
+};
+
+export async function cleanupInactiveUsers({
+  inactivityDays = 365,
+  batchSize = 100,
+}: CleanupOptions = {}) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - inactivityDays);
+  const cutoffIso = cutoff.toISOString();
+
+  const inactivityFilter = `lastLoginAt.lt.${cutoffIso},and(lastLoginAt.is.null,createdAt.lt.${cutoffIso})`;
+  const { data: inactiveUsers, error } = await supabase
+    .from('users')
+    .select('id,lastLoginAt,createdAt,email')
+    .or(inactivityFilter)
+    .order('lastLoginAt', { ascending: true })
+    .limit(batchSize);
+
+  if (error) {
+    throw new Error(`Error consultando usuarios inactivos: ${error.message}`);
+  }
+
+  const deletedUserIds: string[] = [];
+  const failures: Array<{ userId: string; reason: string }> = [];
+
+  for (const user of inactiveUsers ?? []) {
+    try {
+      await logDataRetentionAction(user.id, 'auto_data_deletion', {
+        reason: 'inactive_over_12_months',
+        lastLoginAt: user.lastLoginAt,
+        createdAt: user.createdAt,
+      });
+    } catch (logError) {
+      console.warn('No pudimos registrar log de retención para el usuario', user.id, logError);
+    }
+
+    try {
+      await deleteUserData(user.id);
+      deletedUserIds.push(user.id);
+    } catch (deletionError: any) {
+      console.error('No pudimos eliminar datos del usuario inactivo:', user.id, deletionError);
+      failures.push({
+        userId: user.id,
+        reason: deletionError instanceof Error ? deletionError.message : 'unknown_error',
+      });
+    }
+  }
+
+  return {
+    cutoff: cutoffIso,
+    deletedCount: deletedUserIds.length,
+    deletedUserIds,
+    failures,
+  };
 }

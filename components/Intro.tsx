@@ -27,8 +27,8 @@
 
 'use client';
 
-import { useLenis } from '@studio-freight/react-lenis';
-import { useRef, useState } from 'react';
+import { useContext, useRef } from 'react';
+import { ScrollContext } from '@/components/Providers/ScrollProvider';
 
 function opacityForBlock(sectionProgress: number, blockNumber: number) {
   const progress = sectionProgress - blockNumber;
@@ -41,12 +41,7 @@ function opacityForBlock(sectionProgress: number, blockNumber: number) {
 }
 
 export default function Intro() {
-  const [scrollY, setScrollY] = useState(0);
-
-  useLenis(({ scroll }: any) => {
-    setScrollY(scroll);
-  });
-
+  const { scrollY } = useContext(ScrollContext);
   const refContainer = useRef<HTMLDivElement>(null);
   const numOfPages = 4;
   let progress = 0;
@@ -71,7 +66,7 @@ export default function Intro() {
       id="intro"
     >
       <div className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-6 py-16 text-3xl font-semibold tracking-tight sm:px-8 sm:py-20 sm:text-4xl md:py-24 md:text-5xl lg:px-20 lg:py-28 lg:text-6xl">
-        <div className="text-center leading-tight sm:text-left sm:leading-[1.15]">
+        <div className="w-full text-center leading-tight sm:text-left sm:leading-[1.15]">
           <div className="introText" style={{ opacity: opacityForBlock(progress, 0) }}>
             Minimalista.
           </div>
@@ -93,6 +88,23 @@ export default function Intro() {
           >
             Sensorial.
           </span>
+        </div>
+
+        <div className="mt-12 w-full">
+          <div className="rounded-[32px] border border-white/15 bg-white/5 p-2 shadow-2xl backdrop-blur-2xl dark:border-black/20 dark:bg-black/20">
+            <div className="relative overflow-hidden rounded-[28px] bg-black/70">
+              <video
+                className="aspect-[9/16] w-full object-cover sm:aspect-video"
+                autoPlay
+                muted
+                loop
+                playsInline
+              >
+                <source src="/static/images/video.mp4" type="video/mp4" />
+                Tu navegador no soporta video HTML5.
+              </video>
+            </div>
+          </div>
         </div>
       </div>
     </div>

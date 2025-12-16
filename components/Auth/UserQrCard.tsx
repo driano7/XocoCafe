@@ -29,9 +29,14 @@
 
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
+import { resolveFavoriteLabel } from '@/lib/menuFavorites';
 import { useAuth } from './AuthProvider';
 
-export default function UserQrCard() {
+type UserQrCardProps = {
+  className?: string;
+};
+
+export default function UserQrCard({ className = '' }: UserQrCardProps) {
   const { user } = useAuth();
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -39,8 +44,8 @@ export default function UserQrCard() {
     if (!user?.clientId) return null;
 
     const favoriteBeverage =
-      user.favoriteColdDrink ?? user.favoriteHotDrink ?? user.favoriteFood ?? 'No registrado';
-    const favoriteFood = user.favoriteFood ?? 'No registrado';
+      resolveFavoriteLabel(user.favoriteColdDrink ?? user.favoriteHotDrink) ?? 'No registrado';
+    const favoriteFood = resolveFavoriteLabel(user.favoriteFood) ?? 'No registrado';
 
     const qrPayload = {
       'Id cliente': user.clientId,
@@ -53,7 +58,7 @@ export default function UserQrCard() {
     };
 
     const encoded = encodeURIComponent(JSON.stringify(qrPayload, null, 2));
-    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encoded}`;
+    return `/api/qr?size=220x220&data=${encoded}`;
   }, [
     user?.clientId,
     user?.email,
@@ -91,7 +96,9 @@ export default function UserQrCard() {
   };
 
   return (
-    <div className="w-full rounded-2xl bg-white p-6 text-center shadow dark:bg-gray-800">
+    <div
+      className={`w-full rounded-3xl border border-white/30 bg-white/80 p-6 text-center shadow-xl backdrop-blur-lg dark:border-white/5 dark:bg-gray-900/70 ${className}`}
+    >
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Mi QR de Cliente</h3>
       <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
         Escanea este código para identificar tu cuenta rápidamente en sucursal.

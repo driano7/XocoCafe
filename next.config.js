@@ -25,6 +25,8 @@
  * --------------------------------------------------------------------
  */
 
+process.env.NEXT_DISABLE_OPENTELEMETRY = '1';
+
 const { withContentlayer } = require('next-contentlayer');
 const path = require('path');
 

@@ -26,6 +26,7 @@
  */
 
 /* eslint-disable react/display-name */
+'use client';
 import { coreContent } from '@/lib/utils/contentlayer';
 import type { Authors, Blog } from 'contentlayer/generated';
 import type { MDXComponents } from 'mdx/types';

@@ -43,7 +43,7 @@ export default function Header() {
   return (
     <SectionContainer>
       <header className="z-40 bg-transparent py-5 md:py-10">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
+        <div className="mx-auto flex max-w-5xl items-center justify-between rounded-2xl border border-white/20 bg-white/70 px-4 py-3 text-base font-semibold text-gray-900 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-black/40 dark:text-white">
           <div>
             <Link
               href="/"
@@ -53,7 +53,7 @@ export default function Header() {
                   'horizontal-underline-active': pathName === '/',
                 }
               )}
-              aria-label="A"
+              aria-label="Xoco Café"
             >
               Xoco
             </Link>
@@ -61,7 +61,7 @@ export default function Header() {
           <div className="flex items-center space-x-3 text-base leading-5">
             <div className="hidden space-x-3 sm:flex">
               {headerNavLinks.map(({ title, href }) => {
-                const active = pathName?.includes(href);
+                const active = href === '/' ? pathName === '/' : pathName?.startsWith(href);
                 return (
                   <Link
                     prefetch

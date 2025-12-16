@@ -28,7 +28,15 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+} from 'react';
 import Link from 'next/link';
 import { DayPicker } from 'react-day-picker';
 import { FaWhatsapp } from 'react-icons/fa';
@@ -49,7 +57,7 @@ const BRANCH_NUMBER = '001';
 const QR_EXPIRATION_MINUTES = 30;
 const MAX_ACTIVE_RESERVATIONS = 3;
 const QR_IMAGE_SIZE = '220x220';
-const QR_API_URL = 'https://api.qrserver.com/v1/create-qr-code/';
+const QR_API_URL = '/api/qr';
 const RESERVATION_VISUALS: Record<
   string,
   { label: string; badgeClass: string; dotClass: string; textClass: string }
@@ -233,6 +241,30 @@ const formatReservationDate = (
   const date = new Date(year, (month || 1) - 1, day || 1);
   return date.toLocaleDateString(locale, options);
 };
+
+const formatDateForInput = (date?: Date) => {
+  if (!date) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseDateFromInput = (value: string) => {
+  const [year, month, day] = value.split('-').map(Number);
+  if ([year, month, day].some((segment) => Number.isNaN(segment))) {
+    return null;
+  }
+  const parsed = new Date(year, (month || 1) - 1, day || 1);
+  parsed.setHours(0, 0, 0, 0);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const clampDateToRange = (date: Date, min: Date, max: Date) => {
+  if (date < min) return new Date(min);
+  if (date > max) return new Date(max);
+  return date;
+};
 export default function ReservePage() {
   const { token, user, isLoading } = useAuth();
   const isAuthenticated = Boolean(token && user);
@@ -284,6 +316,29 @@ export default function ReservePage() {
     error: null,
   });
   const [reservationToast, setReservationToast] = useState<string | null>(null);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const detectDevice = () => {
+      if (typeof window === 'undefined') {
+        return;
+      }
+      const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+      const isTouchDevice = typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1;
+      const matchesViewport = window.matchMedia('(max-width: 768px)').matches;
+      const isMobileMatch =
+        /android|iphone|ipad|ipod|windows phone/i.test(userAgent || '') ||
+        isTouchDevice ||
+        matchesViewport;
+      setIsMobileDevice(isMobileMatch);
+    };
+    detectDevice();
+    window.addEventListener('resize', detectDevice);
+    return () => window.removeEventListener('resize', detectDevice);
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 60 * 1000);
@@ -313,6 +368,24 @@ export default function ReservePage() {
       result.success ? result.message ?? fallback : `⚠️ ${result.message ?? fallback}`
     );
   }, [loyaltyReminder, setReservationToast]);
+
+  const handleMobileDateChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const { value } = event.target;
+      if (!value) {
+        setSelectedDate(undefined);
+        return;
+      }
+      const parsed = parseDateFromInput(value);
+      if (!parsed) {
+        return;
+      }
+      const normalized = clampDateToRange(parsed, today, maxReservationDate);
+      setSelectedDate(normalized);
+      setDisplayMonth(new Date(normalized.getFullYear(), normalized.getMonth(), 1));
+    },
+    [maxReservationDate, setDisplayMonth, setSelectedDate, today]
+  );
 
   const userDisplayName = useMemo(() => {
     if (!user) return null;
@@ -741,77 +814,98 @@ export default function ReservePage() {
           <div>
             <p className="mb-3 text-sm font-medium text-gray-800 dark:text-gray-200">Fecha</p>
             <div className="space-y-3 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-              <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 disabled:opacity-40 dark:border-gray-600 dark:text-gray-300"
-                  onClick={() => {
-                    if (!canGoPrev) return;
-                    const prev = new Date(
-                      displayMonth.getFullYear(),
-                      displayMonth.getMonth() - 1,
-                      1
-                    );
-                    setDisplayMonth(prev < minMonth ? minMonth : prev);
-                  }}
-                  disabled={!canGoPrev}
-                >
-                  ← Anterior
-                </button>
-                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  {displayMonth.toLocaleDateString('es-MX', {
-                    month: 'long',
-                    year: 'numeric',
-                  })}
-                </p>
-                <button
-                  type="button"
-                  className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 disabled:opacity-40 dark:border-gray-600 dark:text-gray-300"
-                  onClick={() => {
-                    if (!canGoNext) return;
-                    const next = new Date(
-                      displayMonth.getFullYear(),
-                      displayMonth.getMonth() + 1,
-                      1
-                    );
-                    setDisplayMonth(next > maxMonth ? maxMonth : next);
-                  }}
-                  disabled={!canGoNext}
-                >
-                  Siguiente →
-                </button>
-              </div>
-              <DayPicker
-                mode="single"
-                month={displayMonth}
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                onMonthChange={(month) => {
-                  const normalized = new Date(month.getFullYear(), month.getMonth(), 1);
-                  if (normalized < minMonth) {
-                    setDisplayMonth(minMonth);
-                    return;
-                  }
-                  if (normalized > maxMonth) {
-                    setDisplayMonth(maxMonth);
-                    return;
-                  }
-                  setDisplayMonth(normalized);
-                }}
-                disabled={{ before: today, after: maxReservationDate }}
-                weekStartsOn={1}
-                fromDate={today}
-                toDate={maxReservationDate}
-                showOutsideDays={false}
-                modifiersClassNames={{
-                  selected: 'bg-primary-600 text-white',
-                  today: 'text-primary-600 font-semibold',
-                }}
-                styles={{
-                  caption: { color: '#1f2937' },
-                }}
-              />
-              <p className="px-4 pb-4 text-xs text-gray-500 dark:text-gray-400">
+              {isMobileDevice ? (
+                <div className="space-y-2">
+                  <input
+                    type="date"
+                    value={formatDateForInput(selectedDate)}
+                    min={formatDateForInput(today)}
+                    max={formatDateForInput(maxReservationDate)}
+                    onChange={handleMobileDateChange}
+                    className="w-full rounded-2xl border border-gray-200 px-4 py-4 text-base font-semibold tracking-wide text-gray-900 shadow-inner focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-900/60 dark:text-white"
+                    aria-label="Selecciona la fecha de tu reserva"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    En móviles puedes deslizar el selector para elegir día, mes y año rápidamente.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 disabled:opacity-40 dark:border-gray-600 dark:text-gray-300"
+                      onClick={() => {
+                        if (!canGoPrev) return;
+                        const prev = new Date(
+                          displayMonth.getFullYear(),
+                          displayMonth.getMonth() - 1,
+                          1
+                        );
+                        setDisplayMonth(prev < minMonth ? minMonth : prev);
+                      }}
+                      disabled={!canGoPrev}
+                      aria-label="Mes anterior"
+                    >
+                      ←
+                    </button>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      {displayMonth.toLocaleDateString('es-MX', {
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                    </p>
+                    <button
+                      type="button"
+                      className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 disabled:opacity-40 dark:border-gray-600 dark:text-gray-300"
+                      onClick={() => {
+                        if (!canGoNext) return;
+                        const next = new Date(
+                          displayMonth.getFullYear(),
+                          displayMonth.getMonth() + 1,
+                          1
+                        );
+                        setDisplayMonth(next > maxMonth ? maxMonth : next);
+                      }}
+                      disabled={!canGoNext}
+                      aria-label="Mes siguiente"
+                    >
+                      →
+                    </button>
+                  </div>
+                  <DayPicker
+                    mode="single"
+                    month={displayMonth}
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    onMonthChange={(month) => {
+                      const normalized = new Date(month.getFullYear(), month.getMonth(), 1);
+                      if (normalized < minMonth) {
+                        setDisplayMonth(minMonth);
+                        return;
+                      }
+                      if (normalized > maxMonth) {
+                        setDisplayMonth(maxMonth);
+                        return;
+                      }
+                      setDisplayMonth(normalized);
+                    }}
+                    disabled={{ before: today, after: maxReservationDate }}
+                    weekStartsOn={1}
+                    fromDate={today}
+                    toDate={maxReservationDate}
+                    showOutsideDays={false}
+                    modifiersClassNames={{
+                      selected: 'bg-primary-600 text-white',
+                      today: 'text-primary-600 font-semibold',
+                    }}
+                    styles={{
+                      caption: { color: '#1f2937' },
+                    }}
+                  />
+                </>
+              )}
+              <p className="px-1 pb-1 text-xs text-gray-500 dark:text-gray-400">
                 Fechas disponibles desde hoy hasta{' '}
                 {maxReservationDate.toLocaleDateString('es-MX', {
                   day: 'numeric',

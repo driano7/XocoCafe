@@ -66,9 +66,12 @@ export default function OrderPage() {
   const [selectedPackageId, setSelectedPackageId] = useState('');
   const selectedBeverage = selectedBeverageId ? getMenuItemById(selectedBeverageId) : null;
   const beverageSizeList = selectedBeverage?.metadata?.availableSizes;
-  const selectedBeverageSizes =
-    Array.isArray(beverageSizeList) && beverageSizeList.length > 0 ? beverageSizeList : ['único'];
-  const hasSingleBeverageSize = selectedBeverageSizes.length <= 1;
+  const selectedBeverageSizes = selectedBeverage
+    ? Array.isArray(beverageSizeList) && beverageSizeList.length > 0
+      ? beverageSizeList
+      : ['único']
+    : [];
+  const beverageRequiresSizeSelection = selectedBeverageSizes.length > 1;
 
   const resolveMenuItemPrice = (menuId: string): number => {
     const menuItem = getMenuItemById(menuId);
@@ -83,12 +86,6 @@ export default function OrderPage() {
     },
     [updateUser, user]
   );
-
-  const resolveDefaultSize = (menuId: string) => {
-    const menuItem = getMenuItemById(menuId);
-    if (!menuItem) return null;
-    return menuItem.metadata?.defaultSize ?? menuItem.metadata?.availableSizes?.[0] ?? null;
-  };
 
   const handleActivateLoyaltyReminder = async () => {
     const result = await loyaltyReminder.activate();
@@ -116,6 +113,52 @@ export default function OrderPage() {
     });
   };
 
+  const resetBeverageSelection = () => {
+    setSelectedBeverageId('');
+    setSelectedBeverageSize(null);
+  };
+
+  const handleBeverageSelection = (menuId: string) => {
+    setSelectedBeverageId(menuId);
+    if (!menuId) {
+      setSelectedBeverageSize(null);
+      return;
+    }
+    const menuItem = getMenuItemById(menuId);
+    if (!menuItem) return;
+    const sizeOptions =
+      Array.isArray(menuItem.metadata?.availableSizes) && menuItem.metadata?.availableSizes.length
+        ? menuItem.metadata.availableSizes
+        : ['único'];
+    if (sizeOptions.length <= 1) {
+      handleQuickAdd(menuId, { size: sizeOptions[0] ?? null });
+      resetBeverageSelection();
+    } else {
+      setSelectedBeverageSize(null);
+    }
+  };
+
+  const handleBeverageSizeSelection = (size: string) => {
+    if (!selectedBeverageId || !size) return;
+    setSelectedBeverageSize(size);
+    handleQuickAdd(selectedBeverageId, { size });
+    resetBeverageSelection();
+  };
+
+  const handleFoodSelection = (menuId: string) => {
+    setSelectedFoodId(menuId);
+    if (!menuId) return;
+    handleQuickAdd(menuId);
+    setSelectedFoodId('');
+  };
+
+  const handlePackageSelection = (menuId: string) => {
+    setSelectedPackageId(menuId);
+    if (!menuId) return;
+    handleQuickAdd(menuId);
+    setSelectedPackageId('');
+  };
+
   const clearQuickSelections = () => {
     setSelectedBeverageId('');
     setSelectedBeverageSize(null);
@@ -130,9 +173,7 @@ export default function OrderPage() {
   useEffect(() => {
     if (!selectedBeverageId) {
       setSelectedBeverageSize(null);
-      return;
     }
-    setSelectedBeverageSize(resolveDefaultSize(selectedBeverageId));
   }, [selectedBeverageId]);
 
   useEffect(() => {
@@ -190,14 +231,16 @@ export default function OrderPage() {
             label="Bebida"
             options={beverageOptions}
             value={selectedBeverageId}
-            onChange={setSelectedBeverageId}
+            onChange={handleBeverageSelection}
             helperText={
               selectedBeverageId
-                ? `Precio estimado: ${formatCurrency(resolveMenuItemPrice(selectedBeverageId))}`
-                : 'Selecciona tu bebida preferida'
+                ? beverageRequiresSizeSelection
+                  ? 'Elige el tamaño para agregarla al carrito.'
+                  : `Precio estimado: ${formatCurrency(resolveMenuItemPrice(selectedBeverageId))}`
+                : 'Selecciona una bebida y la agregamos al instante'
             }
           />
-          {selectedBeverageId && (
+          {selectedBeverageId && beverageRequiresSizeSelection && (
             <div className="mt-2">
               <label
                 className="block text-xs font-medium text-gray-600 dark:text-gray-300"
@@ -208,37 +251,23 @@ export default function OrderPage() {
               <select
                 id="quick-beverage-size"
                 value={selectedBeverageSize ?? ''}
-                onChange={(event) => setSelectedBeverageSize(event.target.value)}
-                disabled={hasSingleBeverageSize}
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:disabled:bg-gray-800/70 dark:disabled:text-gray-500"
+                onChange={(event) => handleBeverageSizeSelection(event.target.value)}
+                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
               >
+                <option value="" disabled>
+                  Selecciona un tamaño…
+                </option>
                 {selectedBeverageSizes.map((size) => (
                   <option key={size} value={size}>
                     {size[0].toUpperCase() + size.slice(1)}
                   </option>
                 ))}
               </select>
-              {hasSingleBeverageSize && (
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Esta bebida solo se ofrece en un tamaño.
-                </p>
-              )}
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                La bebida se agrega automáticamente al elegir el tamaño.
+              </p>
             </div>
           )}
-          <button
-            type="button"
-            onClick={() => {
-              if (selectedBeverageId) {
-                handleQuickAdd(selectedBeverageId, { size: selectedBeverageSize });
-                setSelectedBeverageId('');
-                setSelectedBeverageSize(null);
-              }
-            }}
-            disabled={!selectedBeverageId}
-            className="mt-2 w-full rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Agregar bebida
-          </button>
         </div>
 
         <div>
@@ -247,26 +276,13 @@ export default function OrderPage() {
             label="Alimento"
             options={foodOptions}
             value={selectedFoodId}
-            onChange={setSelectedFoodId}
+            onChange={handleFoodSelection}
             helperText={
               selectedFoodId
                 ? `Precio estimado: ${formatCurrency(resolveMenuItemPrice(selectedFoodId))}`
-                : 'Selecciona un alimento'
+                : 'Selecciona un alimento y lo agregamos al momento'
             }
           />
-          <button
-            type="button"
-            onClick={() => {
-              if (selectedFoodId) {
-                handleQuickAdd(selectedFoodId);
-                setSelectedFoodId('');
-              }
-            }}
-            disabled={!selectedFoodId}
-            className="mt-2 w-full rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Agregar alimento
-          </button>
         </div>
 
         <div>
@@ -275,28 +291,15 @@ export default function OrderPage() {
             label="Paquete"
             options={packageOptions}
             value={selectedPackageId}
-            onChange={setSelectedPackageId}
+            onChange={handlePackageSelection}
             helperText={
               selectedPackageId
                 ? `Incluye: ${
                     (getMenuItemById(selectedPackageId)?.metadata?.items ?? []).join(', ') || '—'
                   }`
-                : 'Agrega combos populares'
+                : 'Selecciona un combo y lo agregamos automáticamente'
             }
           />
-          <button
-            type="button"
-            onClick={() => {
-              if (selectedPackageId) {
-                handleQuickAdd(selectedPackageId);
-                setSelectedPackageId('');
-              }
-            }}
-            disabled={!selectedPackageId}
-            className="mt-2 w-full rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Agregar paquete
-          </button>
         </div>
       </div>
     </div>

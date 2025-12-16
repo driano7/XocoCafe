@@ -218,6 +218,22 @@ Xoco Café is an artisanal Mexican coffee project centered on sustainability, co
 
 ---
 
+# 🧹 Data Retention Automation
+
+- Endpoint `/api/cron/cleanup-inactive-users` elimina cuentas y datos relacionados cuando un usuario lleva más de 12 meses sin autenticarse.
+- Protege el acceso usando el header `x-cron-secret` (configura `CRON_SECRET` en tu entorno). También acepta `Authorization: Bearer <secret>`.
+- Parámetros opcionales: `days` para ajustar el umbral de inactividad y `limit` para controlar el tamaño del lote por ejecución.
+- Ejemplo manual:
+
+```bash
+curl -X POST "https://tu-dominio.vercel.app/api/cron/cleanup-inactive-users?limit=50" \
+  -H "x-cron-secret: $CRON_SECRET"
+```
+
+Programa este endpoint con Vercel Cron (o tu orquestador favorito) para ejecutarlo a diario y mantener limpia la base de datos.
+
+---
+
 # ✒️ Credits
 
 ## Founding Team

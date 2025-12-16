@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { forwardRef, useEffect, useMemo, useState } from 'react';
+import { forwardRef, useMemo } from 'react';
 import TicketOrderSummary from '@/components/Orders/TicketOrderSummary';
 
 type ItemCategory = 'beverage' | 'food' | 'package' | 'other';
@@ -54,7 +54,7 @@ export interface VirtualTicketProps {
   showQr?: boolean;
 }
 
-const QR_API_URL = 'https://api.qrserver.com/v1/create-qr-code/';
+const QR_API_URL = '/api/qr';
 const QR_IMAGE_SIZE = '320x320';
 const FISCAL_ADDRESS = 'Escolar 04360, C.U., Coyoacán, 04510 Ciudad de México, CDMX';
 const BEVERAGE_KEYWORDS = [
@@ -313,8 +313,6 @@ const extractItemsFromSource = (source: any): OrderItem[] => {
 
 const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
   ({ order, showQr = true }, ref) => {
-    const [qrSrc, setQrSrc] = useState<string | null>(null);
-
     const items = useMemo<OrderItem[]>(() => {
       const fromOrder = extractItemsFromSource(order.items);
       if (fromOrder.length > 0) {
@@ -574,42 +572,6 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
       return `${QR_API_URL}?size=${QR_IMAGE_SIZE}&data=${encodeURIComponent(qrValue)}`;
     }, [qrValue]);
 
-    useEffect(() => {
-      if (!showQr) {
-        setQrSrc(null);
-        return;
-      }
-      let isMounted = true;
-      let objectUrl: string | null = null;
-      const loadQr = async () => {
-        try {
-          const response = await fetch(qrRequestUrl);
-          if (!response.ok) {
-            throw new Error('No pudimos generar el QR del ticket');
-          }
-          const blob = await response.blob();
-          objectUrl = URL.createObjectURL(blob);
-          if (isMounted) {
-            setQrSrc(objectUrl);
-          }
-        } catch (error) {
-          console.error('Error generando código QR del ticket:', error);
-          if (isMounted) {
-            setQrSrc(qrRequestUrl);
-          }
-        }
-      };
-
-      loadQr();
-
-      return () => {
-        isMounted = false;
-        if (objectUrl) {
-          URL.revokeObjectURL(objectUrl);
-        }
-      };
-    }, [qrRequestUrl, showQr]);
-
     return (
       <div
         ref={ref}
@@ -771,12 +733,13 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
               Gracias por su compra
             </p>
             <Image
-              src={qrSrc ?? qrRequestUrl}
+              src={qrRequestUrl}
               alt="Código QR del ticket"
               width={176}
               height={176}
               className="h-44 w-44 rounded-2xl border border-gray-200 bg-white p-2"
-              unoptimized={(qrSrc ?? qrRequestUrl).startsWith('data:')}
+              unoptimized
+              crossOrigin="anonymous"
             />
             <p className="text-center text-xs text-gray-500">
               Escanea este código para facilitar la entrega.

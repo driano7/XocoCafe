@@ -41,6 +41,43 @@ function buildBucketLabel(date: Date, period: 'month' | 'year') {
   return date.toLocaleDateString('es-MX', options);
 }
 
+type ProductAggregate = {
+  name: string;
+  total: number;
+};
+
+type ConsumptionBucket = {
+  key: string;
+  label: string;
+  beverages: Map<string, ProductAggregate>;
+  foods: Map<string, ProductAggregate>;
+  packages: Map<string, ProductAggregate>;
+};
+
+type OrderItemRecord = {
+  quantity?: number | null;
+  price?: number | null;
+  createdAt?: string;
+  productId?: string | null;
+  category?: string | null;
+  name?: string | null;
+  productName?: string | null;
+  displayName?: string | null;
+  title?: string | null;
+  orders?:
+    | {
+        userId: string;
+        createdAt: string;
+        total: number | null;
+      }
+    | {
+        userId: string;
+        createdAt: string;
+        total: number | null;
+      }[]
+    | null;
+};
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -57,7 +94,15 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('order_items')
-      .select('quantity,price,createdAt,productId,orders!inner(userId,createdAt,total)')
+      .select(
+        `
+        quantity,
+        price,
+        createdAt,
+        productId,
+        orders!inner(userId,createdAt,total)
+      `
+      )
       .eq('orders.userId', decoded.userId)
       .order('createdAt', { ascending: false })
       .limit(500);
@@ -66,14 +111,16 @@ export async function GET(request: NextRequest) {
       throw new Error(error.message);
     }
 
-    const monthlyMap = new Map<string, any>();
-    const yearlyMap = new Map<string, any>();
+    const monthlyMap = new Map<string, ConsumptionBucket>();
+    const yearlyMap = new Map<string, ConsumptionBucket>();
 
-    const detectCategory = (record: any): 'beverage' | 'food' | 'package' => {
-      const rawValues = [record.category, record.productId]
+    const detectCategory = (record: OrderItemRecord): 'beverage' | 'food' | 'package' => {
+      const rawValues = [record.category, record.productId, record.name, record.productName]
         .filter(Boolean)
-        .map((value: string) => value.toLowerCase());
+        .map((value) => String(value).toLowerCase());
+
       const matches = (needle: string) => rawValues.some((value) => value.includes(needle));
+
       if (matches('package') || matches('paquete')) {
         return 'package';
       }
@@ -86,9 +133,16 @@ export async function GET(request: NextRequest) {
       return 'beverage';
     };
 
-    (data ?? []).forEach((item) => {
-      const order = (item as any).orders;
+    (data ?? []).forEach((itemRaw) => {
+      const item = itemRaw as OrderItemRecord;
+      const orderArray = Array.isArray(item.orders)
+        ? item.orders
+        : item.orders
+        ? [item.orders]
+        : [];
+      const order = orderArray[0];
       if (!order) return;
+
       const createdAt = new Date(order.createdAt);
       const monthKey = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(
         2,
@@ -96,49 +150,74 @@ export async function GET(request: NextRequest) {
       )}`;
       const yearKey = `${createdAt.getFullYear()}`;
       const category = detectCategory(item);
-      const targetMap = (map: Map<string, any>, key: string, period: 'month' | 'year') => {
+
+      const applyToMap = (
+        map: Map<string, ConsumptionBucket>,
+        key: string,
+        period: 'month' | 'year'
+      ) => {
         if (!map.has(key)) {
           map.set(key, {
             key,
             label: buildBucketLabel(createdAt, period === 'month' ? 'month' : 'year'),
-            beverages: new Map<string, number>(),
-            foods: new Map<string, number>(),
-            packages: new Map<string, number>(),
+            beverages: new Map<string, ProductAggregate>(),
+            foods: new Map<string, ProductAggregate>(),
+            packages: new Map<string, ProductAggregate>(),
           });
         }
-        const bucket = map.get(key);
-        const target =
+
+        const bucket = map.get(key)!;
+        const targetMap =
           category === 'food'
             ? bucket.foods
             : category === 'package'
             ? bucket.packages
             : bucket.beverages;
-        const current = target.get(item.productId) ?? 0;
-        target.set(item.productId, current + item.quantity);
+
+        const productKey = item.productId ?? item.name ?? item.productName ?? 'producto';
+        const displayName =
+          item.name ??
+          item.productName ??
+          item.displayName ??
+          item.title ??
+          item.productId ??
+          'Producto';
+
+        const current = targetMap.get(productKey) ?? { total: 0, name: displayName };
+
+        targetMap.set(productKey, {
+          name: displayName,
+          total: current.total + Number(item.quantity ?? 0),
+        });
       };
 
-      targetMap(monthlyMap, monthKey, 'month');
-      targetMap(yearlyMap, yearKey, 'year');
+      applyToMap(monthlyMap, monthKey, 'month');
+      applyToMap(yearlyMap, yearKey, 'year');
     });
 
-    const mapToArray = (map: Map<string, any>) =>
+    const mapToArray = (map: Map<string, ConsumptionBucket>) =>
       Array.from(map.values()).map((bucket) => {
-        const beverageEntries = Array.from(bucket.beverages.entries()) as Array<[string, number]>;
-        const foodEntries = Array.from(bucket.foods.entries()) as Array<[string, number]>;
-        const packageEntries = Array.from(bucket.packages.entries()) as Array<[string, number]>;
+        const beverageEntries = Array.from(bucket.beverages.entries()) as Array<
+          [string, ProductAggregate]
+        >;
+        const foodEntries = Array.from(bucket.foods.entries()) as Array<[string, ProductAggregate]>;
+        const packageEntries = Array.from(bucket.packages.entries()) as Array<
+          [string, ProductAggregate]
+        >;
+
         return {
           key: bucket.key,
           label: bucket.label,
           beverages: beverageEntries
-            .map(([name, total]) => ({ name, total }))
+            .map(([, value]) => ({ name: value.name, total: value.total }))
             .sort((a, b) => b.total - a.total)
             .slice(0, 5),
           foods: foodEntries
-            .map(([name, total]) => ({ name, total }))
+            .map(([, value]) => ({ name: value.name, total: value.total }))
             .sort((a, b) => b.total - a.total)
             .slice(0, 5),
           packages: packageEntries
-            .map(([name, total]) => ({ name, total }))
+            .map(([, value]) => ({ name: value.name, total: value.total }))
             .sort((a, b) => b.total - a.total)
             .slice(0, 5),
         };
@@ -151,7 +230,7 @@ export async function GET(request: NextRequest) {
         yearly: mapToArray(yearlyMap),
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error obteniendo consumo:', error);
     return NextResponse.json(
       { success: false, message: 'No pudimos cargar tu consumo' },

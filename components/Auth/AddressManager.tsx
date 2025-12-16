@@ -52,7 +52,6 @@ const formatAddressLine = (address: AddressInput) => {
   const parts = [
     address.street,
     address.city,
-    address.state,
     address.country,
     address.postalCode ? `CP ${address.postalCode}` : null,
   ].filter(Boolean);
@@ -349,14 +348,9 @@ export default function AddressManager({ showIntro = true }: AddressManagerProps
                 className="rounded-2xl border border-gray-200 p-4 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-800"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-base font-semibold text-gray-900 dark:text-white">
-                      {address.label}
-                    </p>
-                    <p className="text-xs uppercase tracking-[0.3em] text-primary-600 dark:text-primary-200">
-                      {address.type === 'billing' ? 'Facturación' : 'Envío'}
-                    </p>
-                  </div>
+                  <p className="text-base font-semibold text-gray-900 dark:text-white">
+                    {address.label}
+                  </p>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -411,34 +405,16 @@ export default function AddressManager({ showIntro = true }: AddressManagerProps
                 </button>
               )}
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
-                Nombre / alias
-                <input
-                  type="text"
-                  value={form.label}
-                  onChange={(event) => setForm((prev) => ({ ...prev, label: event.target.value }))}
-                  className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
-                  placeholder="Casa, Oficina, etc."
-                />
-              </label>
-              <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
-                Tipo
-                <select
-                  value={form.type}
-                  onChange={(event) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      type: event.target.value as AddressInput['type'],
-                    }))
-                  }
-                  className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
-                >
-                  <option value="shipping">Envío</option>
-                  <option value="billing">Facturación</option>
-                </select>
-              </label>
-            </div>
+            <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
+              Nombre / alias
+              <input
+                type="text"
+                value={form.label}
+                onChange={(event) => setForm((prev) => ({ ...prev, label: event.target.value }))}
+                className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
+                placeholder="Casa, Oficina, etc."
+              />
+            </label>
             <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
               Calle y número
               <input
@@ -449,26 +425,15 @@ export default function AddressManager({ showIntro = true }: AddressManagerProps
                 placeholder="Ej. Monterrey 215"
               />
             </label>
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
-                Ciudad
-                <input
-                  type="text"
-                  value={form.city}
-                  onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value }))}
-                  className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
-                />
-              </label>
-              <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
-                Estado
-                <input
-                  type="text"
-                  value={form.state ?? ''}
-                  onChange={(event) => setForm((prev) => ({ ...prev, state: event.target.value }))}
-                  className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
-                />
-              </label>
-            </div>
+            <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
+              Ciudad
+              <input
+                type="text"
+                value={form.city}
+                onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value }))}
+                className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
+              />
+            </label>
             <div className="space-y-2 rounded-xl border border-primary-200 bg-white/80 p-3 text-sm shadow-sm dark:border-primary-700/60 dark:bg-primary-950">
               {user?.phone && (
                 <label className="flex items-center gap-2 text-primary-800 dark:text-primary-100">

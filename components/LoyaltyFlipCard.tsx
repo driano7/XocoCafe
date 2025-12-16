@@ -27,7 +27,9 @@
 
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import classNames from 'classnames';
+import { FiCoffee } from 'react-icons/fi';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './Auth/AuthProvider';
 
 interface LoyaltyFlipCardProps {
@@ -49,6 +51,11 @@ export default function LoyaltyFlipCard({ className = '' }: LoyaltyFlipCardProps
   const { user, token } = useAuth();
   const [coffeeCount, setCoffeeCount] = useState(0);
   const [loyaltyError, setLoyaltyError] = useState<string | null>(null);
+  const remainingStamps = Math.max(0, MAX_STAMPS - coffeeCount);
+  const progressPercent = useMemo(
+    () => Math.min(100, Math.round((coffeeCount / MAX_STAMPS) * 100)),
+    [coffeeCount]
+  );
 
   useEffect(() => {
     if (user?.weeklyCoffeeCount !== undefined) {
@@ -96,20 +103,39 @@ export default function LoyaltyFlipCard({ className = '' }: LoyaltyFlipCardProps
           <span className="ml-1 text-base font-semibold text-white/80">/ {MAX_STAMPS}</span>
         </p>
 
-        <div className="mb-5 grid grid-cols-7 gap-3">
+        <div className="mb-6 w-full">
+          <div className="h-3 w-full overflow-hidden rounded-full bg-white/30">
+            <div
+              className="h-full rounded-full bg-white/90 shadow-[0_4px_12px_rgba(0,0,0,0.15)] transition-all duration-700 ease-out dark:bg-white"
+              style={{ width: `${progressPercent}%` }}
+              aria-label={`Avance ${progressPercent}%`}
+            />
+          </div>
+          <div className="mt-2 flex items-center justify-between text-xs uppercase tracking-[0.25em] text-white/70">
+            <span>0</span>
+            <span>Meta {MAX_STAMPS}</span>
+          </div>
+        </div>
+
+        <div className="mb-4 flex w-full items-center justify-between">
           {Array.from({ length: MAX_STAMPS }, (_, index) => {
             const isFilled = index < coffeeCount;
             return (
               <div
                 key={index}
-                className={`flex h-10 w-10 items-center justify-center rounded-full border-2 border-white/70 text-sm font-semibold ${
-                  isFilled
-                    ? 'bg-white text-[#5c3025] shadow-lg'
-                    : 'bg-white/10 text-white opacity-80'
-                }`}
-                aria-label={`Sello ${index + 1} ${isFilled ? 'completo' : 'pendiente'}`}
+                className="flex flex-col items-center text-[10px] uppercase tracking-widest"
               >
-                {isFilled ? '☕' : index + 1}
+                <div
+                  className={classNames(
+                    'flex h-14 w-14 items-center justify-center rounded-2xl border-2 transition-all duration-300',
+                    isFilled
+                      ? 'border-white bg-white text-[#5c3025]'
+                      : 'border-white/40 bg-white/10 text-white/70'
+                  )}
+                >
+                  <FiCoffee className="text-xl" />
+                </div>
+                <span className="mt-1 text-white/70">{index + 1}</span>
               </div>
             );
           })}
@@ -125,7 +151,9 @@ export default function LoyaltyFlipCard({ className = '' }: LoyaltyFlipCardProps
           <p className="mt-2 text-[11px] opacity-70">
             {coffeeCount >= MAX_STAMPS
               ? 'Canjea tu bebida gratis mostrando este código en barra.'
-              : `Te faltan ${Math.max(0, MAX_STAMPS - coffeeCount)} sellos para tu bebida gratis.`}
+              : `Te faltan ${remainingStamps} ${
+                  remainingStamps === 1 ? 'sello' : 'sellos'
+                } para tu bebida gratis.`}
           </p>
         </div>
 

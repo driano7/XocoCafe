@@ -40,6 +40,7 @@ import LenisProvider from '@/components/Providers/LenisProvider';
 import ThemeProvider from '@/components/Providers/ThemeProvider';
 import { SessionProvider } from 'next-auth/react';
 import FeedbackPromptGate from '@/components/Feedback/FeedbackPromptGate';
+import DockNav from '@/components/DockNav';
 
 const lato = Lato({
   subsets: ['latin'],
@@ -96,8 +97,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
                   >
                     <Header />
                     <LenisProvider>
-                      <main>{children}</main>
+                      <main className="pt-28 pb-32">{children}</main>
                     </LenisProvider>
+                    <DockNav />
                     <Footer />
                     <Analytics />
                     <FeedbackPromptGate />
