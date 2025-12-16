@@ -85,6 +85,15 @@ export default function ConsumptionChart() {
   const [selectedKey, setSelectedKey] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 768px)');
+    const updateMatches = () => setIsMobile(mediaQuery.matches);
+    updateMatches();
+    mediaQuery.addEventListener('change', updateMatches);
+    return () => mediaQuery.removeEventListener('change', updateMatches);
+  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -142,10 +151,11 @@ export default function ConsumptionChart() {
   };
 
   const bars = useMemo(() => {
+    const limit = isMobile ? 3 : 5;
     if (!currentBucket)
       return [] as Array<{ name: string; total: number; type: 'beverage' | 'food' | 'package' }>;
-    return buildBars(currentBucket);
-  }, [currentBucket]);
+    return buildBars(currentBucket).slice(0, limit);
+  }, [currentBucket, isMobile]);
 
   const maxTotal = useMemo(() => {
     return bars.reduce((max, bar) => (bar.total > max ? bar.total : max), 0);

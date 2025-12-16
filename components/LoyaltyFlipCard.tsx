@@ -117,7 +117,7 @@ export default function LoyaltyFlipCard({ className = '' }: LoyaltyFlipCardProps
           </div>
         </div>
 
-        <div className="mb-4 flex w-full items-center justify-between">
+        <div className="mb-4 grid w-full grid-cols-7 gap-2 sm:gap-3">
           {Array.from({ length: MAX_STAMPS }, (_, index) => {
             const isFilled = index < coffeeCount;
             return (
@@ -127,7 +127,7 @@ export default function LoyaltyFlipCard({ className = '' }: LoyaltyFlipCardProps
               >
                 <div
                   className={classNames(
-                    'flex h-14 w-14 items-center justify-center rounded-2xl border-2 transition-all duration-300',
+                    'flex h-12 w-full items-center justify-center rounded-2xl border-2 transition-all duration-300 sm:h-14',
                     isFilled
                       ? 'border-white bg-white text-[#5c3025]'
                       : 'border-white/40 bg-white/10 text-white/70'

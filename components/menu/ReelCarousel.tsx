@@ -18,17 +18,21 @@ export default function ReelCarousel({ items }: ReelCarouselProps) {
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [showSwipeHint, setShowSwipeHint] = useState(true);
   const touchStartRef = useRef(0);
+  const lastInteractionRef = useRef<number>(Date.now());
+  const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleNext = useCallback(() => {
     setDirection('next');
     setCurrentIndex((prev) => (prev + 1) % items.length);
     setShowSwipeHint(false);
+    lastInteractionRef.current = Date.now();
   }, [items.length]);
 
   const handlePrev = useCallback(() => {
     setDirection('prev');
     setCurrentIndex((prev) => (prev - 1 + items.length) % items.length);
     setShowSwipeHint(false);
+    lastInteractionRef.current = Date.now();
   }, [items.length]);
 
   useEffect(() => {
@@ -46,6 +50,7 @@ export default function ReelCarousel({ items }: ReelCarouselProps) {
   const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
     touchStartRef.current = event.touches[0].clientX;
     setShowSwipeHint(false);
+    lastInteractionRef.current = Date.now();
   };
 
   const handleTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
@@ -63,6 +68,20 @@ export default function ReelCarousel({ items }: ReelCarouselProps) {
     const timer = window.setTimeout(() => setShowSwipeHint(false), 6000);
     return () => window.clearTimeout(timer);
   }, [showSwipeHint]);
+
+  useEffect(() => {
+    const INTERVAL = 3500;
+    autoPlayTimerRef.current = setInterval(() => {
+      if (Date.now() - lastInteractionRef.current >= INTERVAL) {
+        handleNext();
+      }
+    }, INTERVAL);
+    return () => {
+      if (autoPlayTimerRef.current) {
+        clearInterval(autoPlayTimerRef.current);
+      }
+    };
+  }, [handleNext]);
 
   const currentItem = items[currentIndex];
   const safeImage = currentItem.image || FALLBACK_IMAGE;
