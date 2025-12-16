@@ -83,22 +83,22 @@ export default function MobileNav() {
           variants={variants}
           className={classNames(
             'fixed inset-0 z-20 h-full w-full',
-            'bg-white text-gray-900',
-            'dark:bg-black dark:text-white'
+            'bg-black text-white',
+            'dark:bg-white'
           )}
         >
           <header className="flex justify-end py-5 px-4">
             <button
               type="button"
               aria-label="toggle modal"
-              className="h-8 w-8 rounded"
+              className="h-8 w-8 rounded text-white drop-shadow-[0_0_18px_rgba(0,0,0,0.65)] dark:text-white"
               onClick={() => setNavShow(!navShow)}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 20 20"
                 fill="currentColor"
-                className="text-gray-900 dark:text-gray-100"
+                className="text-current"
               >
                 <path
                   fillRule="evenodd"
@@ -108,11 +108,11 @@ export default function MobileNav() {
               </svg>
             </button>
           </header>
-          <nav className="flex h-full flex-col justify-center space-y-8 px-10 text-center text-3xl font-semibold tracking-[0.25em]">
+          <nav className="flex h-full flex-col justify-center space-y-8 px-10 text-center text-3xl font-semibold tracking-[0.25em] text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.65)] dark:text-white">
             <Link
               href="/"
               onClick={() => setNavShow(!navShow)}
-              className={classNames('horizontal-underline', {
+              className={classNames('horizontal-underline text-white dark:text-white', {
                 'horizontal-underline-active': pathName === '/',
               })}
             >
@@ -125,7 +125,7 @@ export default function MobileNav() {
                   key={title}
                   href={href}
                   onClick={() => setNavShow(!navShow)}
-                  className={classNames('horizontal-underline', {
+                  className={classNames('horizontal-underline text-white dark:text-white', {
                     'horizontal-underline-active': active,
                   })}
                   aria-label={title}
