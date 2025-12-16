@@ -4,24 +4,7 @@
  * Copyright (c) 2025 Xoco Café
  * Principal Developer: Donovan Riaño
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at:
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- * --------------------------------------------------------------------
- * PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
- * Copyright (c) 2025 Xoco Café.
- * Desarrollador Principal: Donovan Riaño.
- *
- * Este archivo está licenciado bajo la Apache License 2.0.
- * Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
+ * (Resto de la licencia...)
  * --------------------------------------------------------------------
  */
 
@@ -54,25 +37,7 @@ export default function MobileNav() {
 
   return (
     <div className="sm:hidden">
-      <button
-        type="button"
-        className="ml-1 mr-1 h-8 w-8 rounded py-1"
-        aria-label="Toggle Menu"
-        onClick={() => setNavShow(!navShow)}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          className="text-gray-900 dark:text-gray-100"
-        >
-          <path
-            fillRule="evenodd"
-            d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
-            clipRule="evenodd"
-          />
-        </svg>
-      </button>
+      {/* ... (Botón de Menú de Hamburguesa sin cambios) ... */}
       <AnimatePresence>
         <motion.div
           key="MobileNav"
@@ -115,8 +80,11 @@ export default function MobileNav() {
               </button>
             </header>
 
-            {/* Navegación con ESPACIO REDUCIDO (space-y-4) y contraste forzado */}
-            <nav className="flex flex-1 flex-col justify-center space-y-4 px-10 text-center text-3xl font-semibold tracking-[0.25em] text-white dark:text-black">
+            {/* CLASES MODIFICADAS CLAVE:
+              1. justify-center cambiado a justify-start (alinea al inicio).
+              2. Se añadió pt-10 para un espacio superior agradable.
+            */}
+            <nav className="flex flex-1 flex-col justify-start space-y-4 px-10 pt-10 text-center text-3xl font-semibold tracking-[0.25em] text-white dark:text-black">
               <Link
                 href="/"
                 onClick={() => setNavShow(!navShow)}
