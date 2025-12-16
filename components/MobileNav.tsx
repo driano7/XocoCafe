@@ -81,20 +81,19 @@ export default function MobileNav() {
           initial="exit"
           exit="exit"
           variants={variants}
-          // CLASE MODIFICADA: Quitamos la opacidad y hacemos que el fondo
-          // sea negro en modo oscuro y blanco en modo claro.
-          // El 'z-20' se mantiene para que esté por encima de todo.
-          className="fixed inset-0 z-20 h-full w-full bg-white dark:bg-black"
+          // CLASE MODIFICADA CLAVE (Inversión de fondo):
+          // En modo claro (por defecto): Fondo negro (bg-black)
+          // En modo oscuro (dark:): Fondo blanco (dark:bg-white)
+          className="fixed inset-0 z-20 h-full w-full bg-black dark:bg-white"
         >
           <div
             className={classNames(
               'flex h-full w-full flex-col',
-              // CLASES MODIFICADAS: Usamos las clases opuestas al fondo para el texto,
-              // asegurando el contraste total:
-              // En dark:bg-black -> text-white
-              // En bg-white -> text-black
-              'bg-white text-black',
-              'dark:bg-black dark:text-white'
+              // CLASES MODIFICADAS CLAVE (Inversión de texto):
+              // En modo claro (fondo negro): Texto blanco (text-white)
+              // En modo oscuro (fondo blanco): Texto negro (dark:text-black)
+              'bg-black text-white',
+              'dark:bg-white dark:text-black'
             )}
           >
             <header className="flex justify-end py-5 px-4 text-current">
