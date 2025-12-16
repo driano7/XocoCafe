@@ -125,7 +125,7 @@ export default function FavoritesSelect({ onUpdate }: FavoritesSelectProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="w-full space-y-4">
       <div>
         <h3 className="text-lg font-medium text-gray-900 dark:text-white">Mis Favoritos</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400">

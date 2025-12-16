@@ -362,7 +362,7 @@ export default function UserProfile() {
 
   const isGoogleOnly = user.authProvider === 'google';
   const sectionCardClass =
-    'w-full rounded-3xl border border-white/30 bg-white/80 p-6 shadow-xl backdrop-blur-lg dark:border-white/5 dark:bg-gray-900/70';
+    'flex w-full flex-col gap-4 rounded-3xl border border-white/30 bg-white/80 p-6 shadow-xl backdrop-blur-lg dark:border-white/5 dark:bg-gray-900/70';
   const favoriteBeverageLabel =
     resolveFavoriteLabel(user.favoriteColdDrink ?? user.favoriteHotDrink) ?? 'No registrado';
   const favoriteFoodLabel = resolveFavoriteLabel(user.favoriteFood) ?? 'No registrado';
@@ -617,7 +617,7 @@ export default function UserProfile() {
               Consulta tu progreso y activa recordatorios para no perder sellos.
             </p>
           </div>
-          <div className="mt-4 rounded-2xl border border-white/40 bg-white/70 px-4 py-3 text-sm text-gray-700 shadow-sm dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-100">
+          <div className="mt-4 w-full rounded-2xl border border-white/40 bg-white/70 px-4 py-3 text-sm text-gray-700 shadow-sm dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-100">
             <p className="font-semibold text-gray-900 dark:text-white">
               Sellos acumulados:{' '}
               <span className="font-normal text-gray-600 dark:text-gray-300">
@@ -657,7 +657,7 @@ export default function UserProfile() {
 
         <section className={sectionCardClass}>
           <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">Mis favoritos</h3>
-          <div className="mb-4 rounded-2xl border border-white/40 bg-white/70 px-4 py-3 text-sm text-gray-700 shadow-sm dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-100">
+          <div className="mb-4 w-full rounded-2xl border border-white/40 bg-white/70 px-4 py-3 text-sm text-gray-700 shadow-sm dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-100">
             <p className="font-semibold text-gray-900 dark:text-white">
               Tu bebida favorita:{' '}
               <span className="font-normal text-gray-600 dark:text-gray-300">

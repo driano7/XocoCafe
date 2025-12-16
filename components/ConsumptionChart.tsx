@@ -152,7 +152,7 @@ export default function ConsumptionChart() {
   }, [bars]);
 
   return (
-    <div className="rounded-2xl bg-white p-6 shadow dark:bg-gray-800">
+    <div className="w-full rounded-2xl bg-white p-6 shadow dark:bg-gray-800">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
