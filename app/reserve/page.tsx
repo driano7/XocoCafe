@@ -1711,6 +1711,14 @@ const DetailModal = ({ children, onClose }: { children: ReactNode; onClose: () =
         }}
       />
       <div className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[34px] border border-[#462b20] bg-[#2a170f] p-7 text-white shadow-[0_45px_95px_rgba(0,0,0,0.85)]">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
+          aria-label="Cerrar detalle"
+        >
+          ×
+        </button>
         {children}
       </div>
     </div>
@@ -1785,6 +1793,35 @@ const ReservationDetailContent = ({
   const qrImageSrc = `${QR_API_URL}?size=${QR_IMAGE_SIZE}&data=${encodeURIComponent(
     JSON.stringify(qrPayload)
   )}`;
+  const shareDetails = [
+    `Reserva ${reservation.reservationCode}`,
+    formatReservationDateTime(reservation),
+    `Personas: ${reservation.peopleCount}`,
+    `Sucursal: ${branchLabel}`,
+  ].join(' · ');
+
+  const handleShareReservation = () => {
+    const shareData = {
+      title: 'Reserva Xoco Café',
+      text: `${shareDetails}\nTe espero en Xoco Café.`,
+    };
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      navigator
+        .share(shareData)
+        .catch((error) => console.error('Error compartiendo la reservación:', error));
+      return;
+    }
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard
+        .writeText(shareData.text)
+        .then(() => window.alert('Copiamos los detalles de la reservación para que los pegues.'))
+        .catch((error) =>
+          console.error('No pudimos copiar los detalles de la reservación:', error)
+        );
+      return;
+    }
+    window.alert('Comparte manualmente: ' + shareData.text);
+  };
 
   return (
     <div className="space-y-5">
@@ -1840,15 +1877,24 @@ const ReservationDetailContent = ({
                   })}`
                 : `El QR expira ${QR_EXPIRATION_MINUTES} min después de la hora reservada.`}
             </p>
-            {qrIsActive && onDownloadQr && (
+            <div className="flex flex-wrap items-center justify-center gap-3 text-xs font-semibold text-primary-600">
+              {qrIsActive && onDownloadQr && (
+                <button
+                  type="button"
+                  onClick={() => onDownloadQr(reservation)}
+                  className="hover:text-primary-800"
+                >
+                  Descargar QR
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => onDownloadQr(reservation)}
-                className="text-xs font-semibold text-primary-600 hover:text-primary-800"
+                onClick={handleShareReservation}
+                className="hover:text-primary-800"
               >
-                Descargar QR
+                Compartir reservación
               </button>
-            )}
+            </div>
           </div>
           {(reservation.preOrderItems || reservation.message) && (
             <div className="flex-1 space-y-4 text-white">
