@@ -46,11 +46,14 @@ import '@/css/react-day-picker.css';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
 import SessionTimeoutNotice from '@/components/SessionTimeoutNotice';
+import Snackbar from '@/components/Feedback/Snackbar';
 import siteMetadata from 'content/siteMetadata';
 import { DEFAULT_BRANCH_ID } from '@/lib/reservations';
 import { usePagination } from '@/hooks/use-pagination';
 import { cancelReservation } from '@/lib/reservations-client';
 import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
+import { useSnackbarNotifications, type SnackbarTone } from '@/hooks/useSnackbarNotifications';
+import { createBrowserSupabaseClient } from '@/lib/supabase-browser';
 
 const MAX_PEOPLE = 15;
 const BRANCH_ID = DEFAULT_BRANCH_ID;
@@ -317,7 +320,6 @@ export default function ReservePage() {
     message: null,
     error: null,
   });
-  const [reservationToast, setReservationToast] = useState<string | null>(null);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const reservationTicketRef = useRef<HTMLDivElement | null>(null);
   const [reservationTicketActionError, setReservationTicketActionError] = useState<string | null>(
@@ -330,6 +332,8 @@ export default function ReservePage() {
     isIOS: false,
   });
   const [canShareReservation, setCanShareReservation] = useState(false);
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const { snackbar, showSnackbar, dismissSnackbar } = useSnackbarNotifications();
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -386,14 +390,6 @@ export default function ReservePage() {
   }, []);
 
   useEffect(() => {
-    if (!reservationToast) {
-      return;
-    }
-    const timeout = setTimeout(() => setReservationToast(null), 4000);
-    return () => clearTimeout(timeout);
-  }, [reservationToast]);
-
-  useEffect(() => {
     setReservationTicketActionError(null);
     setIsProcessingReservationTicket(false);
   }, [selectedReservation]);
@@ -409,10 +405,12 @@ export default function ReservePage() {
     const fallback = result.success
       ? 'Activamos tu programa de lealtad. Ya puedes acumular sellos.'
       : 'No pudimos activar tu programa de lealtad. Intenta más tarde.';
-    setReservationToast(
-      result.success ? result.message ?? fallback : `⚠️ ${result.message ?? fallback}`
+    const message = result.message ?? fallback;
+    showSnackbar(
+      result.success ? message : `⚠️ ${message}`,
+      result.success ? 'success' : 'warning'
     );
-  }, [loyaltyReminder, setReservationToast]);
+  }, [loyaltyReminder, showSnackbar]);
 
   const handleMobileDateChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -484,6 +482,60 @@ export default function ReservePage() {
   const handleRefreshReservations = useCallback(() => {
     void loadReservations();
   }, [loadReservations]);
+
+  useEffect(() => {
+    if (!user) {
+      return undefined;
+    }
+    const channel = supabase
+      .channel(`reservations-user-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reservations', filter: `userId=eq.${user.id}` },
+        (payload) => {
+          const code =
+            (payload.new as { reservationCode?: string } | null)?.reservationCode ??
+            (payload.old as { reservationCode?: string } | null)?.reservationCode ??
+            '---';
+          const nextStatus = String(
+            (payload.new as { status?: string } | null)?.status ?? ''
+          ).toLowerCase();
+          const previousStatus = String(
+            (payload.old as { status?: string } | null)?.status ?? ''
+          ).toLowerCase();
+          let tone: SnackbarTone = 'info';
+          let message: string | null = null;
+          let deviceNotification: { title: string; body?: string } | null = null;
+          if (payload.eventType === 'INSERT') {
+            tone = 'success';
+            message = `Reserva ${code} creada correctamente.`;
+            deviceNotification = {
+              title: 'Reserva creada',
+              body: `Código ${code}`,
+            };
+          } else if (payload.eventType === 'UPDATE' && nextStatus !== previousStatus) {
+            if (nextStatus === 'completed') {
+              tone = 'success';
+              message = `Tu reserva ${code} se marcó como completada.`;
+              deviceNotification = {
+                title: 'Reserva completada',
+                body: `Código ${code}`,
+              };
+            }
+          }
+          if (message) {
+            showSnackbar(message, tone, {
+              deviceNotification,
+            });
+          }
+          void loadReservations();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadReservations, showSnackbar, supabase, user]);
 
   const handleOpenReservationForm = useCallback(() => {
     setAlert(null);
@@ -1013,7 +1065,12 @@ export default function ReservePage() {
           message: `${actionLabel} correctamente`,
           error: null,
         });
-        setReservationToast(`${actionLabel}.`);
+        showSnackbar(`${actionLabel}.`, action === 'cancel' ? 'warning' : 'success', {
+          deviceNotification: {
+            title: actionLabel,
+            body: `Reserva ${reservation.reservationCode}`,
+          },
+        });
         setSelectedReservation(null);
       } catch (error) {
         const message =
@@ -1025,10 +1082,10 @@ export default function ReservePage() {
           message: null,
           error: message,
         });
-        setReservationToast(message);
+        showSnackbar(message, 'error');
       }
     },
-    [loadReservations, token]
+    [loadReservations, showSnackbar, token]
   );
 
   const handleCancelReservation = useCallback(
@@ -1094,6 +1151,12 @@ export default function ReservePage() {
       setAlert({
         type: 'success',
         text: `¡Reserva confirmada! Tu código es: ${reservationCode}`,
+      });
+      showSnackbar(`Reserva ${reservationCode} creada correctamente.`, 'success', {
+        deviceNotification: {
+          title: 'Reserva creada',
+          body: `Código ${reservationCode}`,
+        },
       });
       setMessage('');
       setPreOrderItems('');
@@ -1578,15 +1641,6 @@ export default function ReservePage() {
               disablePastButton={!hasPastReservations}
             />
 
-            {reservationToast && (
-              <div
-                role="status"
-                className="rounded-full bg-gray-900 px-4 py-2 text-center text-xs font-semibold text-white dark:bg-gray-800"
-              >
-                {reservationToast}
-              </div>
-            )}
-
             {isLoadingReservations ? (
               <div className="grid gap-4 md:grid-cols-2">
                 {[1, 2].map((index) => (
@@ -1762,6 +1816,7 @@ export default function ReservePage() {
           </Link>
         </div>
       )}
+      <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
     </div>
   );
 }

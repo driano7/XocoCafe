@@ -35,7 +35,7 @@ export const fetchCache = 'force-no-store';
 
 const STAFF_ID_DISPLAY_OVERRIDES: Record<string, string> = {
   'barista-demo': 'Demo Barista',
-  'manager-demo': 'Demo Gerente',
+  'manager-demo': 'Demo Barista',
   'socio-demo': 'Socio demo',
   'socio-cots': 'Socio cots',
   'socio-ale': 'Socio Ale',

@@ -31,12 +31,14 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FaWhatsapp } from 'react-icons/fa';
 import siteMetadata from 'content/siteMetadata';
+import Snackbar from '@/components/Feedback/Snackbar';
 import { createBrowserSupabaseClient } from '@/lib/supabase-browser';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
 import { usePagination } from '@/hooks/use-pagination';
 import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
 import VirtualTicket from '@/components/Orders/VirtualTicket';
+import { useSnackbarNotifications, type SnackbarTone } from '@/hooks/useSnackbarNotifications';
 
 interface Order {
   id: string;
@@ -85,6 +87,13 @@ const STATUS_LABELS: Record<Order['status'], string> = {
 
 const getOrderDisplayCode = (order: Order) =>
   order.ticketId ?? order.orderNumber ?? order.id.slice(0, 6);
+
+const resolveOrderStatus = (order?: Partial<Order> | null): Order['status'] => {
+  if (!order) {
+    return 'pending';
+  }
+  return (order.prepStatus as Order['status']) ?? order.status ?? 'pending';
+};
 
 const formatOrderCustomer = (order: Order) => {
   const preferred = (order.customerName ?? '').trim();
@@ -515,7 +524,8 @@ export default function OrdersDashboardPage() {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const isAuthenticated = Boolean(user && token);
-  const [, setStatusTick] = useState(() => Date.now());
+  const [statusTick, setStatusTick] = useState(() => Date.now());
+  const { snackbar, showSnackbar, dismissSnackbar } = useSnackbarNotifications();
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setStatusTick(Date.now()), 60_000);
@@ -559,13 +569,20 @@ export default function OrdersDashboardPage() {
     void loadOrders();
   }, [isAuthLoading, loadOrders]);
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+    void loadOrders();
+  }, [isAuthenticated, statusTick, loadOrders]);
+
   const handleRefreshOrders = useCallback(() => {
     void loadOrders();
   }, [loadOrders]);
 
   // Subscribe to realtime updates
   useEffect(() => {
-    if (!user) return;
+    if (!user) return undefined;
 
     const channel = supabase
       .channel(`orders-user-${user.id}`)
@@ -573,6 +590,13 @@ export default function OrdersDashboardPage() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders', filter: `userId=eq.${user.id}` },
         (payload) => {
+          type NoticePayload = {
+            message: string;
+            tone: SnackbarTone;
+            title: string;
+            body?: string;
+          };
+          let notice: NoticePayload | null = null;
           setOrders((prev) => {
             const next = [...prev];
             const incomingId =
@@ -618,14 +642,27 @@ export default function OrdersDashboardPage() {
             const mergedOrder: Order = {
               id: newOrder.id,
               status: (newOrder.status as Order['status']) ?? 'pending',
-              orderNumber: newOrder.orderNumber ?? null,
-              ticketId: newOrder.ticketId ?? null,
-              userEmail: newOrder.userEmail ?? null,
+              orderNumber:
+                typeof newOrder.orderNumber === 'string'
+                  ? newOrder.orderNumber
+                  : existingRecord?.orderNumber ?? null,
+              ticketId:
+                typeof newOrder.ticketId === 'string'
+                  ? newOrder.ticketId
+                  : existingRecord?.ticketId ?? null,
+              userEmail: newOrder.userEmail ?? existingRecord?.userEmail ?? null,
               customerName: newOrder.customerName ?? existingRecord?.customerName ?? null,
               posCustomerId: newOrder.posCustomerId ?? existingRecord?.posCustomerId ?? null,
-              total: newOrder.total ?? null,
-              tipAmount: typeof newOrder.tipAmount === 'number' ? newOrder.tipAmount : null,
-              tipPercent: typeof newOrder.tipPercent === 'number' ? newOrder.tipPercent : null,
+              total:
+                typeof newOrder.total === 'number' ? newOrder.total : existingRecord?.total ?? null,
+              tipAmount:
+                typeof newOrder.tipAmount === 'number'
+                  ? newOrder.tipAmount
+                  : existingRecord?.tipAmount ?? null,
+              tipPercent:
+                typeof newOrder.tipPercent === 'number'
+                  ? newOrder.tipPercent
+                  : existingRecord?.tipPercent ?? null,
               deliveryTipAmount:
                 typeof (newOrder as { deliveryTipAmount?: number }).deliveryTipAmount === 'number'
                   ? (newOrder as { deliveryTipAmount?: number }).deliveryTipAmount
@@ -634,18 +671,59 @@ export default function OrdersDashboardPage() {
                 typeof (newOrder as { deliveryTipPercent?: number }).deliveryTipPercent === 'number'
                   ? (newOrder as { deliveryTipPercent?: number }).deliveryTipPercent
                   : existingRecord?.deliveryTipPercent ?? null,
-              createdAt: newOrder.createdAt ?? null,
-              updatedAt: newOrder.updatedAt ?? null,
-              type: newOrder.type ?? null,
-              items: newOrder.items ?? existingRecord?.items,
+              createdAt:
+                typeof newOrder.createdAt === 'string'
+                  ? newOrder.createdAt
+                  : existingRecord?.createdAt ?? null,
+              updatedAt:
+                typeof newOrder.updatedAt === 'string'
+                  ? newOrder.updatedAt
+                  : existingRecord?.updatedAt ?? null,
+              type: newOrder.type ?? existingRecord?.type ?? null,
+              items: newOrder.items ?? existingRecord?.items ?? null,
               shipping: shippingWithId,
               qrPayload:
                 (newOrder as { qrPayload?: unknown }).qrPayload ??
                 existingRecord?.qrPayload ??
                 null,
-              prepStatus: existingRecord?.prepStatus ?? null,
-              prepHandlerName: existingRecord?.prepHandlerName ?? null,
+              prepStatus:
+                typeof newOrder.prepStatus === 'string'
+                  ? (newOrder.prepStatus as Order['prepStatus'])
+                  : existingRecord?.prepStatus ?? null,
+              prepHandlerName: newOrder.prepHandlerName ?? existingRecord?.prepHandlerName ?? null,
             };
+
+            const previousStatus = resolveOrderStatus(existingRecord);
+            const nextStatus = resolveOrderStatus(mergedOrder);
+            const displayCode = getOrderDisplayCode({
+              ...(existingRecord ?? { id: mergedOrder.id }),
+              ...mergedOrder,
+            } as Order);
+
+            if (payload.eventType === 'INSERT') {
+              notice = {
+                tone: 'success',
+                message: `Pedido ${displayCode} registrado correctamente.`,
+                title: 'Nuevo pedido creado',
+                body: `Ticket ${displayCode} está en cola.`,
+              };
+            } else if (payload.eventType === 'UPDATE' && previousStatus !== nextStatus) {
+              if (nextStatus === 'in_progress') {
+                notice = {
+                  tone: 'info',
+                  message: `Tu pedido ${displayCode} está en preparación.`,
+                  title: 'Pedido en preparación',
+                  body: 'Tu orden ya está siendo atendida.',
+                };
+              } else if (nextStatus === 'completed') {
+                notice = {
+                  tone: 'success',
+                  message: `Pedido ${displayCode} completado. Puedes recogerlo.`,
+                  title: 'Pedido completado',
+                  body: 'Tu orden está lista para entrega.',
+                };
+              }
+            }
 
             if (index >= 0) {
               next[index] = { ...next[index], ...mergedOrder };
@@ -654,6 +732,17 @@ export default function OrdersDashboardPage() {
             }
             return next;
           });
+
+          const noticePayload = notice;
+          if (noticePayload) {
+            const { message, tone, title, body } = noticePayload;
+            showSnackbar(message, tone, {
+              deviceNotification: {
+                title,
+                body,
+              },
+            });
+          }
         }
       )
       .subscribe();
@@ -661,7 +750,7 @@ export default function OrdersDashboardPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, user]);
+  }, [showSnackbar, supabase, user]);
 
   const isExpiredPending = useCallback((order: Order) => {
     if (order.status !== 'pending' || !order.createdAt) {
@@ -1502,6 +1591,7 @@ export default function OrdersDashboardPage() {
         onClose={() => setShowHistoricalModal(false)}
         orders={boardColumns.pastBucket}
       />
+      <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
     </div>
   );
 }

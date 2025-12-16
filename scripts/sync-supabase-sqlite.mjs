@@ -42,6 +42,22 @@ const SYNC_TABLES = [
   { name: 'reservations', pk: 'id', updatedColumn: 'updatedAt' },
   { name: 'loyalty_points', pk: 'id', updatedColumn: 'createdAt' },
   { name: 'customer_consumption', pk: 'id', updatedColumn: 'createdAt' },
+  { name: 'branches', pk: 'id', updatedColumn: 'updatedAt', pushChanges: false },
+  { name: 'order_codes', pk: 'id', updatedColumn: 'createdAt', pushChanges: false },
+  { name: 'staff_users', pk: 'id', updatedColumn: 'updatedAt' },
+  { name: 'staff_sessions', pk: 'id', updatedColumn: 'updatedAt', pushChanges: false },
+  { name: 'prep_queue', pk: 'id', updatedColumn: 'updatedAt' },
+  { name: 'inventory_categories', pk: 'id', fullRefresh: true, pushChanges: false },
+  { name: 'inventory_items', pk: 'id', updatedColumn: 'updatedAt' },
+  { name: 'inventory_stock', pk: 'id', updatedColumn: 'lastUpdatedAt' },
+  { name: 'inventory_movements', pk: 'id', updatedColumn: 'createdAt' },
+  { name: 'pos_action_logs', pk: 'id', updatedColumn: 'createdAt', pushChanges: false },
+  { name: 'report_requests', pk: 'id', updatedColumn: 'updatedAt', pushChanges: false },
+  { name: 'reservation_failures', pk: 'id', updatedColumn: 'cleanupAt', pushChanges: false },
+  { name: 'pos_queue_entries', pk: 'id', updatedColumn: 'updatedAt' },
+  { name: 'inventory_stock_ledger', pk: 'id', updatedColumn: 'createdAt', pushChanges: false },
+  { name: 'inventory_stock_entries', pk: 'id', updatedColumn: 'createdAt' },
+  { name: 'inventory_stock_entry_items', pk: 'id', fullRefresh: true, pushChanges: false },
 ];
 
 async function ensureSyncStateTable() {
@@ -115,10 +131,10 @@ function buildUpsertStatement(table, row) {
 }
 
 async function pullFromSupabase(table, since) {
-  const updatedColumn = table.updatedColumn;
-  const query = supabase.from(table.name).select('*').order(updatedColumn, { ascending: true });
-  if (since) {
-    query.gt(updatedColumn, since);
+  const orderColumn = table.updatedColumn ?? table.pk;
+  let query = supabase.from(table.name).select('*').order(orderColumn, { ascending: true });
+  if (!table.fullRefresh && table.updatedColumn && since) {
+    query = query.gt(table.updatedColumn, since);
   }
   const { data, error } = await query;
   if (error) {
@@ -137,6 +153,9 @@ async function upsertRows(rows, table) {
 }
 
 async function pushSqliteChanges(table, since) {
+  if (table.pushChanges === false || !table.updatedColumn) {
+    return since;
+  }
   const updatedColumn = table.updatedColumn;
   const rows = await all(
     `SELECT * FROM ${table.name} WHERE ${updatedColumn} IS NOT NULL AND ${updatedColumn} > ?`,
@@ -172,7 +191,9 @@ async function main() {
     const pulledRows = await pullFromSupabase(table, state.lastSupabasePull);
     await upsertRows(pulledRows, table);
     const lastSupabasePull =
-      pulledRows.length > 0 ? pulledRows[pulledRows.length - 1][table.updatedColumn] : state.lastSupabasePull;
+      table.fullRefresh || !table.updatedColumn || pulledRows.length === 0
+        ? state.lastSupabasePull
+        : pulledRows[pulledRows.length - 1][table.updatedColumn];
 
     const lastSqlitePush = await pushSqliteChanges(table, state.lastSqlitePush);
 
