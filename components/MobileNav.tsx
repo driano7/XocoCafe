@@ -1,27 +1,27 @@
 /*
  * --------------------------------------------------------------------
- *  Xoco Café — Software Property
- *  Copyright (c) 2025 Xoco Café
- *  Principal Developer: Donovan Riaño
+ * Xoco Café — Software Property
+ * Copyright (c) 2025 Xoco Café
+ * Principal Developer: Donovan Riaño
  *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at:
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
- *  --------------------------------------------------------------------
- *  PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
- *  Copyright (c) 2025 Xoco Café.
- *  Desarrollador Principal: Donovan Riaño.
+ * --------------------------------------------------------------------
+ * PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
+ * Copyright (c) 2025 Xoco Café.
+ * Desarrollador Principal: Donovan Riaño.
  *
- *  Este archivo está licenciado bajo la Apache License 2.0.
- *  Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
+ * Este archivo está licenciado bajo la Apache License 2.0.
+ * Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
  * --------------------------------------------------------------------
  */
 
@@ -81,13 +81,20 @@ export default function MobileNav() {
           initial="exit"
           exit="exit"
           variants={variants}
-          className="fixed inset-0 z-20 h-full w-full bg-black/80 dark:bg-white/80"
+          // CLASE MODIFICADA: Quitamos la opacidad y hacemos que el fondo
+          // sea negro en modo oscuro y blanco en modo claro.
+          // El 'z-20' se mantiene para que esté por encima de todo.
+          className="fixed inset-0 z-20 h-full w-full bg-white dark:bg-black"
         >
           <div
             className={classNames(
               'flex h-full w-full flex-col',
-              'bg-black text-white',
-              'dark:bg-white dark:text-black'
+              // CLASES MODIFICADAS: Usamos las clases opuestas al fondo para el texto,
+              // asegurando el contraste total:
+              // En dark:bg-black -> text-white
+              // En bg-white -> text-black
+              'bg-white text-black',
+              'dark:bg-black dark:text-white'
             )}
           >
             <header className="flex justify-end py-5 px-4 text-current">
