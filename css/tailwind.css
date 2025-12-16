@@ -1,27 +1,27 @@
 /*
  * --------------------------------------------------------------------
- *  Xoco Café — Software Property
- *  Copyright (c) 2025 Xoco Café
- *  Principal Developer: Donovan Riaño
+ * Xoco Café — Software Property
+ * Copyright (c) 2025 Xoco Café
+ * Principal Developer: Donovan Riaño
  *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at:
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
- *  --------------------------------------------------------------------
- *  PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
- *  Copyright (c) 2025 Xoco Café.
- *  Desarrollador Principal: Donovan Riaño.
+ * --------------------------------------------------------------------
+ * PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
+ * Copyright (c) 2025 Xoco Café.
+ * Desarrollador Principal: Donovan Riaño.
  *
- *  Este archivo está licenciado bajo la Apache License 2.0.
- *  Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
+ * Este archivo está licenciado bajo la Apache License 2.0.
+ * Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
  * --------------------------------------------------------------------
  */
 
@@ -79,13 +79,24 @@ input:-webkit-autofill:focus {
   motion-safe:duration-300 dark:from-primary-500 dark:to-primary-500;
 }
 
+/* --- SECCIÓN MODIFICADA PARA USAR PRIMARY Y CONTRASTE INVERSO --- */
+
 .horizontal-underline {
   border-bottom-width: 0;
-  background-image: linear-gradient(transparent, transparent), linear-gradient(#de1d8d, #de1d8d);
   background-size: 0 3px;
   background-position: 0 100%;
   background-repeat: no-repeat;
   transition: background-size 0.5s ease-in-out;
+
+  /* Color del subrayado para MODO CLARO (Menú de fondo negro -> usa Primary Claro) */
+  background-image: linear-gradient(transparent, transparent),
+    linear-gradient(theme('colors.primary.200'), theme('colors.primary.200'));
+}
+
+/* Color del subrayado para MODO OSCURO (Menú de fondo blanco -> usa Primary Oscuro) */
+.dark .horizontal-underline {
+  background-image: linear-gradient(transparent, transparent),
+    linear-gradient(theme('colors.primary.800'), theme('colors.primary.800'));
 }
 
 .horizontal-underline:hover {
@@ -94,12 +105,16 @@ input:-webkit-autofill:focus {
 }
 
 .horizontal-underline-active {
+  /* Hereda el color del .horizontal-underline para el contraste invertido */
   background-size: 100% 3px;
   background-position: 0 100%;
 }
 
+/* --- FIN SECCIÓN MODIFICADA --- */
+
 #nprogress .bar {
-  background: #de1d8d !important;
+  /* Usamos Primary-500 como color principal de la barra de progreso */
+  background: theme('colors.primary.500') !important;
   height: 4px !important;
 }
 

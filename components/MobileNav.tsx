@@ -81,33 +81,30 @@ export default function MobileNav() {
           initial="exit"
           exit="exit"
           variants={variants}
-          // CLASE MODIFICADA CLAVE (Inversión de fondo):
-          // En modo claro (por defecto): Fondo negro (bg-black)
-          // En modo oscuro (dark:): Fondo blanco (dark:bg-white)
+          // Fondo invertido: Negro en claro, Blanco en oscuro.
           className="fixed inset-0 z-20 h-full w-full bg-black dark:bg-white"
         >
           <div
             className={classNames(
               'flex h-full w-full flex-col',
-              // CLASES MODIFICADAS CLAVE (Inversión de texto):
-              // En modo claro (fondo negro): Texto blanco (text-white)
-              // En modo oscuro (fondo blanco): Texto negro (dark:text-black)
+              // Contraste de texto y fondo: Blanco sobre negro, Negro sobre blanco.
               'bg-black text-white',
               'dark:bg-white dark:text-black'
             )}
           >
-            <header className="flex justify-end py-5 px-4 text-current">
+            {/* Cabecera y botón de cierre con contraste forzado */}
+            <header className="flex justify-end py-5 px-4 text-white dark:text-black">
               <button
                 type="button"
                 aria-label="toggle modal"
-                className="h-8 w-8 rounded text-current"
+                className="h-8 w-8 rounded text-white dark:text-black"
                 onClick={() => setNavShow(!navShow)}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 20 20"
                   fill="currentColor"
-                  className="text-current"
+                  className="text-white dark:text-black"
                 >
                   <path
                     fillRule="evenodd"
@@ -117,7 +114,9 @@ export default function MobileNav() {
                 </svg>
               </button>
             </header>
-            <nav className="flex flex-1 flex-col justify-center space-y-8 px-10 text-center text-3xl font-semibold tracking-[0.25em] text-current">
+
+            {/* Navegación con ESPACIO REDUCIDO (space-y-4) y contraste forzado */}
+            <nav className="flex flex-1 flex-col justify-center space-y-4 px-10 text-center text-3xl font-semibold tracking-[0.25em] text-white dark:text-black">
               <Link
                 href="/"
                 onClick={() => setNavShow(!navShow)}
