@@ -16,16 +16,19 @@ const FALLBACK_IMAGE =
 export default function ReelCarousel({ items }: ReelCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
+  const [showSwipeHint, setShowSwipeHint] = useState(true);
   const touchStartRef = useRef(0);
 
   const handleNext = useCallback(() => {
     setDirection('next');
     setCurrentIndex((prev) => (prev + 1) % items.length);
+    setShowSwipeHint(false);
   }, [items.length]);
 
   const handlePrev = useCallback(() => {
     setDirection('prev');
     setCurrentIndex((prev) => (prev - 1 + items.length) % items.length);
+    setShowSwipeHint(false);
   }, [items.length]);
 
   useEffect(() => {
@@ -42,6 +45,7 @@ export default function ReelCarousel({ items }: ReelCarouselProps) {
 
   const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
     touchStartRef.current = event.touches[0].clientX;
+    setShowSwipeHint(false);
   };
 
   const handleTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
@@ -53,6 +57,12 @@ export default function ReelCarousel({ items }: ReelCarouselProps) {
     }
     touchStartRef.current = 0;
   };
+
+  useEffect(() => {
+    if (!showSwipeHint) return undefined;
+    const timer = window.setTimeout(() => setShowSwipeHint(false), 6000);
+    return () => window.clearTimeout(timer);
+  }, [showSwipeHint]);
 
   const currentItem = items[currentIndex];
   const safeImage = currentItem.image || FALLBACK_IMAGE;
@@ -131,6 +141,14 @@ export default function ReelCarousel({ items }: ReelCarouselProps) {
           </AnimatePresence>
         </div>
       </div>
+
+      {showSwipeHint && (
+        <div className="pointer-events-none absolute top-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-white/80 shadow-lg md:hidden">
+          <FiChevronLeft size={14} />
+          <span>Desliza</span>
+          <FiChevronRight size={14} />
+        </div>
+      )}
 
       <div className="absolute bottom-6 flex gap-2">
         {items.map((item, index) => (

@@ -33,8 +33,10 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
+  type MutableRefObject,
   type ReactNode,
 } from 'react';
 import Link from 'next/link';
@@ -317,6 +319,17 @@ export default function ReservePage() {
   });
   const [reservationToast, setReservationToast] = useState<string | null>(null);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const reservationTicketRef = useRef<HTMLDivElement | null>(null);
+  const [reservationTicketActionError, setReservationTicketActionError] = useState<string | null>(
+    null
+  );
+  const [isProcessingReservationTicket, setIsProcessingReservationTicket] = useState(false);
+  const [reservationDeviceInfo, setReservationDeviceInfo] = useState({
+    isMobile: false,
+    isAndroid: false,
+    isIOS: false,
+  });
+  const [canShareReservation, setCanShareReservation] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -341,6 +354,33 @@ export default function ReservePage() {
   }, []);
 
   useEffect(() => {
+    const detectCapabilities = () => {
+      if (typeof navigator === 'undefined' || typeof window === 'undefined') {
+        return;
+      }
+      type WindowWithOpera = Window & { opera?: string };
+      const ua =
+        navigator.userAgent ||
+        navigator.vendor ||
+        ((window as WindowWithOpera).opera ? String((window as WindowWithOpera).opera) : '');
+      const isAndroid = /android/i.test(ua);
+      const isIPhone = /iphone|ipod/i.test(ua);
+      const isIPad =
+        /ipad/i.test(ua) ||
+        (/macintosh/i.test(ua) &&
+          typeof navigator.maxTouchPoints === 'number' &&
+          navigator.maxTouchPoints > 1);
+      setReservationDeviceInfo({
+        isMobile: isAndroid || isIPhone || isIPad,
+        isAndroid,
+        isIOS: isIPhone,
+      });
+      setCanShareReservation(typeof navigator.share === 'function' && (isAndroid || isIPhone));
+    };
+    detectCapabilities();
+  }, []);
+
+  useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 60 * 1000);
     return () => clearInterval(interval);
   }, []);
@@ -352,6 +392,11 @@ export default function ReservePage() {
     const timeout = setTimeout(() => setReservationToast(null), 4000);
     return () => clearTimeout(timeout);
   }, [reservationToast]);
+
+  useEffect(() => {
+    setReservationTicketActionError(null);
+    setIsProcessingReservationTicket(false);
+  }, [selectedReservation]);
 
   const loyaltyReminder = useLoyaltyReminder({
     userId: user?.id,
@@ -623,6 +668,18 @@ export default function ReservePage() {
     [userDisplayName, user]
   );
 
+  const buildReservationShareText = useCallback((reservation: ReservationRecord) => {
+    const branchLabel = reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
+    return [
+      `Reserva ${reservation.reservationCode}`,
+      formatReservationDateTime(reservation),
+      `Personas: ${reservation.peopleCount}`,
+      `Sucursal: ${branchLabel}${
+        reservation.branchNumber ? ` (#${reservation.branchNumber})` : ''
+      }`,
+    ].join(' · ');
+  }, []);
+
   const handleDownloadQr = useCallback(
     async (reservation: ReservationRecord) => {
       try {
@@ -651,6 +708,285 @@ export default function ReservePage() {
       }
     },
     [buildQrPayload, setAlert]
+  );
+
+  const runReservationShareGuard = useCallback(async (action: () => Promise<void>) => {
+    if (typeof document === 'undefined') {
+      await action();
+      return;
+    }
+    let wasHidden = false;
+    let settled = false;
+    let rejectAbort: ((reason?: unknown) => void) | null = null;
+    const abortPromise = new Promise<never>((_, reject) => {
+      rejectAbort = reject;
+    });
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        wasHidden = true;
+        return;
+      }
+      if (document.visibilityState === 'visible' && wasHidden && !settled && rejectAbort) {
+        rejectAbort(new Error('share_aborted_visibility'));
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    const cleanup = () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      rejectAbort = null;
+    };
+    try {
+      await Promise.race([
+        action().finally(() => {
+          settled = true;
+        }),
+        abortPromise,
+      ]);
+    } finally {
+      cleanup();
+    }
+  }, []);
+
+  const waitForReservationAssets = useCallback(async () => {
+    if (!reservationTicketRef.current) return;
+    const images = Array.from(reservationTicketRef.current.querySelectorAll('img'));
+    await Promise.all(
+      images.map(
+        (image) =>
+          new Promise<void>((resolve) => {
+            if (image.complete && image.naturalWidth > 0) {
+              resolve();
+              return;
+            }
+            const handleResolve = () => {
+              image.removeEventListener('load', handleResolve);
+              image.removeEventListener('error', handleResolve);
+              resolve();
+            };
+            image.addEventListener('load', handleResolve);
+            image.addEventListener('error', handleResolve);
+          })
+      )
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }, []);
+
+  const captureReservationTicket = useCallback(async () => {
+    if (!reservationTicketRef.current) return null;
+    await waitForReservationAssets();
+    const html2canvas = (await import('html2canvas')).default;
+    const canvas = await html2canvas(reservationTicketRef.current, {
+      scale: 2,
+      backgroundColor: '#0f1524',
+      useCORS: true,
+    });
+    return new Promise<Blob | null>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('No pudimos generar la imagen de la reserva.'));
+            return;
+          }
+          resolve(blob);
+        },
+        'image/png',
+        1
+      );
+    });
+  }, [waitForReservationAssets]);
+
+  const buildReservationTicketFileName = useCallback(
+    (reservation: ReservationRecord) =>
+      `reserva-${reservation.reservationCode}-${reservation.reservationDate}`,
+    []
+  );
+
+  const triggerReservationDownload = useCallback(
+    (blob: Blob, filename: string) => {
+      const objectUrl = URL.createObjectURL(blob);
+      if (reservationDeviceInfo.isMobile) {
+        const newTab = window.open(objectUrl, '_blank');
+        if (!newTab) {
+          const link = document.createElement('a');
+          link.href = objectUrl;
+          link.download = `${filename}.png`;
+          link.rel = 'noopener';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `${filename}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
+    },
+    [reservationDeviceInfo.isMobile]
+  );
+
+  const saveReservationToGallery = useCallback(
+    async (blob: Blob, filename: string) => {
+      if (
+        !canShareReservation ||
+        typeof navigator === 'undefined' ||
+        typeof navigator.share !== 'function'
+      ) {
+        throw new Error('reservation_gallery_unsupported');
+      }
+      const file = new File([blob], `${filename}.png`, { type: 'image/png' });
+      if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+        throw new Error('reservation_gallery_unsupported');
+      }
+      try {
+        await runReservationShareGuard(() =>
+          navigator.share({
+            files: [file],
+            title: 'Reserva Xoco Café',
+            text: 'Guardaremos tu confirmación en tu galería.',
+          })
+        );
+      } catch (error) {
+        if (
+          error instanceof DOMException &&
+          (error.name === 'AbortError' || error.name === 'NotAllowedError')
+        ) {
+          throw new Error('reservation_gallery_permission');
+        }
+        if (error instanceof Error && error.message === 'share_aborted_visibility') {
+          throw error;
+        }
+        throw new Error('reservation_gallery_failed');
+      }
+    },
+    [canShareReservation, runReservationShareGuard]
+  );
+
+  const handleDownloadReservationTicket = useCallback(
+    async (reservation: ReservationRecord) => {
+      setReservationTicketActionError(null);
+      setIsProcessingReservationTicket(true);
+      try {
+        const blob = await captureReservationTicket();
+        if (!blob) {
+          throw new Error('reservation_capture_failed');
+        }
+        const filename = buildReservationTicketFileName(reservation);
+        if (reservationDeviceInfo.isMobile && canShareReservation) {
+          try {
+            await saveReservationToGallery(blob, filename);
+            return;
+          } catch (mobileError) {
+            if (
+              mobileError instanceof Error &&
+              mobileError.message === 'share_aborted_visibility'
+            ) {
+              setReservationTicketActionError('Cancelaste la acción antes de guardar la reserva.');
+              return;
+            }
+            if (
+              mobileError instanceof Error &&
+              mobileError.message === 'reservation_gallery_permission'
+            ) {
+              setReservationTicketActionError(
+                'Necesitamos permiso para guardar la reserva en tu galería.'
+              );
+              return;
+            }
+            if (
+              mobileError instanceof Error &&
+              mobileError.message === 'reservation_gallery_failed'
+            ) {
+              setReservationTicketActionError(
+                'No pudimos guardar en galería, enviamos la imagen a tus descargas.'
+              );
+            }
+          }
+        }
+        triggerReservationDownload(blob, filename);
+      } catch (error) {
+        console.error('Error descargando confirmación de reserva:', error);
+        if (error instanceof Error && error.message === 'reservation_capture_failed') {
+          setReservationTicketActionError('No pudimos generar la imagen de la reserva.');
+        } else {
+          setReservationTicketActionError('No pudimos descargar la reserva. Intenta de nuevo.');
+        }
+      } finally {
+        setIsProcessingReservationTicket(false);
+      }
+    },
+    [
+      buildReservationTicketFileName,
+      canShareReservation,
+      captureReservationTicket,
+      reservationDeviceInfo.isMobile,
+      saveReservationToGallery,
+      triggerReservationDownload,
+    ]
+  );
+
+  const handleShareReservationTicket = useCallback(
+    async (reservation: ReservationRecord) => {
+      setReservationTicketActionError(null);
+      setIsProcessingReservationTicket(true);
+      try {
+        if (
+          typeof navigator === 'undefined' ||
+          typeof navigator.share !== 'function' ||
+          !canShareReservation
+        ) {
+          const fallback = `${buildReservationShareText(reservation)}\nTe espero en Xoco Café.`;
+          if (typeof navigator !== 'undefined' && navigator.clipboard) {
+            await navigator.clipboard.writeText(fallback);
+            setReservationTicketActionError('Copiamos los detalles de la reserva al portapapeles.');
+            return;
+          }
+          window.alert('Comparte manualmente: ' + fallback);
+          return;
+        }
+        const blob = await captureReservationTicket();
+        if (!blob) {
+          throw new Error('reservation_capture_failed');
+        }
+        const file = new File([blob], `${buildReservationTicketFileName(reservation)}.png`, {
+          type: 'image/png',
+        });
+        if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+          throw new Error('reservation_share_unsupported');
+        }
+        await runReservationShareGuard(() =>
+          navigator.share({
+            files: [file],
+            title: 'Reserva Xoco Café',
+            text: `${buildReservationShareText(reservation)}\nTe espero en Xoco Café.`,
+          })
+        );
+      } catch (error) {
+        console.error('Error compartiendo reserva:', error);
+        if (error instanceof Error && error.message === 'share_aborted_visibility') {
+          setReservationTicketActionError('Cancelaste la acción de compartir.');
+        } else if (error instanceof Error && error.message === 'reservation_capture_failed') {
+          setReservationTicketActionError('No pudimos generar la imagen de la reserva.');
+        } else {
+          setReservationTicketActionError(
+            'No pudimos compartir esta reservación en tu dispositivo.'
+          );
+        }
+      } finally {
+        setIsProcessingReservationTicket(false);
+      }
+    },
+    [
+      buildReservationShareText,
+      buildReservationTicketFileName,
+      canShareReservation,
+      captureReservationTicket,
+      runReservationShareGuard,
+    ]
   );
 
   const handleReservationAction = useCallback(
@@ -1374,6 +1710,15 @@ export default function ReservePage() {
                 onDownloadQr={(reservation) => void handleDownloadQr(reservation)}
                 actionState={reservationActionState}
                 currentUserName={userDisplayName}
+                onDownloadTicket={(reservation) =>
+                  void handleDownloadReservationTicket(reservation)
+                }
+                onShareReservation={(reservation) => void handleShareReservationTicket(reservation)}
+                ticketRef={reservationTicketRef}
+                shareState={{
+                  error: reservationTicketActionError,
+                  isProcessing: isProcessingReservationTicket,
+                }}
               />
             </DetailModal>
           )}
@@ -1767,12 +2112,20 @@ const ReservationDetailContent = ({
   onDownloadQr,
   actionState,
   currentUserName,
+  onDownloadTicket,
+  onShareReservation,
+  ticketRef,
+  shareState,
 }: {
   reservation: ReservationRecord;
   onCancelReservation?: (reservation: ReservationRecord) => void;
   onDownloadQr?: (reservation: ReservationRecord) => void;
   actionState?: DetailActionState;
   currentUserName?: string | null;
+  onDownloadTicket?: (reservation: ReservationRecord) => void;
+  onShareReservation?: (reservation: ReservationRecord) => void;
+  ticketRef?: MutableRefObject<HTMLDivElement | null>;
+  shareState?: { error: string | null; isProcessing: boolean };
 }) => {
   const slotDateTime = buildSlotDateTime(reservation.reservationDate, reservation.reservationTime);
   const qrExpiresAt = new Date(slotDateTime.getTime() + QR_EXPIRATION_MINUTES * 60 * 1000);
@@ -1793,38 +2146,15 @@ const ReservationDetailContent = ({
   const qrImageSrc = `${QR_API_URL}?size=${QR_IMAGE_SIZE}&data=${encodeURIComponent(
     JSON.stringify(qrPayload)
   )}`;
-  const shareDetails = [
-    `Reserva ${reservation.reservationCode}`,
-    formatReservationDateTime(reservation),
-    `Personas: ${reservation.peopleCount}`,
-    `Sucursal: ${branchLabel}`,
-  ].join(' · ');
-
-  const handleShareReservation = () => {
-    const shareData = {
-      title: 'Reserva Xoco Café',
-      text: `${shareDetails}\nTe espero en Xoco Café.`,
-    };
-    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-      navigator
-        .share(shareData)
-        .catch((error) => console.error('Error compartiendo la reservación:', error));
-      return;
-    }
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard
-        .writeText(shareData.text)
-        .then(() => window.alert('Copiamos los detalles de la reservación para que los pegues.'))
-        .catch((error) =>
-          console.error('No pudimos copiar los detalles de la reservación:', error)
-        );
-      return;
-    }
-    window.alert('Comparte manualmente: ' + shareData.text);
-  };
-
   return (
-    <div className="space-y-5">
+    <div
+      className="space-y-5"
+      ref={(node) => {
+        if (ticketRef) {
+          ticketRef.current = node;
+        }
+      }}
+    >
       <div className="rounded-[32px] border border-[#1d2537] bg-[#0f1524] p-6 text-white shadow-[0_25px_60px_rgba(0,0,0,0.55)]">
         <header className="space-y-1">
           <p className="text-xs uppercase tracking-[0.35em] text-primary-200">
@@ -1887,14 +2217,32 @@ const ReservationDetailContent = ({
                   Descargar QR
                 </button>
               )}
-              <button
-                type="button"
-                onClick={handleShareReservation}
-                className="hover:text-primary-800"
-              >
-                Compartir reservación
-              </button>
+              {onDownloadTicket && (
+                <button
+                  type="button"
+                  onClick={() => onDownloadTicket(reservation)}
+                  className="hover:text-primary-800"
+                  disabled={shareState?.isProcessing}
+                >
+                  {shareState?.isProcessing ? 'Generando…' : 'Descargar reserva'}
+                </button>
+              )}
+              {onShareReservation && (
+                <button
+                  type="button"
+                  onClick={() => onShareReservation(reservation)}
+                  className="hover:text-primary-800"
+                  disabled={shareState?.isProcessing}
+                >
+                  {shareState?.isProcessing ? 'Compartiendo…' : 'Compartir reservación'}
+                </button>
+              )}
             </div>
+            {shareState?.error && (
+              <p className="mt-2 text-center text-xs font-semibold text-red-300">
+                {shareState.error}
+              </p>
+            )}
           </div>
           {(reservation.preOrderItems || reservation.message) && (
             <div className="flex-1 space-y-4 text-white">

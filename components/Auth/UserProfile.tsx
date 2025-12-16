@@ -362,7 +362,7 @@ export default function UserProfile() {
 
   const isGoogleOnly = user.authProvider === 'google';
   const sectionCardClass =
-    'rounded-3xl border border-white/30 bg-white/80 p-6 shadow-xl backdrop-blur-lg dark:border-white/5 dark:bg-gray-900/70';
+    'w-full rounded-3xl border border-white/30 bg-white/80 p-6 shadow-xl backdrop-blur-lg dark:border-white/5 dark:bg-gray-900/70';
   const favoriteBeverageLabel =
     resolveFavoriteLabel(user.favoriteColdDrink ?? user.favoriteHotDrink) ?? 'No registrado';
   const favoriteFoodLabel = resolveFavoriteLabel(user.favoriteFood) ?? 'No registrado';

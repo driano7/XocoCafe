@@ -788,6 +788,42 @@ export default function OrdersDashboardPage() {
 
   const [isProcessingTicket, setIsProcessingTicket] = useState(false);
   const [ticketActionError, setTicketActionError] = useState<string | null>(null);
+  const runWithShareGuard = useCallback(async (action: () => Promise<void>) => {
+    if (typeof document === 'undefined') {
+      await action();
+      return;
+    }
+    let wasHidden = false;
+    let settled = false;
+    let rejectAbort: ((reason?: unknown) => void) | null = null;
+    const abortPromise = new Promise<never>((_, reject) => {
+      rejectAbort = reject;
+    });
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        wasHidden = true;
+        return;
+      }
+      if (document.visibilityState === 'visible' && wasHidden && !settled && rejectAbort) {
+        rejectAbort(new Error('share_aborted_visibility'));
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    const cleanup = () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      rejectAbort = null;
+    };
+    try {
+      await Promise.race([
+        action().finally(() => {
+          settled = true;
+        }),
+        abortPromise,
+      ]);
+    } finally {
+      cleanup();
+    }
+  }, []);
 
   const detectDevice = useCallback(() => {
     if (typeof navigator === 'undefined' || typeof window === 'undefined') {
@@ -937,11 +973,13 @@ export default function OrdersDashboardPage() {
         throw new Error('gallery_not_supported');
       }
       try {
-        await navigator.share({
-          files: [file],
-          title: 'Ticket digital Xoco Café',
-          text: 'Guardaremos tu ticket en tu galería.',
-        });
+        await runWithShareGuard(() =>
+          navigator.share({
+            files: [file],
+            title: 'Ticket digital Xoco Café',
+            text: 'Guardaremos tu ticket en tu galería.',
+          })
+        );
       } catch (error) {
         console.error('Error guardando ticket en galería:', error);
         if (
@@ -950,10 +988,13 @@ export default function OrdersDashboardPage() {
         ) {
           throw new Error('gallery_permission_denied');
         }
+        if (error instanceof Error && error.message === 'share_aborted_visibility') {
+          throw error;
+        }
         throw new Error('gallery_share_failed');
       }
     },
-    [canShareTicket]
+    [canShareTicket, runWithShareGuard]
   );
 
   const handleDownloadTicket = useCallback(async () => {
@@ -987,7 +1028,9 @@ export default function OrdersDashboardPage() {
       triggerDownload(blob, filename);
     } catch (error) {
       console.error('Error descargando ticket:', error);
-      if (error instanceof Error && error.message === 'gallery_permission_denied') {
+      if (error instanceof Error && error.message === 'share_aborted_visibility') {
+        setTicketActionError('Cancelaste la acción antes de guardar el ticket.');
+      } else if (error instanceof Error && error.message === 'gallery_permission_denied') {
         setTicketActionError(
           'Necesitamos permiso para guardar el ticket en tu galería. Intenta aceptarlo o usa el botón Compartir.'
         );
@@ -1032,14 +1075,20 @@ export default function OrdersDashboardPage() {
       if (navigator.canShare && !navigator.canShare({ files: [file] })) {
         throw new Error('El dispositivo no soporta compartir archivos');
       }
-      await navigator.share({
-        files: [file],
-        title: 'Ticket digital Xoco Café',
-        text: 'Comparte tu ticket con otra persona o guárdalo en tu galería.',
-      });
+      await runWithShareGuard(() =>
+        navigator.share({
+          files: [file],
+          title: 'Ticket digital Xoco Café',
+          text: 'Comparte tu ticket con otra persona o guárdalo en tu galería.',
+        })
+      );
     } catch (error) {
       console.error('Error compartiendo ticket:', error);
-      setTicketActionError('No pudimos compartir el ticket en este dispositivo.');
+      if (error instanceof Error && error.message === 'share_aborted_visibility') {
+        setTicketActionError('Cancelaste la acción de compartir.');
+      } else {
+        setTicketActionError('No pudimos compartir el ticket en este dispositivo.');
+      }
     } finally {
       setIsProcessingTicket(false);
     }
@@ -1050,6 +1099,7 @@ export default function OrdersDashboardPage() {
     deviceInfo.isIOS,
     selectedOrder,
     isShareSupported,
+    runWithShareGuard,
   ]);
 
   useEffect(() => {
@@ -1364,7 +1414,12 @@ export default function OrdersDashboardPage() {
                 </div>
               ) : (
                 <div className="mt-6 flex justify-center">
-                  <VirtualTicket order={selectedOrder} ref={ticketRef} showQr={shouldShowQr} />
+                  <VirtualTicket
+                    order={selectedOrder}
+                    ref={ticketRef}
+                    showQr={shouldShowQr}
+                    orderStatus={selectedOrderEffectiveStatus ?? selectedOrder.status}
+                  />
                 </div>
               )}
 

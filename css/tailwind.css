@@ -147,3 +147,37 @@ input:-webkit-autofill:focus {
 [cmdk-empty] {
   @apply flex items-center justify-center py-4 text-sm text-gray-500;
 }
+
+.menu-simple-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.5rem;
+}
+
+.menu-simple-prose thead {
+  position: sticky;
+  top: 0;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(79, 70, 229, 0.2);
+}
+
+.menu-simple-prose th,
+.menu-simple-prose td {
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  font-size: 0.95rem;
+}
+
+.menu-simple-prose tbody tr:last-child td {
+  border-bottom: none;
+}
+
+@media (max-width: 640px) {
+  .menu-simple-prose th,
+  .menu-simple-prose td {
+    padding: 0.5rem;
+    font-size: 0.85rem;
+  }
+}

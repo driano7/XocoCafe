@@ -82,7 +82,7 @@ export default function MobileNav() {
           exit="exit"
           variants={variants}
           className={classNames(
-            'fixed inset-0 z-20 h-full w-full bg-white opacity-95 dark:bg-black'
+            'fixed inset-0 z-20 h-full w-full bg-[#05070f]/95 text-white backdrop-blur-2xl dark:bg-black/95'
           )}
         >
           <header className="flex justify-end py-5 px-4">
@@ -106,13 +106,13 @@ export default function MobileNav() {
               </svg>
             </button>
           </header>
-          <nav className="fixed mt-8 h-full">
+          <nav className="mt-8 h-full overflow-y-auto px-10 pb-12">
             <div key="Home" className="px-12 py-4">
               <Link
                 href="/"
                 onClick={() => setNavShow(!navShow)}
                 className={classNames(
-                  'horizontal-underline font-bold tracking-widest text-gray-900 backdrop:text-2xl dark:text-gray-100',
+                  'horizontal-underline text-2xl font-black uppercase tracking-[0.4em] text-white',
                   { 'horizontal-underline-active': pathName === '/' }
                 )}
               >
@@ -128,7 +128,7 @@ export default function MobileNav() {
                     href={href}
                     onClick={() => setNavShow(!navShow)}
                     className={classNames(
-                      'horizontal-underline font-bold tracking-widest text-gray-900 backdrop:text-2xl dark:text-gray-100',
+                      'horizontal-underline text-2xl font-black uppercase tracking-[0.4em] text-white/80 transition hover:text-white',
                       { 'horizontal-underline-active': active }
                     )}
                     aria-label={title}

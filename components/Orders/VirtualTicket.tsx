@@ -20,6 +20,7 @@ export interface VirtualTicketProps {
     id: string;
     orderNumber?: string | null;
     ticketId?: string | null;
+    status?: 'pending' | 'in_progress' | 'completed' | 'past' | null;
     userEmail?: string | null;
     customerName?: string | null;
     createdAt?: string | null;
@@ -52,6 +53,7 @@ export interface VirtualTicketProps {
     } | null;
   };
   showQr?: boolean;
+  orderStatus?: 'pending' | 'in_progress' | 'completed' | 'past' | null;
 }
 
 const QR_API_URL = '/api/qr';
@@ -312,7 +314,7 @@ const extractItemsFromSource = (source: any): OrderItem[] => {
 };
 
 const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
-  ({ order, showQr = true }, ref) => {
+  ({ order, showQr = true, orderStatus }, ref) => {
     const items = useMemo<OrderItem[]>(() => {
       const fromOrder = extractItemsFromSource(order.items);
       if (fromOrder.length > 0) {
@@ -341,6 +343,14 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
       return groups;
     }, [items]);
     const categoryOrder: ItemCategory[] = ['beverage', 'food', 'package', 'other'];
+
+    const normalizedStatus = useMemo(
+      () => orderStatus ?? order.status ?? null,
+      [order.status, orderStatus]
+    );
+    const thankYouHeadline =
+      normalizedStatus === 'pending' ? 'Gracias por su pedido' : 'Gracias por su compra';
+    const isDelivered = normalizedStatus === 'completed';
 
     const formatCurrency = (value?: number | null) =>
       new Intl.NumberFormat('es-MX', {
@@ -730,8 +740,13 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
         {showQr && (
           <div className="mt-4 flex flex-col items-center space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary-600">
-              Gracias por su compra
+              {thankYouHeadline}
             </p>
+            {isDelivered && (
+              <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-emerald-600">
+                Pedido pagado y entregado
+              </p>
+            )}
             <Image
               src={qrRequestUrl}
               alt="Código QR del ticket"

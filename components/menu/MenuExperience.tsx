@@ -57,8 +57,10 @@ export default function MenuExperience({ simpleCode, simpleContent }: MenuExperi
           <ReelCarousel items={menuItems} />
         ) : activeTab === 'simple' ? (
           <div className="rounded-3xl border border-[#cfc7bc] bg-[#d8d0c7] p-6 text-[#1f1c19] shadow-lg dark:border-white/10 dark:bg-[#10121d]/95 dark:text-white">
-            <div className="prose prose-neutral max-w-none text-[#1f1c19] dark:prose-invert dark:text-white dark:[&_h2]:text-white dark:[&_h3]:text-white dark:[&_p]:text-white dark:[&_li]:text-white dark:[&_td]:text-white dark:[&_th]:text-white dark:[&_em]:text-white dark:[&_strong]:text-white">
-              <SimpleContent content={simpleContent} components={mdxComponents} />
+            <div className="max-h-[75vh] w-full overflow-x-auto rounded-2xl bg-white/60 p-4 dark:bg-white/5 sm:max-h-none">
+              <div className="menu-simple-prose prose prose-neutral max-w-none text-[#1f1c19] dark:prose-invert dark:text-white dark:[&_h2]:text-white dark:[&_h3]:text-white dark:[&_p]:text-white dark:[&_li]:text-white dark:[&_td]:text-white dark:[&_th]:text-white dark:[&_em]:text-white dark:[&_strong]:text-white">
+                <SimpleContent content={simpleContent} components={mdxComponents} />
+              </div>
             </div>
           </div>
         ) : (

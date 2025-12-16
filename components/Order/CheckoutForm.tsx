@@ -600,7 +600,7 @@ export default function CheckoutForm({ token, user, onAddressesUpdate }: Checkou
                 : 'border-primary-100 text-primary-700 hover:border-primary-200 dark:border-primary-700 dark:text-primary-100'
             )}
           >
-            Personalizar
+            Otro
           </button>
         </div>
         {tipSelection === 'custom' && (

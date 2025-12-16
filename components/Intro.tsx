@@ -27,7 +27,7 @@
 
 'use client';
 
-import { useContext, useRef } from 'react';
+import { useContext, useEffect, useRef } from 'react';
 import { ScrollContext } from '@/components/Providers/ScrollProvider';
 
 function opacityForBlock(sectionProgress: number, blockNumber: number) {
@@ -43,6 +43,7 @@ function opacityForBlock(sectionProgress: number, blockNumber: number) {
 export default function Intro() {
   const { scrollY } = useContext(ScrollContext);
   const refContainer = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const numOfPages = 4;
   let progress = 0;
   const { current: elContainer } = refContainer;
@@ -58,6 +59,21 @@ export default function Intro() {
 
     progress = Math.min(numOfPages - 0.5, Math.max(0.5, percentY * numOfPages));
   }
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) {
+      return;
+    }
+    const attemptPlay = async () => {
+      try {
+        await video.play();
+      } catch (error) {
+        console.warn('No pudimos auto reproducir el video del home:', error);
+      }
+    };
+    attemptPlay();
+  }, []);
 
   return (
     <div
@@ -94,7 +110,8 @@ export default function Intro() {
           <div className="rounded-[32px] border border-white/15 bg-white/5 p-2 shadow-2xl backdrop-blur-2xl dark:border-black/20 dark:bg-black/20">
             <div className="relative overflow-hidden rounded-[28px] bg-black/70">
               <video
-                className="aspect-[9/16] w-full object-cover sm:aspect-video"
+                ref={videoRef}
+                className="aspect-[4/5] w-full object-cover sm:aspect-video"
                 autoPlay
                 muted
                 loop
