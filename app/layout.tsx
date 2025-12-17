@@ -70,6 +70,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <link rel="icon" type="image/png" sizes="16x16" href="/static/favicons/CafeIcon.png" />
         <meta name="msapplication-TileColor" content="#000000" />
         <meta name="theme-color" content="#000000" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link rel="alternate" type="application/rss+xml" href="/feed.xml" />
         <link rel="preload" as="image" href="/static/images/Xoco.jpeg" />
       </head>

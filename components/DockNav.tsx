@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  FiBell,
   FiCalendar,
   FiCoffee,
   FiFileText,
@@ -14,6 +13,7 @@ import {
   FiMoreHorizontal,
   FiShoppingBag,
 } from 'react-icons/fi';
+import { PiTrayBold } from 'react-icons/pi';
 
 type DockLink = {
   href: string;
@@ -31,7 +31,7 @@ const PRIMARY_LINKS: DockLink[] = [
     startsWith: '/dashboard/pedidos',
   },
   { href: '/reserve', icon: FiCalendar, label: 'Reservas', startsWith: '/reserve' },
-  { href: '/uses', icon: FiBell, label: 'Menú', startsWith: '/uses' },
+  { href: '/uses', icon: PiTrayBold, label: 'Menú', startsWith: '/uses' },
 ];
 
 const EXTRA_LINKS: DockLink[] = [
