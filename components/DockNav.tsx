@@ -10,7 +10,6 @@ import {
   FiFileText,
   FiFolderMinus,
   FiHome,
-  FiInfo,
   FiMenu,
   FiMoreHorizontal,
   FiPackage,
@@ -36,7 +35,6 @@ const PRIMARY_LINKS: DockLink[] = [
 ];
 
 const EXTRA_LINKS: DockLink[] = [
-  { href: '/about', icon: FiInfo, label: 'About', startsWith: '/about' },
   {
     href: '/blog/facturacion',
     icon: FiFileText,
@@ -45,6 +43,12 @@ const EXTRA_LINKS: DockLink[] = [
   },
   { href: '/blog', icon: FiCoffee, label: 'Blog', startsWith: '/blog' },
 ];
+
+const DOCK_BUTTON_BASE =
+  'flex h-11 w-11 items-center justify-center rounded-2xl text-xl transition';
+const DOCK_BUTTON_ACTIVE = 'bg-black text-white shadow-lg dark:bg-white dark:text-gray-900';
+const DOCK_BUTTON_INACTIVE =
+  'bg-white text-gray-900 shadow-sm hover:bg-gray-100 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700';
 
 const isActiveRoute = (pathname: string, link: DockLink) => {
   if (link.href === '/') {
@@ -132,7 +136,7 @@ export default function DockNav() {
   return (
     <div className="fixed inset-x-0 bottom-4 z-50 px-4 sm:hidden">
       {!isCollapsed && showExtras && (
-        <div className="absolute bottom-24 right-6 flex flex-col space-y-3 rounded-3xl border border-white/20 bg-black/25 p-4 text-white shadow-2xl backdrop-blur-lg dark:border-black/10 dark:bg-white/45 dark:text-gray-900">
+        <div className="absolute bottom-24 right-6 flex flex-col space-y-3 rounded-3xl border border-white/20 bg-white/80 p-4 text-gray-900 shadow-2xl backdrop-blur-lg dark:border-black/10 dark:bg-gray-900/80 dark:text-white">
           {extraLinks.map((link) => {
             const Icon = link.icon;
             const active = isActiveRoute(pathname ?? '', link);
@@ -142,10 +146,8 @@ export default function DockNav() {
                 href={link.href}
                 onClick={handleLinkClick}
                 className={classNames(
-                  'flex h-12 w-12 items-center justify-center rounded-2xl text-xl transition',
-                  active
-                    ? 'bg-white/90 text-gray-900 dark:bg-gray-900 dark:text-white'
-                    : 'bg-white/10 text-white hover:bg-white/20 dark:bg-gray-900/10 dark:text-gray-800 dark:hover:bg-gray-900/20'
+                  DOCK_BUTTON_BASE,
+                  active ? DOCK_BUTTON_ACTIVE : DOCK_BUTTON_INACTIVE
                 )}
                 aria-label={link.label}
               >
@@ -157,7 +159,7 @@ export default function DockNav() {
             type="button"
             aria-label="Ocultar barra"
             onClick={() => handleAutoCollapse(true)}
-            className="mt-1 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-xl text-white transition hover:bg-white/25 dark:bg-gray-900/15 dark:text-gray-800 dark:hover:bg-gray-900/30"
+            className={classNames('mt-1', DOCK_BUTTON_BASE, DOCK_BUTTON_INACTIVE)}
           >
             <FiFolderMinus />
           </button>
@@ -180,10 +182,8 @@ export default function DockNav() {
                 aria-label={link.label}
                 onClick={handleLinkClick}
                 className={classNames(
-                  'flex h-11 w-11 items-center justify-center rounded-2xl text-xl transition',
-                  active
-                    ? 'bg-black text-white shadow-lg dark:bg-white dark:text-gray-900'
-                    : 'bg-white text-gray-900 shadow-sm hover:bg-gray-100 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700'
+                  DOCK_BUTTON_BASE,
+                  active ? DOCK_BUTTON_ACTIVE : DOCK_BUTTON_INACTIVE
                 )}
               >
                 <Icon />
@@ -194,10 +194,8 @@ export default function DockNav() {
             type="button"
             aria-label="Más opciones"
             className={classNames(
-              'flex h-11 w-11 items-center justify-center rounded-2xl text-xl transition',
-              showExtras
-                ? 'bg-black text-white shadow-lg dark:bg-white dark:text-gray-900'
-                : 'bg-white text-gray-900 shadow-sm hover:bg-gray-100 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700'
+              DOCK_BUTTON_BASE,
+              showExtras ? DOCK_BUTTON_ACTIVE : DOCK_BUTTON_INACTIVE
             )}
             onClick={() => {
               handleDockInteraction();
