@@ -41,6 +41,7 @@ import ThemeProvider from '@/components/Providers/ThemeProvider';
 import { SessionProvider } from 'next-auth/react';
 import FeedbackPromptGate from '@/components/Feedback/FeedbackPromptGate';
 import DockNav from '@/components/DockNav';
+import AndroidViewportFix from '@/components/Providers/AndroidViewportFix';
 
 const lato = Lato({
   subsets: ['latin'],
@@ -95,6 +96,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
                     enableSystem={false}
                     themes={['dark', 'light']}
                   >
+                    <AndroidViewportFix />
                     <Header />
                     <LenisProvider>
                       <main className="pt-0 pb-3 sm:pt-4 sm:pb-10 lg:pt-8 lg:pb-16">

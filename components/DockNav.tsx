@@ -5,14 +5,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  FiBell,
   FiCalendar,
   FiCoffee,
   FiFileText,
   FiFolderMinus,
   FiHome,
-  FiMenu,
   FiMoreHorizontal,
-  FiPackage,
+  FiShoppingBag,
 } from 'react-icons/fi';
 
 type DockLink = {
@@ -26,12 +26,12 @@ const PRIMARY_LINKS: DockLink[] = [
   { href: '/', icon: FiHome, label: 'Inicio' },
   {
     href: '/dashboard/pedidos',
-    icon: FiPackage,
+    icon: FiShoppingBag,
     label: 'Pedidos',
     startsWith: '/dashboard/pedidos',
   },
   { href: '/reserve', icon: FiCalendar, label: 'Reservas', startsWith: '/reserve' },
-  { href: '/uses', icon: FiMenu, label: 'Menú', startsWith: '/uses' },
+  { href: '/uses', icon: FiBell, label: 'Menú', startsWith: '/uses' },
 ];
 
 const EXTRA_LINKS: DockLink[] = [
