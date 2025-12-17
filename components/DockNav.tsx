@@ -86,13 +86,23 @@ export default function DockNav() {
     };
   }, [pathname, scheduleCollapse]);
 
-  useEffect(() => {
-    return () => {
-      if (collapseTimer.current) {
-        clearTimeout(collapseTimer.current);
+  const handleAutoCollapse = useCallback(
+    (shouldCollapse: boolean) => {
+      if (shouldCollapse) {
+        if (collapseTimer.current) {
+          clearTimeout(collapseTimer.current);
+        }
+        setShowExtras(false);
+        if (!isCollapsed) {
+          setIsCollapsed(true);
+        }
+      } else if (isCollapsed) {
+        setIsCollapsed(false);
+        scheduleCollapse();
       }
-    };
-  }, []);
+    },
+    [isCollapsed, scheduleCollapse]
+  );
 
   const handleDockInteraction = useCallback(() => {
     setIsCollapsed(false);
@@ -103,6 +113,21 @@ export default function DockNav() {
     handleDockInteraction();
     setShowExtras(false);
   }, [handleDockInteraction]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const nearBottom =
+        window.innerHeight + window.scrollY >= document.documentElement.offsetHeight - 24;
+      const nearTop = window.scrollY <= 24;
+      if (nearBottom) {
+        handleAutoCollapse(true);
+      } else if (nearTop) {
+        handleAutoCollapse(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [handleAutoCollapse]);
 
   return (
     <div className="fixed inset-x-0 bottom-4 z-50 px-4 sm:hidden">
@@ -131,7 +156,7 @@ export default function DockNav() {
           <button
             type="button"
             aria-label="Ocultar barra"
-            onClick={() => setIsCollapsed(true)}
+            onClick={() => handleAutoCollapse(true)}
             className="mt-1 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-xl text-white transition hover:bg-white/25 dark:bg-gray-900/15 dark:text-gray-800 dark:hover:bg-gray-900/30"
           >
             <FiFolderMinus />
