@@ -8,6 +8,7 @@ import {
   FiCalendar,
   FiCoffee,
   FiFileText,
+  FiFolderMinus,
   FiHome,
   FiInfo,
   FiMenu,
@@ -70,7 +71,7 @@ export default function DockNav() {
     collapseTimer.current = setTimeout(() => {
       setShowExtras(false);
       setIsCollapsed(true);
-    }, 40_000);
+    }, 30_000);
   }, []);
 
   useEffect(() => {
@@ -114,6 +115,7 @@ export default function DockNav() {
               <Link
                 key={link.href}
                 href={link.href}
+                onClick={handleLinkClick}
                 className={classNames(
                   'flex h-12 w-12 items-center justify-center rounded-2xl text-xl transition',
                   active
@@ -126,6 +128,14 @@ export default function DockNav() {
               </Link>
             );
           })}
+          <button
+            type="button"
+            aria-label="Ocultar barra"
+            onClick={() => setIsCollapsed(true)}
+            className="mt-1 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-xl text-white transition hover:bg-white/25 dark:bg-gray-900/15 dark:text-gray-800 dark:hover:bg-gray-900/30"
+          >
+            <FiFolderMinus />
+          </button>
         </div>
       )}
       <div className="relative flex w-full items-end justify-center">

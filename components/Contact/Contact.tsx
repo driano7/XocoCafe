@@ -37,7 +37,7 @@ export default function Contact() {
             href="/blog/cafe"
             className="font-black text-primary-600 underline decoration-4 underline-offset-8 dark:text-primary-400"
           >
-            café
+            Café
           </Link>
         </p>
         <p className="text-3xl md:text-6xl xl:text-8xl text-end">
