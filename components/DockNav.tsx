@@ -132,7 +132,7 @@ export default function DockNav() {
   return (
     <div className="fixed inset-x-0 bottom-4 z-50 px-4 sm:hidden">
       {!isCollapsed && showExtras && (
-        <div className="absolute bottom-24 right-6 flex flex-col space-y-3 rounded-3xl border border-white/20 bg-black/70 p-4 text-white shadow-2xl backdrop-blur-3xl dark:border-black/10 dark:bg-white/80 dark:text-gray-900">
+        <div className="absolute bottom-24 right-6 flex flex-col space-y-3 rounded-3xl border border-white/20 bg-black/40 p-4 text-white shadow-2xl backdrop-blur-xl dark:border-black/10 dark:bg-white/60 dark:text-gray-900">
           {extraLinks.map((link) => {
             const Icon = link.icon;
             const active = isActiveRoute(pathname ?? '', link);
@@ -166,7 +166,7 @@ export default function DockNav() {
       <div className="relative flex w-full items-end justify-center">
         <nav
           className={classNames(
-            'flex w-full items-center justify-between rounded-full border border-white/30 bg-white/75 px-4 py-2.5 text-gray-900 shadow-2xl backdrop-blur-3xl transition-transform duration-300 ease-in-out dark:border-white/10 dark:bg-gray-900/80 dark:text-white',
+            'flex w-full items-center justify-between rounded-full border border-white/30 bg-white/60 px-4 py-2.5 text-gray-900 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-in-out dark:border-white/10 dark:bg-gray-900/70 dark:text-white',
             isCollapsed ? 'scale-0 opacity-0 pointer-events-none' : 'scale-100 opacity-100'
           )}
         >

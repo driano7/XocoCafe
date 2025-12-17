@@ -28,6 +28,7 @@
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { resilientInsert, syncPendingOperations } from '@/lib/resilientSupabase';
 
 interface AnalyticsPayload {
   eventType: string;
@@ -67,22 +68,7 @@ export async function POST(request: NextRequest) {
     const normalizedBounce = typeof payload.bounce === 'boolean' ? payload.bounce : false;
     const normalizedExitPage = typeof payload.exitPage === 'boolean' ? payload.exitPage : false;
 
-    // Verificar conexión a la base de datos
-    const connectivityAttempt = await safeSupabase(() =>
-      supabase.from('sessions').select('id').limit(1).maybeSingle()
-    );
-    if (connectivityAttempt.skip) {
-      return connectivityAttempt.skip;
-    }
-    const connectivityResult = connectivityAttempt.result!;
-    const { error: connectivityError } = connectivityResult;
-    const connectivitySkip = maybeSkipDueToDb(connectivityError);
-    if (connectivitySkip) {
-      return connectivitySkip;
-    }
-    if (connectivityError) {
-      throw new Error(connectivityError.message);
-    }
+    await syncPendingOperations();
 
     // Extraer IP del request
     const ipAddress =
@@ -126,6 +112,7 @@ export async function POST(request: NextRequest) {
         id: randomUUID(),
         token: payload.sessionId,
         userId: payload.userId || null,
+        createdAt: new Date().toISOString(),
         expiresAt,
         ipAddress,
         userAgent,
@@ -136,20 +123,10 @@ export async function POST(request: NextRequest) {
         city: 'unknown',
       });
 
-      const insertSessionAttempt = await safeSupabase(() =>
-        supabase
-          .from('sessions')
-          .insert(buildNewSession())
-          .select('id,createdAt,pageViews')
-          .maybeSingle()
-      );
-      if (insertSessionAttempt.skip) {
-        return insertSessionAttempt.skip;
-      }
-      const { data: newSession, error: insertSessionError } = insertSessionAttempt.result!;
-
-      if (insertSessionError) {
-        if (insertSessionError.code === '23505') {
+      const newSessionRecord = buildNewSession();
+      const insertSessionResult = await resilientInsert('sessions', newSessionRecord);
+      if (insertSessionResult.error) {
+        if (insertSessionResult.error.code === '23505') {
           const conflictResolutionAttempt = await safeSupabase(() =>
             supabase
               .from('sessions')
@@ -172,19 +149,19 @@ export async function POST(request: NextRequest) {
           }
 
           sessionId = conflictSession?.id ?? null;
-          sessionCreatedAt = conflictSession?.createdAt ?? new Date().toISOString();
+          sessionCreatedAt = conflictSession?.createdAt ?? newSessionRecord.createdAt;
           sessionPageViews = conflictSession?.pageViews ?? 0;
         } else {
-          const skip = maybeSkipDueToDb(insertSessionError);
+          const skip = maybeSkipDueToDb(insertSessionResult.error);
           if (skip) {
             return skip;
           }
-          throw new Error(insertSessionError.message);
+          throw new Error(insertSessionResult.error.message);
         }
       } else {
-        sessionId = newSession?.id ?? null;
-        sessionCreatedAt = newSession?.createdAt ?? new Date().toISOString();
-        sessionPageViews = newSession?.pageViews ?? 0;
+        sessionId = newSessionRecord.id ?? null;
+        sessionCreatedAt = newSessionRecord.createdAt ?? new Date().toISOString();
+        sessionPageViews = 0;
       }
     } else {
       sessionId = existingSession.id;
@@ -231,37 +208,30 @@ export async function POST(request: NextRequest) {
       throw new Error('No se pudo determinar la sesión para registrar la analítica');
     }
 
-    // Guardar analítica de página
-    const insertAnalyticsAttempt = await safeSupabase(() =>
-      supabase.from('page_analytics').insert({
-        id: randomUUID(),
-        userId: payload.userId || null,
-        sessionId,
-        pagePath: payload.pagePath,
-        pageTitle: payload.pageTitle,
-        pageCategory: payload.pageCategory,
-        timeOnPage: normalizedTimeOnPage,
-        scrollDepth: normalizedScrollDepth,
-        bounce: normalizedBounce,
-        exitPage: normalizedExitPage,
-        ipAddress,
-        userAgent,
-        referrerUrl: payload.referrerUrl,
-        conversionEvent: payload.conversionEvent,
-        conversionValue: payload.conversionValue ?? null,
-      })
-    );
-    if (insertAnalyticsAttempt.skip) {
-      return insertAnalyticsAttempt.skip;
-    }
-    const { error: analyticsError } = insertAnalyticsAttempt.result!;
-
-    if (analyticsError) {
-      const skip = maybeSkipDueToDb(analyticsError);
+    const pageAnalyticsRecord = {
+      id: randomUUID(),
+      userId: payload.userId || null,
+      sessionId,
+      pagePath: payload.pagePath,
+      pageTitle: payload.pageTitle,
+      pageCategory: payload.pageCategory,
+      timeOnPage: normalizedTimeOnPage,
+      scrollDepth: normalizedScrollDepth,
+      bounce: normalizedBounce,
+      exitPage: normalizedExitPage,
+      ipAddress,
+      userAgent,
+      referrerUrl: payload.referrerUrl,
+      conversionEvent: payload.conversionEvent,
+      conversionValue: payload.conversionValue ?? null,
+    };
+    const pageAnalyticsInsert = await resilientInsert('page_analytics', pageAnalyticsRecord);
+    if (pageAnalyticsInsert.error) {
+      const skip = maybeSkipDueToDb(pageAnalyticsInsert.error);
       if (skip) {
         return skip;
       }
-      throw new Error(analyticsError.message);
+      throw new Error(pageAnalyticsInsert.error.message);
     }
 
     // Si es un evento de conversión, guardarlo también en conversion_events
@@ -277,31 +247,25 @@ export async function POST(request: NextRequest) {
         utmContent: payload.utmContent,
       };
 
-      const insertConversionAttempt = await safeSupabase(() =>
-        supabase.from('conversion_events').insert({
-          id: randomUUID(),
-          userId: payload.userId || null,
-          sessionId,
-          eventType: conversionEvent,
-          eventCategory: getEventCategory(conversionEvent),
-          eventValue: payload.conversionValue ?? null,
-          eventData,
-          ipAddress,
-          userAgent,
-          pagePath: payload.pagePath,
-        })
-      );
-      if (insertConversionAttempt.skip) {
-        return insertConversionAttempt.skip;
-      }
-      const { error: conversionError } = insertConversionAttempt.result!;
-
-      if (conversionError) {
-        const skip = maybeSkipDueToDb(conversionError);
+      const conversionRecord = {
+        id: randomUUID(),
+        userId: payload.userId || null,
+        sessionId,
+        eventType: conversionEvent,
+        eventCategory: getEventCategory(conversionEvent),
+        eventValue: payload.conversionValue ?? null,
+        eventData,
+        ipAddress,
+        userAgent,
+        pagePath: payload.pagePath,
+      };
+      const conversionInsert = await resilientInsert('conversion_events', conversionRecord);
+      if (conversionInsert.error) {
+        const skip = maybeSkipDueToDb(conversionInsert.error);
         if (skip) {
           return skip;
         }
-        throw new Error(conversionError.message);
+        throw new Error(conversionInsert.error.message);
       }
     }
 

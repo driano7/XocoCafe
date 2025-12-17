@@ -97,7 +97,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
                   >
                     <Header />
                     <LenisProvider>
-                      <main className="pt-8 pb-14 sm:pt-16 sm:pb-24 lg:pt-20 lg:pb-28">
+                      <main className="pt-0 pb-6 sm:pt-6 sm:pb-16 lg:pt-10 lg:pb-20">
                         {children}
                       </main>
                     </LenisProvider>
