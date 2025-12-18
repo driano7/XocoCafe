@@ -169,6 +169,27 @@ input:-webkit-autofill:focus {
   @apply flex items-center justify-center py-4 text-sm text-gray-500;
 }
 
+.typewriter-caret {
+  animation: typewriter-blink 1s steps(2, start) infinite;
+}
+
+.typewriter-caret-complete {
+  animation: none;
+  opacity: 0;
+}
+
+@keyframes typewriter-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
 .menu-simple-prose table {
   width: 100%;
   border-collapse: collapse;

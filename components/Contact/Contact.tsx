@@ -25,30 +25,48 @@
  * --------------------------------------------------------------------
  */
 
-import Link from 'next/link';
+'use client';
+
+import TypewriterText from '@/components/TypewriterText';
 
 export default function Contact() {
   return (
     <section className="relative h-screen w-screen py-10 px-12 md:px-32 xl:px-36 dark:bg-black dark:text-white bg-white  text-black">
       <div className="flex flex-col justify-evenly h-5/6">
         <p className="text-3xl md:text-6xl xl:text-8xl">
-          ¿A poco no se te antoja <br /> un buen{' '}
-          <Link
-            href="/blog/cafe"
-            className="font-black text-primary-600 underline decoration-4 underline-offset-8 dark:text-primary-400"
-          >
-            Café
-          </Link>
+          <TypewriterText
+            className="inline-block"
+            segments={[
+              { text: '¿A poco no se te antoja ' },
+              { text: '\n', kind: 'lineBreak' },
+              { text: 'un buen ' },
+              {
+                text: 'Café',
+                kind: 'link',
+                href: '/blog/cafe',
+                className:
+                  'font-black text-primary-600 underline decoration-4 underline-offset-8 dark:text-primary-400',
+              },
+            ]}
+            startDelay={600}
+          />
         </p>
         <p className="text-3xl md:text-6xl xl:text-8xl text-end">
-          ó{' '}
-          <Link
-            href="/blog/chocolate"
-            className="font-black text-primary-600 underline decoration-4 underline-offset-8 dark:text-primary-400"
-          >
-            Chocolate
-          </Link>
-          ?
+          <TypewriterText
+            className="inline-block"
+            segments={[
+              { text: 'ó ' },
+              {
+                text: 'Chocolate',
+                kind: 'link',
+                href: '/blog/chocolate',
+                className:
+                  'font-black text-primary-600 underline decoration-4 underline-offset-8 dark:text-primary-400',
+              },
+              { text: '?' },
+            ]}
+            startDelay={1200}
+          />
         </p>
       </div>
     </section>

@@ -32,13 +32,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FaWhatsapp } from 'react-icons/fa';
 import siteMetadata from 'content/siteMetadata';
 import Snackbar from '@/components/Feedback/Snackbar';
-import { createBrowserSupabaseClient } from '@/lib/supabase-browser';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
 import { usePagination } from '@/hooks/use-pagination';
 import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
 import VirtualTicket from '@/components/Orders/VirtualTicket';
 import { useSnackbarNotifications, type SnackbarTone } from '@/hooks/useSnackbarNotifications';
+import { useOrders } from '@/hooks/useOrders';
 
 interface Order {
   id: string;
@@ -593,9 +593,6 @@ function formatCurrency(value?: number | null) {
 
 export default function OrdersDashboardPage() {
   const { user, token, isLoading: isAuthLoading } = useAuth();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showHistoricalModal, setShowHistoricalModal] = useState(false);
   const [loyaltyNotice, setLoyaltyNotice] = useState<{
@@ -612,245 +609,33 @@ export default function OrdersDashboardPage() {
   const canShareTicket = isShareSupported && (deviceInfo.isAndroid || deviceInfo.isIOS);
   const ticketRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
-  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const isAuthenticated = Boolean(user && token);
-  const [statusTick, setStatusTick] = useState(() => Date.now());
   const {
     snackbar,
     showSnackbar,
     dismissSnackbar,
     notificationPermission,
     requestNotificationPermission,
-    shouldDisplayPermissionPrompt,
   } = useSnackbarNotifications();
   const trackOrderStatuses = useOrderStatusTracker(showSnackbar);
-  const showMobileNotificationPrompt =
-    shouldDisplayPermissionPrompt && notificationPermission === 'default' && deviceInfo.isIOS;
+  const { orders, isLoading, error, refresh } = useOrders<Order>({
+    token,
+    enabled: Boolean(token) && !isAuthLoading,
+    pollingIntervalMs: 60_000,
+  });
+  const showMobileNotificationPrompt = deviceInfo.isIOS && notificationPermission === 'default';
 
   const handleRequestPushPermission = useCallback(() => {
     void requestNotificationPermission();
   }, [requestNotificationPermission]);
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => setStatusTick(Date.now()), 60_000);
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, []);
-
-  const loadOrders = useCallback(async () => {
-    if (!token) {
-      setOrders([]);
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/orders/history', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        cache: 'no-store',
-      });
-      const payload = await response.json();
-      if (!response.ok || !payload.success) {
-        throw new Error(payload.message || 'No pudimos cargar tus pedidos');
-      }
-      const incomingOrders = (payload.data ?? []) as Order[];
-      setOrders(incomingOrders);
-      trackOrderStatuses(incomingOrders);
-    } catch (error) {
-      console.error(error);
-      setError(error instanceof Error ? error.message : 'No pudimos cargar tus pedidos');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [token, trackOrderStatuses]);
-
-  useEffect(() => {
-    if (isAuthLoading) {
-      return;
-    }
-    void loadOrders();
-  }, [isAuthLoading, loadOrders]);
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      return;
-    }
-    void loadOrders();
-  }, [isAuthenticated, statusTick, loadOrders]);
+    trackOrderStatuses(orders);
+  }, [orders, trackOrderStatuses]);
 
   const handleRefreshOrders = useCallback(() => {
-    void loadOrders();
-  }, [loadOrders]);
-
-  // Subscribe to realtime updates
-  useEffect(() => {
-    if (!user) return undefined;
-
-    const channel = supabase
-      .channel(`orders-user-${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders', filter: `userId=eq.${user.id}` },
-        (payload) => {
-          setOrders((prev) => {
-            const next = [...prev];
-            const incomingId =
-              typeof (payload.new as { id?: unknown } | null)?.id === 'string'
-                ? ((payload.new as { id: string }).id as string)
-                : undefined;
-            const index = incomingId ? next.findIndex((order) => order.id === incomingId) : -1;
-
-            if (payload.eventType === 'DELETE') {
-              if (index >= 0) {
-                next.splice(index, 1);
-              }
-              return next;
-            }
-
-            const newOrder = payload.new as Partial<Order> | null;
-            if (!newOrder || typeof newOrder.id !== 'string') {
-              return next;
-            }
-            const existingRecord = index >= 0 ? next[index] : null;
-            const rawItems = newOrder.items;
-            const realtimeShipping =
-              (newOrder.shipping as Order['shipping']) ??
-              (rawItems && typeof rawItems === 'object' && !Array.isArray(rawItems)
-                ? (rawItems as { shipping?: Order['shipping'] }).shipping ?? null
-                : null);
-            const shippingAddressIdFromRow =
-              (newOrder as { shipping_address_id?: string | null }).shipping_address_id ??
-              (newOrder as { shippingAddressId?: string | null }).shippingAddressId ??
-              null ??
-              realtimeShipping?.addressId ??
-              null;
-            const previousShipping = existingRecord?.shipping ?? null;
-            const normalizedShippingSource = realtimeShipping ?? previousShipping ?? null;
-            const shippingWithId =
-              normalizedShippingSource || shippingAddressIdFromRow
-                ? {
-                    ...(normalizedShippingSource ?? {}),
-                    addressId:
-                      shippingAddressIdFromRow ?? normalizedShippingSource?.addressId ?? null,
-                  }
-                : null;
-            const mergedOrder: Order = {
-              id: newOrder.id,
-              status: (newOrder.status as Order['status']) ?? 'pending',
-              orderNumber:
-                typeof newOrder.orderNumber === 'string'
-                  ? newOrder.orderNumber
-                  : existingRecord?.orderNumber ?? null,
-              ticketId:
-                typeof newOrder.ticketId === 'string'
-                  ? newOrder.ticketId
-                  : existingRecord?.ticketId ?? null,
-              userEmail: newOrder.userEmail ?? existingRecord?.userEmail ?? null,
-              customerName: newOrder.customerName ?? existingRecord?.customerName ?? null,
-              posCustomerId: newOrder.posCustomerId ?? existingRecord?.posCustomerId ?? null,
-              total:
-                typeof newOrder.total === 'number' ? newOrder.total : existingRecord?.total ?? null,
-              tipAmount:
-                typeof newOrder.tipAmount === 'number'
-                  ? newOrder.tipAmount
-                  : existingRecord?.tipAmount ?? null,
-              tipPercent:
-                typeof newOrder.tipPercent === 'number'
-                  ? newOrder.tipPercent
-                  : existingRecord?.tipPercent ?? null,
-              deliveryTipAmount:
-                typeof (newOrder as { deliveryTipAmount?: number }).deliveryTipAmount === 'number'
-                  ? (newOrder as { deliveryTipAmount?: number }).deliveryTipAmount
-                  : existingRecord?.deliveryTipAmount ?? null,
-              deliveryTipPercent:
-                typeof (newOrder as { deliveryTipPercent?: number }).deliveryTipPercent === 'number'
-                  ? (newOrder as { deliveryTipPercent?: number }).deliveryTipPercent
-                  : existingRecord?.deliveryTipPercent ?? null,
-              createdAt:
-                typeof newOrder.createdAt === 'string'
-                  ? newOrder.createdAt
-                  : existingRecord?.createdAt ?? null,
-              updatedAt:
-                typeof newOrder.updatedAt === 'string'
-                  ? newOrder.updatedAt
-                  : existingRecord?.updatedAt ?? null,
-              type: newOrder.type ?? existingRecord?.type ?? null,
-              items: newOrder.items ?? existingRecord?.items ?? null,
-              shipping: shippingWithId,
-              qrPayload:
-                (newOrder as { qrPayload?: unknown }).qrPayload ??
-                existingRecord?.qrPayload ??
-                null,
-              prepStatus:
-                typeof newOrder.prepStatus === 'string'
-                  ? (newOrder.prepStatus as Order['prepStatus'])
-                  : existingRecord?.prepStatus ?? null,
-              prepHandlerName: newOrder.prepHandlerName ?? existingRecord?.prepHandlerName ?? null,
-            };
-
-            const previousStatus = resolveOrderStatus(existingRecord);
-            const nextStatus = resolveOrderStatus(mergedOrder);
-            const displayCode = getOrderDisplayCode({
-              ...(existingRecord ?? { id: mergedOrder.id }),
-              ...mergedOrder,
-            } as Order);
-
-            let notice: NoticePayload | null = null;
-            if (payload.eventType === 'INSERT') {
-              notice = {
-                tone: 'success',
-                message: `Pedido ${displayCode} registrado correctamente.`,
-                title: 'Nuevo pedido creado',
-                body: `Ticket ${displayCode} está en cola.`,
-              };
-            } else if (payload.eventType === 'UPDATE' && previousStatus !== nextStatus) {
-              if (nextStatus === 'in_progress') {
-                notice = {
-                  tone: 'info',
-                  message: `Tu pedido ${displayCode} está en preparación.`,
-                  title: 'Pedido en preparación',
-                  body: 'Tu orden ya está siendo atendida.',
-                };
-              } else if (nextStatus === 'completed') {
-                notice = {
-                  tone: 'success',
-                  message: `Pedido ${displayCode} completado. Puedes recogerlo.`,
-                  title: 'Pedido completado',
-                  body: 'Tu orden está lista para entrega.',
-                };
-              }
-            }
-
-            if (index >= 0) {
-              next[index] = { ...next[index], ...mergedOrder };
-            } else {
-              next.unshift(mergedOrder);
-            }
-
-            if (notice) {
-              queueMicrotask(() => {
-                showSnackbar(notice!.message, notice!.tone, {
-                  deviceNotification: {
-                    title: notice!.title,
-                    body: notice!.body,
-                  },
-                });
-              });
-            }
-            return next;
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [showSnackbar, supabase, user]);
+    void refresh();
+  }, [refresh]);
 
   const isExpiredPending = useCallback((order: Order) => {
     if (order.status !== 'pending' || !order.createdAt) {
@@ -1392,7 +1177,7 @@ export default function OrdersDashboardPage() {
         </div>
       </header>
       {showMobileNotificationPrompt && (
-        <div className="mb-6 rounded-3xl border border-primary-200 bg-white/70 p-4 text-sm text-gray-800 shadow dark:border-primary-500/30 dark:bg-primary-900/20 dark:text-primary-50 sm:hidden">
+        <div className="mb-6 rounded-3xl border border-primary-200 bg-white/70 p-4 text-sm text-gray-800 shadow dark:border-primary-500/30 dark:bg-primary-900/20 dark:text-primary-50">
           <p className="mb-3 font-semibold">
             Activa las notificaciones push para enterarte cuando cambiemos el estado de tus pedidos.
           </p>

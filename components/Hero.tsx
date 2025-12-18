@@ -31,6 +31,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { ReactElement, useContext, useEffect, useRef } from 'react';
 import { HiOutlineArrowNarrowDown } from 'react-icons/hi';
+import TypewriterText from './TypewriterText';
 import { ScrollContext } from './Providers/ScrollProvider';
 import { renderCanvas } from './renderCanvas';
 
@@ -60,7 +61,10 @@ export default function Hero(): ReactElement {
                 Xoco Café
               </h1>
               <h2 className="text-3xl font-medium opacity-80 sm:text-6xl md:text-6xl xl:text-7xl">
-                Sabor ancestral, placer eterno.
+                <TypewriterText
+                  segments={[{ text: 'Sabor ancestral, placer eterno.' }]}
+                  startDelay={400}
+                />
               </h2>
               <Link
                 href="/about"
