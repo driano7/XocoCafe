@@ -58,6 +58,7 @@ export function useSnackbarNotifications(autoHideMs = 3000) {
   const [permission, setPermission] = useState<NotificationPermission>(() =>
     getInitialPermission()
   );
+  const [manualPromptRequired, setManualPromptRequired] = useState(false);
 
   useEffect(() => {
     if (!snackbar) {
@@ -73,6 +74,9 @@ export function useSnackbarNotifications(autoHideMs = 3000) {
     }
     const result = await Notification.requestPermission();
     setPermission(result);
+    if (result !== 'default') {
+      setManualPromptRequired(false);
+    }
     return result;
   }, []);
 
@@ -81,12 +85,22 @@ export function useSnackbarNotifications(autoHideMs = 3000) {
       return;
     }
     if (permission !== 'default') {
+      setManualPromptRequired(false);
       return;
     }
     const ua = navigator.userAgent?.toLowerCase() ?? '';
     const isTouch = navigator.maxTouchPoints > 1;
     const isMobile = /android|iphone|ipad|ipod/.test(ua) || isTouch;
+    const isIOS =
+      /iphone|ipod|ipad/.test(ua) ||
+      (/macintosh/i.test(navigator.userAgent || '') &&
+        typeof navigator.maxTouchPoints === 'number' &&
+        navigator.maxTouchPoints > 1);
     if (!isMobile) {
+      return;
+    }
+    if (isIOS) {
+      setManualPromptRequired(true);
       return;
     }
     void requestPermission();
@@ -129,5 +143,6 @@ export function useSnackbarNotifications(autoHideMs = 3000) {
     dismissSnackbar,
     notificationPermission: permission,
     requestNotificationPermission: requestPermission,
+    shouldDisplayPermissionPrompt: manualPromptRequired && permission === 'default',
   };
 }

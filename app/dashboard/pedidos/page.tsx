@@ -615,8 +615,21 @@ export default function OrdersDashboardPage() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const isAuthenticated = Boolean(user && token);
   const [statusTick, setStatusTick] = useState(() => Date.now());
-  const { snackbar, showSnackbar, dismissSnackbar } = useSnackbarNotifications();
+  const {
+    snackbar,
+    showSnackbar,
+    dismissSnackbar,
+    notificationPermission,
+    requestNotificationPermission,
+    shouldDisplayPermissionPrompt,
+  } = useSnackbarNotifications();
   const trackOrderStatuses = useOrderStatusTracker(showSnackbar);
+  const showMobileNotificationPrompt =
+    shouldDisplayPermissionPrompt && notificationPermission === 'default' && deviceInfo.isIOS;
+
+  const handleRequestPushPermission = useCallback(() => {
+    void requestNotificationPermission();
+  }, [requestNotificationPermission]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setStatusTick(Date.now()), 60_000);
@@ -1020,7 +1033,7 @@ export default function OrdersDashboardPage() {
     setDeviceInfo({
       isMobile: isAndroid || isIPad || isIPhone,
       isAndroid,
-      isIOS: isIPhone,
+      isIOS: isIPhone || isIPad,
       isIPadOS: isIPad,
     });
     const supportsShare = typeof navigator.share === 'function';
@@ -1378,6 +1391,23 @@ export default function OrdersDashboardPage() {
           )}
         </div>
       </header>
+      {showMobileNotificationPrompt && (
+        <div className="mb-6 rounded-3xl border border-primary-200 bg-white/70 p-4 text-sm text-gray-800 shadow dark:border-primary-500/30 dark:bg-primary-900/20 dark:text-primary-50 sm:hidden">
+          <p className="mb-3 font-semibold">
+            Activa las notificaciones push para enterarte cuando cambiemos el estado de tus pedidos.
+          </p>
+          <button
+            type="button"
+            onClick={handleRequestPushPermission}
+            className="w-full rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          >
+            Permitir notificaciones
+          </button>
+          <p className="mt-2 text-xs text-gray-500 dark:text-primary-100/70">
+            iOS requiere que aceptes manualmente para poder enviarte avisos.
+          </p>
+        </div>
+      )}
       {isAuthenticated && loyaltyNotice && (
         <div
           className={`mb-4 rounded-full px-4 py-2 text-sm font-semibold ${
