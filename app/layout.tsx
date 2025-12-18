@@ -57,6 +57,13 @@ export const metadata = {
   metadataBase: new URL('http://localhost:8000'),
 };
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: 'cover',
+};
+
 interface RootLayoutProps {
   children: React.ReactNode;
 }
@@ -75,7 +82,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <link rel="preload" as="image" href="/static/images/Xoco.jpeg" />
       </head>
       <body
-        className={`${lato.className} ${lato.variable} bg-white text-black antialiased dark:bg-black dark:text-white`}
+        className={`${lato.className} ${lato.variable} bg-white text-black antialiased dark:bg-black dark:text-white overflow-x-hidden`}
       >
         <SessionProvider>
           <LanguageProvider fallbackLanguage="es">
