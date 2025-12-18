@@ -48,7 +48,7 @@ export default function Snackbar({ snackbar, onDismiss }: SnackbarProps) {
   }
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-5 z-[100] flex justify-center px-4 backdrop-blur-lg">
+    <div className="pointer-events-none fixed inset-x-0 top-[112px] z-[100] flex justify-center px-4 backdrop-blur-lg sm:top-auto sm:bottom-5">
       <div
         className={classNames(
           'pointer-events-auto flex max-w-md items-center gap-3 rounded-full px-4 py-3 text-sm font-semibold shadow-2xl ring-1 ring-black/10 dark:ring-white/10',

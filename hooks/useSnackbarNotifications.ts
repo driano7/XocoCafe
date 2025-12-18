@@ -76,6 +76,22 @@ export function useSnackbarNotifications(autoHideMs = 3000) {
     return result;
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+      return;
+    }
+    if (permission !== 'default') {
+      return;
+    }
+    const ua = navigator.userAgent?.toLowerCase() ?? '';
+    const isTouch = navigator.maxTouchPoints > 1;
+    const isMobile = /android|iphone|ipad|ipod/.test(ua) || isTouch;
+    if (!isMobile) {
+      return;
+    }
+    void requestPermission();
+  }, [permission, requestPermission]);
+
   const emitDeviceNotification = useMemo(() => {
     if (typeof window === 'undefined' || typeof Notification === 'undefined') {
       return async () => {};

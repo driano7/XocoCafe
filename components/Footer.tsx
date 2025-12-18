@@ -43,7 +43,7 @@ export default function Footer() {
   return (
     <SectionContainer>
       <footer>
-        <div className="mb-0 flex flex-col justify-start space-y-1.5 space-x-0 py-10 text-gray-500 dark:text-gray-400">
+        <div className="mb-0 flex flex-col justify-start space-y-1.5 space-x-0 pt-10 pb-32 text-gray-500 dark:text-gray-400 sm:pb-16">
           <Suspense fallback="loading...">
             <NowPlaying />
           </Suspense>

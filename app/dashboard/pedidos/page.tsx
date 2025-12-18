@@ -119,6 +119,96 @@ type ItemWithQuantity = {
   quantity?: unknown;
 };
 
+type NoticePayload = {
+  message: string;
+  tone: SnackbarTone;
+  title: string;
+  body?: string;
+};
+
+const useOrderStatusTracker = (
+  showSnackbar: (
+    message: string,
+    tone?: SnackbarTone,
+    options?: { deviceNotification?: { title: string; body?: string } | null }
+  ) => void
+) => {
+  const hasSnapshotRef = useRef(false);
+  const statusMapRef = useRef(new Map<string, Order['status']>());
+
+  return useCallback(
+    (orders: Order[]) => {
+      const notices: NoticePayload[] = [];
+      const seenIds = new Set<string>();
+
+      orders.forEach((order) => {
+        const orderId = order.id;
+        const nextStatus = resolveOrderStatus(order);
+        const prevStatus = statusMapRef.current.get(orderId);
+        const displayCode = getOrderDisplayCode(order);
+        seenIds.add(orderId);
+
+        if (!hasSnapshotRef.current) {
+          statusMapRef.current.set(orderId, nextStatus);
+          return;
+        }
+
+        if (prevStatus === undefined) {
+          notices.push({
+            tone: 'success',
+            message: `Pedido ${displayCode} registrado correctamente.`,
+            title: 'Nuevo pedido creado',
+            body: `Ticket ${displayCode} está en cola.`,
+          });
+        } else if (prevStatus !== nextStatus) {
+          if (nextStatus === 'in_progress') {
+            notices.push({
+              tone: 'info',
+              message: `Tu pedido ${displayCode} está en preparación.`,
+              title: 'Pedido en preparación',
+              body: 'Tu orden ya está siendo atendida.',
+            });
+          } else if (nextStatus === 'completed') {
+            notices.push({
+              tone: 'success',
+              message: `Pedido ${displayCode} completado. Puedes recogerlo.`,
+              title: 'Pedido completado',
+              body: 'Tu orden está lista para entrega.',
+            });
+          }
+        }
+
+        statusMapRef.current.set(orderId, nextStatus);
+      });
+
+      statusMapRef.current.forEach((_, id) => {
+        if (!seenIds.has(id)) {
+          statusMapRef.current.delete(id);
+        }
+      });
+
+      if (!hasSnapshotRef.current) {
+        hasSnapshotRef.current = true;
+        return;
+      }
+
+      if (notices.length > 0) {
+        notices.forEach((notice, index) => {
+          window.setTimeout(() => {
+            showSnackbar(notice.message, notice.tone, {
+              deviceNotification: {
+                title: notice.title,
+                body: notice.body,
+              },
+            });
+          }, index * 150);
+        });
+      }
+    },
+    [showSnackbar]
+  );
+};
+
 const extractOrderItems = (items: unknown) => {
   if (!items) return [];
   const normalizeItem = (item: unknown) => {
@@ -526,6 +616,7 @@ export default function OrdersDashboardPage() {
   const isAuthenticated = Boolean(user && token);
   const [statusTick, setStatusTick] = useState(() => Date.now());
   const { snackbar, showSnackbar, dismissSnackbar } = useSnackbarNotifications();
+  const trackOrderStatuses = useOrderStatusTracker(showSnackbar);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setStatusTick(Date.now()), 60_000);
@@ -553,14 +644,16 @@ export default function OrdersDashboardPage() {
       if (!response.ok || !payload.success) {
         throw new Error(payload.message || 'No pudimos cargar tus pedidos');
       }
-      setOrders(payload.data ?? []);
+      const incomingOrders = (payload.data ?? []) as Order[];
+      setOrders(incomingOrders);
+      trackOrderStatuses(incomingOrders);
     } catch (error) {
       console.error(error);
       setError(error instanceof Error ? error.message : 'No pudimos cargar tus pedidos');
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [token, trackOrderStatuses]);
 
   useEffect(() => {
     if (isAuthLoading) {
@@ -590,13 +683,6 @@ export default function OrdersDashboardPage() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders', filter: `userId=eq.${user.id}` },
         (payload) => {
-          type NoticePayload = {
-            message: string;
-            tone: SnackbarTone;
-            title: string;
-            body?: string;
-          };
-          let notice: NoticePayload | null = null;
           setOrders((prev) => {
             const next = [...prev];
             const incomingId =
@@ -700,6 +786,7 @@ export default function OrdersDashboardPage() {
               ...mergedOrder,
             } as Order);
 
+            let notice: NoticePayload | null = null;
             if (payload.eventType === 'INSERT') {
               notice = {
                 tone: 'success',
@@ -730,19 +817,19 @@ export default function OrdersDashboardPage() {
             } else {
               next.unshift(mergedOrder);
             }
+
+            if (notice) {
+              queueMicrotask(() => {
+                showSnackbar(notice!.message, notice!.tone, {
+                  deviceNotification: {
+                    title: notice!.title,
+                    body: notice!.body,
+                  },
+                });
+              });
+            }
             return next;
           });
-
-          const noticePayload = notice;
-          if (noticePayload) {
-            const { message, tone, title, body } = noticePayload;
-            showSnackbar(message, tone, {
-              deviceNotification: {
-                title,
-                body,
-              },
-            });
-          }
         }
       )
       .subscribe();

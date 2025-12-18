@@ -119,6 +119,13 @@ export default function DockNav() {
   }, [handleDockInteraction]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+    const prefersCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+    if (prefersCoarsePointer) {
+      return undefined;
+    }
     const handleScroll = () => {
       const nearBottom =
         window.innerHeight + window.scrollY >= document.documentElement.offsetHeight - 24;
