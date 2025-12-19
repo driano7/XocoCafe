@@ -624,6 +624,7 @@ export default function OrdersDashboardPage() {
     notificationPermission,
     requestNotificationPermission,
     shouldDisplayPermissionPrompt,
+    notificationSupported,
   } = useSnackbarNotifications();
   const trackOrderStatuses = useOrderStatusTracker(showSnackbar);
   const { orders, isLoading, error, refresh } = useOrders<Order>({
@@ -639,9 +640,17 @@ export default function OrdersDashboardPage() {
   } = useTicketDetails(ticketIdentifier);
   const { stats: loyaltyStats, isLoading: isLoyaltyLoading } = useLoyalty();
   const showMobileNotificationPrompt =
-    shouldDisplayPermissionPrompt || (deviceInfo.isIOS && notificationPermission === 'default');
+    notificationSupported &&
+    (shouldDisplayPermissionPrompt || (deviceInfo.isIOS && notificationPermission === 'default'));
 
   const handleRequestPushPermission = useCallback(async () => {
+    if (!notificationSupported) {
+      showSnackbar(
+        'Este navegador no permite notificaciones push. Revisa los ajustes del sistema o instala la app para activarlas.',
+        'warning'
+      );
+      return;
+    }
     const result = await requestNotificationPermission();
     if (result === 'granted') {
       showSnackbar('Activamos las notificaciones para este dispositivo.', 'success');
@@ -653,7 +662,7 @@ export default function OrdersDashboardPage() {
     } else {
       showSnackbar('No pudimos abrir el aviso de permisos. Intenta de nuevo.', 'error');
     }
-  }, [requestNotificationPermission, showSnackbar]);
+  }, [notificationSupported, requestNotificationPermission, showSnackbar]);
 
   useEffect(() => {
     trackOrderStatuses(orders);

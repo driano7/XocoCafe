@@ -46,8 +46,15 @@ interface SnackbarOptions {
   deviceNotification?: DeviceNotificationOptions | null;
 }
 
+const PERMISSION_STORAGE_KEY = 'xoco_push_permission';
+
+const hasNotificationSupport = () =>
+  typeof window !== 'undefined' &&
+  typeof Notification !== 'undefined' &&
+  typeof Notification.requestPermission === 'function';
+
 const getInitialPermission = (): NotificationPermission => {
-  if (typeof window === 'undefined' || typeof Notification === 'undefined') {
+  if (!hasNotificationSupport()) {
     return 'default';
   }
   return Notification.permission;
@@ -59,6 +66,16 @@ export function useSnackbarNotifications(autoHideMs = 3000) {
     getInitialPermission()
   );
   const [manualPromptRequired, setManualPromptRequired] = useState(false);
+  const [storedPermission, setStoredPermission] = useState<NotificationPermission | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const cached = window.localStorage.getItem(PERMISSION_STORAGE_KEY);
+    if (cached === 'granted' || cached === 'denied') {
+      return cached;
+    }
+    return null;
+  });
+  const notificationSupported = hasNotificationSupport();
+  const effectivePermission = storedPermission ?? permission;
 
   useEffect(() => {
     if (!snackbar) {
@@ -69,22 +86,31 @@ export function useSnackbarNotifications(autoHideMs = 3000) {
   }, [autoHideMs, snackbar]);
 
   const requestPermission = useCallback(async () => {
-    if (typeof window === 'undefined' || typeof Notification === 'undefined') {
-      return 'denied';
+    if (!notificationSupported) {
+      setManualPromptRequired(false);
+      setStoredPermission('denied');
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(PERMISSION_STORAGE_KEY, 'denied');
+      }
+      return 'denied' as NotificationPermission;
     }
     const result = await Notification.requestPermission();
     setPermission(result);
     if (result !== 'default') {
       setManualPromptRequired(false);
+      setStoredPermission(result);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(PERMISSION_STORAGE_KEY, result);
+      }
     }
     return result;
-  }, []);
+  }, [notificationSupported]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof navigator === 'undefined') {
       return;
     }
-    if (permission !== 'default') {
+    if (effectivePermission !== 'default') {
       setManualPromptRequired(false);
       return;
     }
@@ -104,26 +130,26 @@ export function useSnackbarNotifications(autoHideMs = 3000) {
       return;
     }
     void requestPermission();
-  }, [permission, requestPermission]);
+  }, [effectivePermission, requestPermission]);
 
   const emitDeviceNotification = useMemo(() => {
-    if (typeof window === 'undefined' || typeof Notification === 'undefined') {
+    if (!notificationSupported) {
       return async () => {};
     }
     return async ({ title, body }: DeviceNotificationOptions) => {
       if (!title) return;
-      if (permission === 'granted') {
+      if (effectivePermission === 'granted') {
         new Notification(title, { body });
         return;
       }
-      if (permission === 'default') {
+      if (effectivePermission === 'default') {
         const result = await requestPermission();
         if (result === 'granted') {
           new Notification(title, { body });
         }
       }
     };
-  }, [permission, requestPermission]);
+  }, [effectivePermission, notificationSupported, requestPermission]);
 
   const showSnackbar = useCallback(
     (message: string, tone: SnackbarTone = 'info', options?: SnackbarOptions) => {
@@ -141,8 +167,10 @@ export function useSnackbarNotifications(autoHideMs = 3000) {
     snackbar,
     showSnackbar,
     dismissSnackbar,
-    notificationPermission: permission,
+    notificationPermission: effectivePermission,
     requestNotificationPermission: requestPermission,
-    shouldDisplayPermissionPrompt: manualPromptRequired && permission === 'default',
+    shouldDisplayPermissionPrompt:
+      notificationSupported && manualPromptRequired && effectivePermission === 'default',
+    notificationSupported,
   };
 }
