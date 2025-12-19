@@ -25,8 +25,8 @@
  * --------------------------------------------------------------------
  */
 
-import '@/css/prism.css';
-import '@/css/tailwind.css';
+import '../css/prism.css';
+import '../css/tailwind.css';
 
 import { Suspense } from 'react';
 import { Lato } from 'next/font/google';

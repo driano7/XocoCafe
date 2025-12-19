@@ -34,11 +34,17 @@ import siteMetadata from 'content/siteMetadata';
 import Snackbar from '@/components/Feedback/Snackbar';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
+import FavoriteItemsList from '@/components/FavoriteItemsList';
+import LoyaltyProgressCard from '@/components/LoyaltyProgressCard';
+import { TicketAssignmentNotice } from '@/components/Orders/TicketAssignmentNotice';
 import { usePagination } from '@/hooks/use-pagination';
 import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
 import VirtualTicket from '@/components/Orders/VirtualTicket';
 import { useSnackbarNotifications, type SnackbarTone } from '@/hooks/useSnackbarNotifications';
 import { useOrders } from '@/hooks/useOrders';
+import { useLoyalty } from '@/hooks/useLoyalty';
+import { useTicketDetails } from '@/hooks/useTicketDetails';
+import { resolveFavoriteLabel } from '@/lib/menuFavorites';
 
 interface Order {
   id: string;
@@ -623,6 +629,13 @@ export default function OrdersDashboardPage() {
     enabled: Boolean(token) && !isAuthLoading,
     pollingIntervalMs: 60_000,
   });
+  const [ticketIdentifier, setTicketIdentifier] = useState<string | null>(null);
+  const {
+    data: ticketDetails,
+    isLoading: isTicketLoading,
+    error: ticketDetailsError,
+  } = useTicketDetails(ticketIdentifier);
+  const { stats: loyaltyStats, isLoading: isLoyaltyLoading } = useLoyalty();
   const showMobileNotificationPrompt = deviceInfo.isIOS && notificationPermission === 'default';
 
   const handleRequestPushPermission = useCallback(() => {
@@ -632,6 +645,15 @@ export default function OrdersDashboardPage() {
   useEffect(() => {
     trackOrderStatuses(orders);
   }, [orders, trackOrderStatuses]);
+
+  useEffect(() => {
+    if (!selectedOrder) {
+      setTicketIdentifier(null);
+      return;
+    }
+    const identifier = selectedOrder.ticketId ?? selectedOrder.orderNumber ?? selectedOrder.id;
+    setTicketIdentifier((prev) => (prev === identifier ? prev : identifier));
+  }, [selectedOrder]);
 
   const handleRefreshOrders = useCallback(() => {
     void refresh();
@@ -747,6 +769,48 @@ export default function OrdersDashboardPage() {
     enrolled: user?.loyaltyEnrolled ?? false,
     token,
   });
+  const activeClientId = useMemo(() => {
+    const fromOrder = selectedOrder?.posCustomerId?.trim();
+    const fromTicket = ticketDetails?.customer?.clientId?.trim();
+    return fromOrder || fromTicket || null;
+  }, [selectedOrder?.posCustomerId, ticketDetails?.customer?.clientId]);
+  const activeLoyaltyCustomer = useMemo(() => {
+    if (!loyaltyStats) {
+      return null;
+    }
+    const normalizedClientId = activeClientId?.toLowerCase();
+    const ticketUserId = ticketDetails?.customer?.id ?? null;
+    return (
+      loyaltyStats.customers.find((customer) => {
+        if (normalizedClientId && customer.clientId?.toLowerCase() === normalizedClientId) {
+          return true;
+        }
+        if (ticketUserId && customer.userId === ticketUserId) {
+          return true;
+        }
+        return false;
+      }) ?? null
+    );
+  }, [activeClientId, loyaltyStats, ticketDetails?.customer?.id]);
+  const favoriteBeverageLabel =
+    resolveFavoriteLabel(activeLoyaltyCustomer?.favoriteBeverage ?? null) ??
+    activeLoyaltyCustomer?.favoriteBeverage ??
+    null;
+  const favoriteFoodLabel =
+    resolveFavoriteLabel(activeLoyaltyCustomer?.favoriteFood ?? null) ??
+    activeLoyaltyCustomer?.favoriteFood ??
+    null;
+  const shouldShowFavoritesPanel = Boolean(
+    selectedOrder && (activeClientId || activeLoyaltyCustomer || isLoyaltyLoading)
+  );
+  const shouldShowLoyaltyPanel = Boolean(
+    selectedOrder && (activeLoyaltyCustomer || isLoyaltyLoading)
+  );
+  const loyaltyCardName =
+    ticketDetails?.customer?.name ?? (selectedOrder ? formatOrderCustomer(selectedOrder) : null);
+  const loyaltyOrders = activeLoyaltyCustomer?.orders ?? null;
+  const loyaltyInteractions = activeLoyaltyCustomer?.totalInteractions ?? null;
+  const loyaltyCoffees = activeLoyaltyCustomer?.loyaltyCoffees ?? null;
 
   const handleLoyaltyActivation = useCallback(async () => {
     const result = await activateLoyaltyProgram();
@@ -1396,6 +1460,32 @@ export default function OrdersDashboardPage() {
                       : ''}
                   </p>
                 ) : null}
+              </div>
+              <div className="mt-5 space-y-4">
+                <TicketAssignmentNotice
+                  ticket={ticketDetails?.ticket}
+                  order={ticketDetails?.order}
+                  isLoading={isTicketLoading && Boolean(ticketIdentifier)}
+                />
+                {ticketDetailsError && (
+                  <p className="text-xs text-red-600 dark:text-red-400">{ticketDetailsError}</p>
+                )}
+                {shouldShowFavoritesPanel && (
+                  <FavoriteItemsList
+                    beverage={favoriteBeverageLabel}
+                    food={favoriteFoodLabel}
+                    isLoading={isLoyaltyLoading}
+                  />
+                )}
+                {shouldShowLoyaltyPanel && (
+                  <LoyaltyProgressCard
+                    coffees={loyaltyCoffees ?? undefined}
+                    orders={loyaltyOrders ?? undefined}
+                    totalInteractions={loyaltyInteractions ?? undefined}
+                    customerName={loyaltyCardName ?? undefined}
+                    isLoading={isLoyaltyLoading}
+                  />
+                )}
               </div>
 
               {expiredSelectedOrder ? (
