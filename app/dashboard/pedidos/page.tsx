@@ -614,6 +614,7 @@ export default function OrdersDashboardPage() {
   });
   const [isShareSupported, setIsShareSupported] = useState(false);
   const canShareTicket = isShareSupported && (deviceInfo.isAndroid || deviceInfo.isIOS);
+  const shouldShowShareButton = deviceInfo.isMobile;
   const ticketRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const isAuthenticated = Boolean(user && token);
@@ -626,6 +627,7 @@ export default function OrdersDashboardPage() {
     shouldDisplayPermissionPrompt,
     notificationSupported,
   } = useSnackbarNotifications();
+  const [pushPermissionInfo, setPushPermissionInfo] = useState<string | null>(null);
   const trackOrderStatuses = useOrderStatusTracker(showSnackbar);
   const { orders, isLoading, error, refresh } = useOrders<Order>({
     token,
@@ -645,22 +647,26 @@ export default function OrdersDashboardPage() {
 
   const handleRequestPushPermission = useCallback(async () => {
     if (!notificationSupported) {
-      showSnackbar(
-        'Este navegador no permite notificaciones push. Revisa los ajustes del sistema o instala la app para activarlas.',
-        'warning'
-      );
+      const message =
+        'Este navegador no permite notificaciones push. Revisa los ajustes del sistema o instala la app para activarlas.';
+      showSnackbar(message, 'warning');
+      setPushPermissionInfo(message);
       return;
     }
     const result = await requestNotificationPermission();
     if (result === 'granted') {
-      showSnackbar('Activamos las notificaciones para este dispositivo.', 'success');
+      const message = 'Activamos las notificaciones para este dispositivo.';
+      showSnackbar(message, 'success');
+      setPushPermissionInfo(message);
     } else if (result === 'denied') {
-      showSnackbar(
-        'Tu navegador bloqueó las notificaciones. Revisa los ajustes de sitio o habilítalas manualmente.',
-        'warning'
-      );
+      const message =
+        'Tu navegador bloqueó las notificaciones. Revisa los ajustes de sitio o habilítalas manualmente.';
+      showSnackbar(message, 'warning');
+      setPushPermissionInfo(message);
     } else {
-      showSnackbar('No pudimos abrir el aviso de permisos. Intenta de nuevo.', 'error');
+      const message = 'No pudimos abrir el aviso de permisos. Intenta de nuevo.';
+      showSnackbar(message, 'error');
+      setPushPermissionInfo(message);
     }
   }, [notificationSupported, requestNotificationPermission, showSnackbar]);
 
@@ -1136,13 +1142,16 @@ export default function OrdersDashboardPage() {
   ]);
 
   const handleShareTicket = useCallback(async () => {
+    if (!selectedOrder) {
+      return;
+    }
     if (
-      !selectedOrder ||
       typeof navigator === 'undefined' ||
       typeof navigator.share !== 'function' ||
       !(deviceInfo.isAndroid || deviceInfo.isIOS) ||
       !isShareSupported
     ) {
+      setTicketActionError('Tu navegador no permite compartir directamente este archivo.');
       return;
     }
     setTicketActionError(null);
@@ -1298,6 +1307,11 @@ export default function OrdersDashboardPage() {
           <p className="mt-2 text-xs text-gray-500 dark:text-primary-100/70">
             iOS requiere que aceptes manualmente para poder enviarte avisos.
           </p>
+          {pushPermissionInfo && (
+            <p className="mt-1 text-xs font-semibold text-primary-600 dark:text-primary-200">
+              {pushPermissionInfo}
+            </p>
+          )}
         </div>
       )}
       {isAuthenticated && loyaltyNotice && (
@@ -1603,15 +1617,21 @@ export default function OrdersDashboardPage() {
                   >
                     {isProcessingTicket ? 'Generando ticket…' : 'Descargar Ticket'}
                   </button>
-                  {canShareTicket && (
+                  {shouldShowShareButton && (
                     <button
                       type="button"
                       onClick={() => void handleShareTicket()}
-                      disabled={isProcessingTicket}
+                      disabled={isProcessingTicket || !canShareTicket}
                       className="w-full rounded-full border border-primary-200 px-4 py-3 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-primary-500/60 dark:text-primary-200 dark:hover:bg-primary-500/10"
                     >
-                      Compartir ticket
+                      {canShareTicket ? 'Compartir ticket' : 'Compartir no disponible'}
                     </button>
+                  )}
+                  {shouldShowShareButton && !canShareTicket && (
+                    <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+                      Tu navegador no soporta compartir archivos. Usa la descarga para guardar tu
+                      ticket.
+                    </p>
                   )}
                   {ticketActionError && (
                     <p className="text-center text-xs text-red-600 dark:text-red-400">
