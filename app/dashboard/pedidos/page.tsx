@@ -45,6 +45,7 @@ import { useOrders } from '@/hooks/useOrders';
 import { useLoyalty } from '@/hooks/useLoyalty';
 import { useTicketDetails } from '@/hooks/useTicketDetails';
 import { resolveFavoriteLabel } from '@/lib/menuFavorites';
+import { useClientFavorites } from '@/hooks/useClientFavorites';
 
 interface Order {
   id: string;
@@ -622,6 +623,7 @@ export default function OrdersDashboardPage() {
     dismissSnackbar,
     notificationPermission,
     requestNotificationPermission,
+    shouldDisplayPermissionPrompt,
   } = useSnackbarNotifications();
   const trackOrderStatuses = useOrderStatusTracker(showSnackbar);
   const { orders, isLoading, error, refresh } = useOrders<Order>({
@@ -636,11 +638,22 @@ export default function OrdersDashboardPage() {
     error: ticketDetailsError,
   } = useTicketDetails(ticketIdentifier);
   const { stats: loyaltyStats, isLoading: isLoyaltyLoading } = useLoyalty();
-  const showMobileNotificationPrompt = deviceInfo.isIOS && notificationPermission === 'default';
+  const showMobileNotificationPrompt =
+    shouldDisplayPermissionPrompt || (deviceInfo.isIOS && notificationPermission === 'default');
 
-  const handleRequestPushPermission = useCallback(() => {
-    void requestNotificationPermission();
-  }, [requestNotificationPermission]);
+  const handleRequestPushPermission = useCallback(async () => {
+    const result = await requestNotificationPermission();
+    if (result === 'granted') {
+      showSnackbar('Activamos las notificaciones para este dispositivo.', 'success');
+    } else if (result === 'denied') {
+      showSnackbar(
+        'Tu navegador bloqueó las notificaciones. Revisa los ajustes de sitio o habilítalas manualmente.',
+        'warning'
+      );
+    } else {
+      showSnackbar('No pudimos abrir el aviso de permisos. Intenta de nuevo.', 'error');
+    }
+  }, [requestNotificationPermission, showSnackbar]);
 
   useEffect(() => {
     trackOrderStatuses(orders);
@@ -774,6 +787,11 @@ export default function OrdersDashboardPage() {
     const fromTicket = ticketDetails?.customer?.clientId?.trim();
     return fromOrder || fromTicket || null;
   }, [selectedOrder?.posCustomerId, ticketDetails?.customer?.clientId]);
+  const {
+    data: clientFavorites,
+    isLoading: isClientFavoritesLoading,
+    error: clientFavoritesError,
+  } = useClientFavorites(activeClientId, token);
   const activeLoyaltyCustomer = useMemo(() => {
     if (!loyaltyStats) {
       return null;
@@ -792,25 +810,39 @@ export default function OrdersDashboardPage() {
       }) ?? null
     );
   }, [activeClientId, loyaltyStats, ticketDetails?.customer?.id]);
+  const favoritesFromPos = clientFavorites?.favorites;
+  const loyaltyFromPos = clientFavorites?.loyalty;
   const favoriteBeverageLabel =
+    favoritesFromPos?.primaryBeverage?.label ??
+    favoritesFromPos?.beverageCold?.label ??
+    favoritesFromPos?.beverageHot?.label ??
     resolveFavoriteLabel(activeLoyaltyCustomer?.favoriteBeverage ?? null) ??
     activeLoyaltyCustomer?.favoriteBeverage ??
     null;
   const favoriteFoodLabel =
+    favoritesFromPos?.food?.label ??
     resolveFavoriteLabel(activeLoyaltyCustomer?.favoriteFood ?? null) ??
     activeLoyaltyCustomer?.favoriteFood ??
     null;
   const shouldShowFavoritesPanel = Boolean(
-    selectedOrder && (activeClientId || activeLoyaltyCustomer || isLoyaltyLoading)
+    selectedOrder &&
+      (activeClientId ||
+        activeLoyaltyCustomer ||
+        clientFavorites ||
+        isLoyaltyLoading ||
+        isClientFavoritesLoading)
   );
   const shouldShowLoyaltyPanel = Boolean(
-    selectedOrder && (activeLoyaltyCustomer || isLoyaltyLoading)
+    selectedOrder &&
+      (activeLoyaltyCustomer || loyaltyFromPos || isLoyaltyLoading || isClientFavoritesLoading)
   );
   const loyaltyCardName =
     ticketDetails?.customer?.name ?? (selectedOrder ? formatOrderCustomer(selectedOrder) : null);
   const loyaltyOrders = activeLoyaltyCustomer?.orders ?? null;
   const loyaltyInteractions = activeLoyaltyCustomer?.totalInteractions ?? null;
-  const loyaltyCoffees = activeLoyaltyCustomer?.loyaltyCoffees ?? null;
+  const loyaltyCoffees =
+    loyaltyFromPos?.weeklyCoffeeCount ?? activeLoyaltyCustomer?.loyaltyCoffees ?? null;
+  const combinedFavoritesLoading = isLoyaltyLoading || isClientFavoritesLoading;
 
   const handleLoyaltyActivation = useCallback(async () => {
     const result = await activateLoyaltyProgram();
@@ -879,14 +911,16 @@ export default function OrdersDashboardPage() {
         typeof navigator.maxTouchPoints === 'number' &&
         navigator.maxTouchPoints > 1);
     const isIPhone = /iphone|ipod/i.test(ua);
+    const isMobile = isAndroid || isIPad || isIPhone;
+    const isIOS = isIPhone || isIPad;
     setDeviceInfo({
-      isMobile: isAndroid || isIPad || isIPhone,
+      isMobile,
       isAndroid,
-      isIOS: isIPhone || isIPad,
+      isIOS,
       isIPadOS: isIPad,
     });
     const supportsShare = typeof navigator.share === 'function';
-    setIsShareSupported(supportsShare && (isAndroid || isIPhone));
+    setIsShareSupported(supportsShare && (isAndroid || isIPhone || isIPad));
   }, []);
 
   useEffect(() => {
@@ -1474,8 +1508,11 @@ export default function OrdersDashboardPage() {
                   <FavoriteItemsList
                     beverage={favoriteBeverageLabel}
                     food={favoriteFoodLabel}
-                    isLoading={isLoyaltyLoading}
+                    isLoading={combinedFavoritesLoading}
                   />
+                )}
+                {clientFavoritesError && (
+                  <p className="text-xs text-red-600 dark:text-red-400">{clientFavoritesError}</p>
                 )}
                 {shouldShowLoyaltyPanel && (
                   <LoyaltyProgressCard
@@ -1483,7 +1520,7 @@ export default function OrdersDashboardPage() {
                     orders={loyaltyOrders ?? undefined}
                     totalInteractions={loyaltyInteractions ?? undefined}
                     customerName={loyaltyCardName ?? undefined}
-                    isLoading={isLoyaltyLoading}
+                    isLoading={combinedFavoritesLoading}
                   />
                 )}
               </div>
