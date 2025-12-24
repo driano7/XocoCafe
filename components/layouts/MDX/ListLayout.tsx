@@ -29,6 +29,7 @@
 
 import Pagination from '@/components/Pagination';
 import PostCard from '@/components/PostCard';
+import SupportBanner from '@/components/SupportBanner';
 import { CoreContent } from '@/lib/utils/contentlayer';
 import type { Blog } from 'contentlayer/generated';
 import { ComponentProps, useState } from 'react';
@@ -85,6 +86,7 @@ export default function ListLayout({ posts, title, initialDisplayPosts = [], pag
       {pagination && pagination.totalPages > 1 && !searchValue && (
         <Pagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} />
       )}
+      <SupportBanner />
     </>
   );
 }

@@ -41,11 +41,16 @@ const siteMetadata = {
   github: 'https://github.com/driano7',
   twitter: 'https://twitter.com/mrcripto_',
   facebook: 'https://facebook.com',
-  linkedin: 'https://www.linkedin.com/in/driano7',
+  linkedin: '',
   spotify: 'https://open.spotify.com/user/12138049443?si=UYIjkFRkQtWqiwFmQsnFKg&pi=u-GbLyzfogTQqa',
   tiktok: 'https://www.tiktok.com/@mrcripto_',
   instagram: 'https://www.instagram.com/anonimocafe_',
   whats: 'https://wa.me/525512291607',
+  donations: {
+    ethereum: '0xfc10B4f288Dfcc996EB819021934536095a7Ce90',
+    bitcoin: 'bc1qdewvy6fd8rc6m9uq6hultpz3ymyr9lfuxghw3w',
+    bank: '1234567890123',
+  },
   locale: 'en-US',
   comment: {
     provider: 'giscus',

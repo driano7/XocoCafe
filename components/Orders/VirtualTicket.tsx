@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { forwardRef, useMemo } from 'react';
 import TicketOrderSummary from '@/components/Orders/TicketOrderSummary';
+import { buildOrderQrPayload } from '@/lib/orderQrPayload';
 
 type ItemCategory = 'beverage' | 'food' | 'package' | 'other';
 
@@ -13,6 +14,7 @@ export interface OrderItem {
   category: ItemCategory;
   size?: string | null;
   packageItems?: string[] | null;
+  productId?: string | null;
 }
 
 export interface VirtualTicketProps {
@@ -23,6 +25,7 @@ export interface VirtualTicketProps {
     status?: 'pending' | 'in_progress' | 'completed' | 'past' | null;
     userEmail?: string | null;
     customerName?: string | null;
+    posCustomerId?: string | null;
     createdAt?: string | null;
     total?: number | null;
     tipAmount?: number | null;
@@ -222,6 +225,12 @@ const buildOrderItem = (item: any): OrderItem => {
     packageItems: Array.isArray(item?.packageItems)
       ? item.packageItems.map((entry: any) => String(entry))
       : null,
+    productId:
+      typeof item?.productId === 'string'
+        ? item.productId
+        : typeof item?.id === 'string'
+        ? item.id
+        : null,
   };
 };
 
@@ -519,64 +528,45 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
       return totalWithVatBeforeTips + tipAmount + deliveryTipAmount;
     }, [deliveryTipAmount, order.total, tipAmount, totalWithVatBeforeTips]);
 
-    const qrValue = useMemo(() => {
-      const payload: Record<string, unknown> = {
-        t: (order.ticketId ?? order.orderNumber ?? order.id).trim().toUpperCase(),
-        c: (order.customerName ?? order.userEmail ?? 'n/a').trim(),
-        a: Math.round(grandTotal * 100) / 100,
-        tip: {
-          a: Math.round(tipAmount * 100) / 100,
-          p: tipPercent ?? null,
-        },
-        i: items.slice(0, 20).map((item) => {
-          const entry: Record<string, string | number> = {
-            n: item.name,
-            q: item.quantity,
-            c: item.category,
-          };
-          if (item.size) entry.s = item.size;
-          return entry;
-        }),
-        addr: order.shipping?.addressId ?? undefined,
-        dt:
-          deliveryTipAmount > 0
-            ? {
-                a: Math.round(deliveryTipAmount * 100) / 100,
-                p: deliveryTipPercent ?? null,
-              }
-            : undefined,
-        ts: (() => {
-          const date = order.createdAt ? new Date(order.createdAt) : new Date();
-          if (Number.isNaN(date.getTime())) {
-            return new Date().toISOString().slice(0, 16);
-          }
-          const day = String(date.getDate()).padStart(2, '0');
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const year = date.getFullYear();
-          const hours = String(date.getHours()).padStart(2, '0');
-          const minutes = String(date.getMinutes()).padStart(2, '0');
-          return `${day}/${month}/${year}-${hours}:${minutes}`;
-        })(),
-        o: order.id,
-      };
-      if (!payload.addr) delete payload.addr;
-      if (!payload.dt) delete payload.dt;
-      return JSON.stringify(payload);
+    const qrPayloadValue = useMemo(() => {
+      return buildOrderQrPayload({
+        ticketCode: order.ticketId ?? order.orderNumber ?? order.id,
+        orderId: order.id,
+        customerName: (order.customerName ?? order.userEmail ?? 'Cliente Xoco Café').trim(),
+        customerEmail: order.userEmail ?? null,
+        customerClientId: order.posCustomerId ?? null,
+        totalAmount: grandTotal,
+        tipAmount,
+        tipPercent: tipPercent ?? null,
+        items: items.map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          category: item.category,
+          size: item.size ?? null,
+        })),
+        shippingAddressId: order.shipping?.addressId ?? null,
+        deliveryTipAmount: deliveryTipAmount > 0 ? deliveryTipAmount : null,
+        deliveryTipPercent: deliveryTipPercent ?? null,
+        createdAt: order.createdAt ?? null,
+      });
     }, [
       deliveryTipAmount,
       deliveryTipPercent,
       grandTotal,
       items,
+      order.createdAt,
       order.customerName,
       order.id,
       order.orderNumber,
+      order.posCustomerId,
       order.shipping?.addressId,
       order.ticketId,
       order.userEmail,
       tipAmount,
       tipPercent,
-      order.createdAt,
     ]);
+
+    const qrValue = useMemo(() => JSON.stringify(qrPayloadValue), [qrPayloadValue]);
 
     const qrRequestUrl = useMemo(() => {
       return `${QR_API_URL}?size=${QR_IMAGE_SIZE}&data=${encodeURIComponent(qrValue)}`;

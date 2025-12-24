@@ -32,16 +32,15 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FaWhatsapp } from 'react-icons/fa';
 import siteMetadata from 'content/siteMetadata';
-import LoyaltyFlipCard from '@/components/LoyaltyFlipCard';
 import UserQrCard from '@/components/Auth/UserQrCard';
 import FavoritesSelect from '@/components/FavoritesSelect';
 import ConsumptionChart from '@/components/ConsumptionChart';
-import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
 import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
 import SessionTimeoutNotice from '@/components/SessionTimeoutNotice';
 import AddressManager from '@/components/Auth/AddressManager';
 import { useAuth } from './AuthProvider';
 import ShareExperienceForm from '@/components/Feedback/ShareExperienceForm';
+import LoyaltyProgramPanel from '@/components/LoyaltyProgramPanel';
 import {
   updateProfileSchema,
   updateConsentSchema,
@@ -367,6 +366,20 @@ export default function UserProfile() {
     resolveFavoriteLabel(user.favoriteColdDrink ?? user.favoriteHotDrink) ?? 'No registrado';
   const favoriteFoodLabel = resolveFavoriteLabel(user.favoriteFood) ?? 'No registrado';
   const loyaltyStamps = Math.max(0, Math.min(7, user.weeklyCoffeeCount ?? 0));
+  const normalizeMetric = (value: unknown): number | null =>
+    typeof value === 'number' && Number.isFinite(value) ? value : null;
+  const monthlyMetrics = (user.monthlyMetrics ?? null) as Record<string, unknown> | null;
+  const userRecord = user as unknown as Record<string, unknown>;
+  const loyaltyOrdersCount =
+    normalizeMetric(monthlyMetrics?.['orders']) ??
+    normalizeMetric(monthlyMetrics?.['totalOrders']) ??
+    normalizeMetric(userRecord?.['ordersCount']);
+  const loyaltyInteractionsCount =
+    normalizeMetric(monthlyMetrics?.['interactions']) ??
+    normalizeMetric(monthlyMetrics?.['totalInteractions']) ??
+    normalizeMetric(userRecord?.['interactionsCount']);
+  const profileCustomerName =
+    [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;
 
   return (
     <>
@@ -608,70 +621,45 @@ export default function UserProfile() {
 
         <UserQrCard className={sectionCardClass} />
 
+        <LoyaltyProgramPanel
+          className={sectionCardClass}
+          stamps={loyaltyStamps}
+          customerName={profileCustomerName}
+          ordersCount={loyaltyOrdersCount ?? undefined}
+          interactionsCount={loyaltyInteractionsCount ?? undefined}
+          reminderAlert={loyaltyReminderAlert}
+          showReminderCard={loyaltyReminder.showReminder}
+          onActivateReminder={handleActivateLoyaltyReminder}
+          isActivatingReminder={loyaltyReminder.isActivating}
+        />
+
         <section className={sectionCardClass}>
-          <div className="space-y-1">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Programa de lealtad
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Consulta tu progreso y activa recordatorios para no perder sellos.
-            </p>
-          </div>
-          <div className="mt-4 w-full rounded-2xl border border-white/40 bg-white/70 px-4 py-3 text-sm text-gray-700 shadow-sm dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-100">
-            <p className="font-semibold text-gray-900 dark:text-white">
-              Sellos acumulados:{' '}
-              <span className="font-normal text-gray-600 dark:text-gray-300">
-                {loyaltyStamps} / 7
-              </span>
-            </p>
-            <p className="text-xs text-gray-600 dark:text-gray-300">
-              {loyaltyStamps >= 7
-                ? 'Ya puedes canjear tu bebida gratis mostrando tu QR.'
-                : `Te faltan ${Math.max(0, 7 - loyaltyStamps)} sellos para tu bebida gratis.`}
-            </p>
-          </div>
-
-          {loyaltyReminderAlert && (
-            <div
-              className={`mt-4 rounded-full px-4 py-2 text-sm font-semibold ${
-                loyaltyReminderAlert.type === 'success'
-                  ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
-                  : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-100'
-              }`}
-            >
-              {loyaltyReminderAlert.message}
+          <div className="rounded-[32px] border border-white/10 bg-gradient-to-br from-[#13162b] via-[#1e233b] to-[#33243c] p-5 text-white shadow-xl">
+            <p className="text-xs uppercase tracking-[0.35em] text-white/70">Favoritos</p>
+            <h3 className="mt-1 text-2xl font-semibold">Tus elecciones principales</h3>
+            <div className="mt-6 grid gap-6 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/20 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.3em] text-white/60">Bebida</p>
+                <p className="mt-2 text-lg font-semibold text-white">{favoriteBeverageLabel}</p>
+              </div>
+              <div className="rounded-2xl border border-white/20 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.3em] text-white/60">Alimento</p>
+                <p className="mt-2 text-lg font-semibold text-white">{favoriteFoodLabel}</p>
+              </div>
             </div>
-          )}
-
-          {loyaltyReminder.showReminder && (
+            <p className="mt-4 text-sm text-white/70">
+              Actualiza tus favoritos para pedir más rápido desde cualquier dispositivo.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-white/30 bg-white/70 p-4 shadow-sm dark:border-white/10 dark:bg-gray-800/70">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Personalízalos</h4>
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              Selecciona tus bebidas y alimentos favoritos del menú.
+            </p>
             <div className="mt-4">
-              <LoyaltyReminderCard
-                onActivate={handleActivateLoyaltyReminder}
-                isLoading={loyaltyReminder.isActivating}
-                className="w-full"
-              />
+              <FavoritesSelect />
             </div>
-          )}
-          <LoyaltyFlipCard className="mt-6 w-full" />
-        </section>
-
-        <section className={sectionCardClass}>
-          <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">Mis favoritos</h3>
-          <div className="mb-4 w-full rounded-2xl border border-white/40 bg-white/70 px-4 py-3 text-sm text-gray-700 shadow-sm dark:border-white/10 dark:bg-gray-800/60 dark:text-gray-100">
-            <p className="font-semibold text-gray-900 dark:text-white">
-              Tu bebida favorita:{' '}
-              <span className="font-normal text-gray-600 dark:text-gray-300">
-                {favoriteBeverageLabel}
-              </span>
-            </p>
-            <p className="font-semibold text-gray-900 dark:text-white">
-              Tu alimento favorito:{' '}
-              <span className="font-normal text-gray-600 dark:text-gray-300">
-                {favoriteFoodLabel}
-              </span>
-            </p>
           </div>
-          <FavoritesSelect />
         </section>
 
         <section className={sectionCardClass}>

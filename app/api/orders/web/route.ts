@@ -29,6 +29,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { verifyToken } from '@/lib/auth';
+import { buildOrderQrPayload } from '@/lib/orderQrPayload';
 
 interface OrderItemPayload {
   productId: string;
@@ -51,90 +52,6 @@ function generateOrderNumber(source: 'client' | 'store' = 'client') {
 }
 
 const DEFAULT_POS_CUSTOMER_ID = 'AAA-1111';
-
-const formatTicketTimestamp = (input?: string | null) => {
-  const date = input ? new Date(input) : new Date();
-  if (Number.isNaN(date.getTime())) {
-    const fallback = new Date();
-    return `${String(fallback.getDate()).padStart(2, '0')}/${String(
-      fallback.getMonth() + 1
-    ).padStart(2, '0')}/${fallback.getFullYear()}-${String(fallback.getHours()).padStart(
-      2,
-      '0'
-    )}:${String(fallback.getMinutes()).padStart(2, '0')}`;
-  }
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${day}/${month}/${year}-${hours}:${minutes}`;
-};
-
-const buildQrPayload = ({
-  ticketCode,
-  customer,
-  total,
-  tipAmountValue,
-  tipPercentValue,
-  items,
-  shippingAddressId,
-  deliveryTipAmountValue,
-  deliveryTipPercentValue,
-  createdAt,
-  orderId,
-}: {
-  ticketCode: string;
-  customer: string;
-  total: number;
-  tipAmountValue: number;
-  tipPercentValue: number | null;
-  items: OrderItemPayload[];
-  shippingAddressId: string | null;
-  deliveryTipAmountValue: number | null;
-  deliveryTipPercentValue: number | null;
-  createdAt?: string | null;
-  orderId: string;
-}) => {
-  const payload: Record<string, unknown> = {
-    t: ticketCode,
-    c: customer.trim(),
-    a: Math.round(total * 100) / 100,
-    tip: {
-      a: Math.round(tipAmountValue * 100) / 100,
-      p: tipPercentValue,
-    },
-    i: items.map((item) => {
-      const entry: Record<string, string | number> = {
-        n: item.name,
-        q: item.quantity,
-        c: item.category ?? 'other',
-      };
-      if (item.size) {
-        entry.s = item.size;
-      }
-      return entry;
-    }),
-    addr: shippingAddressId ?? undefined,
-    dt:
-      deliveryTipAmountValue && deliveryTipAmountValue > 0
-        ? {
-            a: deliveryTipAmountValue,
-            p: deliveryTipPercentValue,
-          }
-        : undefined,
-    ts: formatTicketTimestamp(createdAt),
-    o: orderId,
-  };
-
-  if (!payload.addr) {
-    delete payload.addr;
-  }
-  if (!payload.dt) {
-    delete payload.dt;
-  }
-  return payload;
-};
 
 export async function POST(request: NextRequest) {
   try {
@@ -309,18 +226,25 @@ export async function POST(request: NextRequest) {
     }
 
     const ticketCode = data.orderNumber ?? orderPayload.orderNumber;
-    const qrPayload = buildQrPayload({
+    const qrPayload = buildOrderQrPayload({
       ticketCode,
-      customer: normalizedCustomerName || decoded.email || 'Cliente',
-      total: totalAmount,
-      tipAmountValue: normalizedTipAmount ?? 0,
-      tipPercentValue: normalizedTipPercent ?? null,
-      items: normalizedItems,
-      shippingAddressId,
-      deliveryTipAmountValue: normalizedDeliveryTipAmount,
-      deliveryTipPercentValue: normalizedDeliveryTipPercent ?? null,
-      createdAt: data.createdAt ?? null,
       orderId: data.id,
+      customerName: normalizedCustomerName || decoded.email || 'Cliente Xoco Café',
+      customerEmail: decoded.email ?? null,
+      customerClientId: decoded.clientId ?? null,
+      totalAmount,
+      tipAmount: normalizedTipAmount ?? 0,
+      tipPercent: normalizedTipPercent ?? null,
+      items: normalizedItems.map((item) => ({
+        name: item.name,
+        quantity: item.quantity,
+        category: item.category ?? 'other',
+        size: item.size ?? null,
+      })),
+      shippingAddressId,
+      deliveryTipAmount: normalizedDeliveryTipAmount ?? null,
+      deliveryTipPercent: normalizedDeliveryTipPercent ?? null,
+      createdAt: data.createdAt ?? null,
     });
 
     const { error: ticketError } = await supabase.from('tickets').insert({

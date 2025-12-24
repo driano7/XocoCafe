@@ -33,8 +33,8 @@ import { useRouter } from 'next/navigation';
 import CheckoutForm from '@/components/Order/CheckoutForm';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import { useCartStore } from '@/hooks/useCartStore';
-import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
 import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
+import LoyaltyProgramPanel from '@/components/LoyaltyProgramPanel';
 import SearchableDropdown from '@/components/SearchableDropdown';
 import { beverageOptions, foodOptions, getMenuItemById, packageOptions } from '@/lib/menuData';
 import type { AddressInput } from '@/lib/validations/auth';
@@ -56,10 +56,23 @@ export default function OrderPage() {
     enrolled: user?.loyaltyEnrolled ?? false,
     token,
   });
-  const [loyaltyNotice, setLoyaltyNotice] = useState<{
+  const [loyaltyReminderAlert, setLoyaltyReminderAlert] = useState<{
     type: 'success' | 'error';
     message: string;
   } | null>(null);
+  const loyaltyStamps = Math.max(0, Math.min(7, user?.weeklyCoffeeCount ?? 0));
+  const normalizeMetric = (value: unknown): number | null =>
+    typeof value === 'number' && Number.isFinite(value) ? value : null;
+  const monthlyMetrics = (user?.monthlyMetrics ?? null) as Record<string, unknown> | null;
+  const userRecord = (user ?? null) as Record<string, unknown> | null;
+  const loyaltyOrdersCount =
+    normalizeMetric(monthlyMetrics?.['orders']) ??
+    normalizeMetric(monthlyMetrics?.['totalOrders']) ??
+    normalizeMetric(userRecord?.['ordersCount']);
+  const loyaltyInteractionsCount =
+    normalizeMetric(monthlyMetrics?.['interactions']) ??
+    normalizeMetric(monthlyMetrics?.['totalInteractions']) ??
+    normalizeMetric(userRecord?.['interactionsCount']);
   const [selectedBeverageId, setSelectedBeverageId] = useState('');
   const [selectedBeverageSize, setSelectedBeverageSize] = useState<string | null>(null);
   const [selectedFoodId, setSelectedFoodId] = useState('');
@@ -89,7 +102,7 @@ export default function OrderPage() {
 
   const handleActivateLoyaltyReminder = async () => {
     const result = await loyaltyReminder.activate();
-    setLoyaltyNotice({
+    setLoyaltyReminderAlert({
       type: result.success ? 'success' : 'error',
       message:
         result.message ??
@@ -177,12 +190,12 @@ export default function OrderPage() {
   }, [selectedBeverageId]);
 
   useEffect(() => {
-    if (!loyaltyNotice) {
+    if (!loyaltyReminderAlert) {
       return undefined;
     }
-    const timeout = setTimeout(() => setLoyaltyNotice(null), 4000);
+    const timeout = setTimeout(() => setLoyaltyReminderAlert(null), 4000);
     return () => clearTimeout(timeout);
-  }, [loyaltyNotice]);
+  }, [loyaltyReminderAlert]);
 
   useEffect(() => {
     router.prefetch('/dashboard/pedidos');
@@ -317,28 +330,26 @@ export default function OrderPage() {
         </p>
       </div>
 
-      {loyaltyNotice && (
-        <div
-          className={`mb-4 rounded-full px-4 py-2 text-sm font-semibold ${
-            loyaltyNotice.type === 'success'
-              ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
-              : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-100'
-          }`}
-        >
-          {loyaltyNotice.message}
-        </div>
-      )}
-
-      {loyaltyReminder.showReminder && (
-        <LoyaltyReminderCard
-          onActivate={handleActivateLoyaltyReminder}
-          isLoading={loyaltyReminder.isActivating}
-          className="mb-8"
-        />
-      )}
-
       <div className="grid gap-8 lg:grid-cols-[1.2fr,0.8fr]">
-        <section className="space-y-6">{quickAddSection}</section>
+        <section className="space-y-6">
+          {quickAddSection}
+          <LoyaltyProgramPanel
+            as="div"
+            className="rounded-2xl border border-gray-200 bg-white p-5 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+            stamps={loyaltyStamps}
+            customerName={
+              [user?.firstName, user?.lastName].filter(Boolean).join(' ') ||
+              user?.email ||
+              undefined
+            }
+            ordersCount={loyaltyOrdersCount ?? undefined}
+            interactionsCount={loyaltyInteractionsCount ?? undefined}
+            reminderAlert={loyaltyReminderAlert}
+            showReminderCard={loyaltyReminder.showReminder}
+            onActivateReminder={handleActivateLoyaltyReminder}
+            isActivatingReminder={loyaltyReminder.isActivating}
+          />
+        </section>
 
         <aside className="rounded-2xl border border-gray-200 bg-white p-5 shadow-lg dark:border-gray-700 dark:bg-gray-900">
           <div className="mb-4 flex items-center justify-between">

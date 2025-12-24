@@ -218,6 +218,8 @@ export function useOrders<TOrder extends OrderRecord = OrderRecord>({
   useEffect(() => {
     if (!enabled) {
       stopPolling();
+      statusMapRef.current.clear();
+      hasSnapshotRef.current = false;
       return;
     }
 

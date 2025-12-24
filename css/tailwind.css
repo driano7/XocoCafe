@@ -192,16 +192,30 @@ input:-webkit-autofill:focus {
 
 .menu-simple-prose table {
   width: 100%;
+  min-width: 680px;
   border-collapse: collapse;
   margin-bottom: 1.5rem;
 }
 
-.menu-simple-prose thead {
+.menu-simple-prose thead th {
   position: sticky;
   top: 0;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(79, 70, 229, 0.2);
+  z-index: 5;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(79, 70, 229, 0.25);
+}
+
+.dark .menu-simple-prose thead th {
+  background: rgba(5, 7, 15, 0.9);
+}
+
+.menu-simple-prose tbody tr:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.dark .menu-simple-prose tbody tr:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .menu-simple-prose th,
@@ -217,9 +231,13 @@ input:-webkit-autofill:focus {
 }
 
 @media (max-width: 640px) {
+  .menu-simple-prose table {
+    min-width: 620px;
+  }
+
   .menu-simple-prose th,
   .menu-simple-prose td {
-    padding: 0.5rem;
-    font-size: 0.85rem;
+    padding: 0.45rem;
+    font-size: 0.8rem;
   }
 }

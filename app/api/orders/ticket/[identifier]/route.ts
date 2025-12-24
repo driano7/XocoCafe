@@ -29,6 +29,9 @@ const USERS_TABLE = process.env.SUPABASE_USERS_TABLE ?? 'users';
 
 const TICKET_FIELDS =
   'id,"ticketCode","orderId","userId","paymentMethod","tipAmount","tipPercent",currency,"createdAt"';
+const ORDER_SELECT_FIELDS =
+  'id,"orderNumber",status,total,currency,"createdAt","userId","items","metadata","notes","message","instructions"';
+const COLUMN_MISSING_REGEX = /column .* does not exist/i;
 
 const toTrimmedString = (value: unknown) => {
   if (typeof value === 'string') {
@@ -53,6 +56,40 @@ const coerceMetadataObject = (value: unknown): Record<string, unknown> | null =>
     }
   }
   return null;
+};
+
+type OrderRecord = {
+  id?: string | null;
+  orderNumber?: string | null;
+  userId?: string | null;
+  status?: string | null;
+  total?: number | null;
+  currency?: string | null;
+  createdAt?: string | null;
+  items?: unknown;
+  metadata?: unknown;
+  notes?: unknown;
+  message?: unknown;
+  instructions?: unknown;
+  queuedByStaffId?: unknown;
+  queuedByStaffName?: unknown;
+  queuedPaymentMethod?: unknown;
+  queuedPaymentReference?: unknown;
+  queuedPaymentReferenceType?: unknown;
+};
+
+const fetchOrderRecord = async (column: string, value: string): Promise<OrderRecord | null> => {
+  const executeQuery = async (selectFields: string) =>
+    supabaseAdmin.from(ORDERS_TABLE).select(selectFields).eq(column, value).maybeSingle();
+
+  let { data, error } = await executeQuery(ORDER_SELECT_FIELDS);
+  if (error && COLUMN_MISSING_REGEX.test(error.message ?? '')) {
+    ({ data, error } = await executeQuery('*'));
+  }
+  if (error) {
+    throw new Error(error.message);
+  }
+  return (data ?? null) as OrderRecord | null;
 };
 
 export const dynamic = 'force-dynamic';
@@ -119,34 +156,11 @@ export async function GET(
       orderId = ticketByOrder?.orderId ?? trimmedIdentifier;
     }
 
-    const orderSelectFields =
-      'id,"orderNumber",status,total,currency,"createdAt","userId","items","metadata","notes","message","instructions","queuedPaymentMethod","queuedPaymentReference","queuedPaymentReferenceType","queuedByStaffId","queuedByStaffName"';
-
-    const { data: orderById, error: orderError } = await supabaseAdmin
-      .from(ORDERS_TABLE)
-      .select(orderSelectFields)
-      .eq('id', orderId)
-      .maybeSingle();
-
-    if (orderError) {
-      throw new Error(orderError.message);
-    }
-
-    let order = orderById ?? null;
+    let order = await fetchOrderRecord('id', orderId);
 
     if (!order) {
-      const { data: orderByNumber, error: orderByNumberError } = await supabaseAdmin
-        .from(ORDERS_TABLE)
-        .select(orderSelectFields)
-        .eq('orderNumber', trimmedIdentifier)
-        .maybeSingle();
-
-      if (orderByNumberError) {
-        throw new Error(orderByNumberError.message);
-      }
-
-      order = orderByNumber ?? null;
-      if (order) {
+      order = await fetchOrderRecord('orderNumber', trimmedIdentifier);
+      if (order?.id) {
         orderId = order.id;
       }
     }

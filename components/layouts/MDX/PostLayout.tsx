@@ -31,6 +31,7 @@ import { CoreContent } from '@/lib/utils/contentlayer';
 import siteMetadata from 'content/siteMetadata';
 import type { Blog } from 'contentlayer/generated';
 import { ReactNode } from 'react';
+import SupportBanner from '@/components/SupportBanner';
 
 const postDateTemplate: Intl.DateTimeFormatOptions = {
   year: 'numeric',
@@ -75,6 +76,7 @@ export default function PostLayout({ content, children, next, prev }: Props) {
           <div className="prose max-w-none pt-8 pb-8 dark:prose-dark">
             {children}
             <PostNavigation prev={prev} next={next} />
+            <SupportBanner />
             {/* <PostComments /> */}
           </div>
         </div>

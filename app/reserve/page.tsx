@@ -146,9 +146,13 @@ interface FailedReservationRecord extends BaseReservationRecord {
 }
 
 interface ReservationQrPayload {
+  type?: 'reservation';
   reservationId: string;
+  id?: string;
+  reservationCode?: string;
   code: string;
   user: string;
+  customerName?: string;
   date: string;
   time: string;
   people: number;
@@ -156,6 +160,10 @@ interface ReservationQrPayload {
   branchNumber: string | number | null;
   message: string | null;
   preOrderItems?: string | null;
+  clientId?: string | null;
+  customerId?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
 
 type DetailActionState = {
@@ -1293,6 +1301,9 @@ export default function ReservePage() {
                     weekStartsOn={1}
                     fromDate={today}
                     toDate={maxReservationDate}
+                    fromMonth={minMonth}
+                    toMonth={maxMonth}
+                    disableNavigation
                     showOutsideDays={false}
                     modifiersClassNames={{
                       selected: 'bg-primary-600 text-white',
@@ -2182,14 +2193,21 @@ const ReservationDetailContent = ({
   ticketRef?: MutableRefObject<HTMLDivElement | null>;
   shareState?: { error: string | null; isProcessing: boolean };
 }) => {
+  const { user } = useAuth();
   const slotDateTime = buildSlotDateTime(reservation.reservationDate, reservation.reservationTime);
   const qrExpiresAt = new Date(slotDateTime.getTime() + QR_EXPIRATION_MINUTES * 60 * 1000);
   const qrIsActive = Date.now() < qrExpiresAt.getTime();
   const branchLabel = reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
+  const resolvedCustomerName =
+    currentUserName || user?.firstName || user?.email || 'Cliente Xoco Café';
   const qrPayload = {
+    type: 'reservation',
     reservationId: reservation.id,
+    reservationCode: reservation.reservationCode,
     code: reservation.reservationCode,
-    user: currentUserName || 'Cliente Xoco Café',
+    id: reservation.id,
+    user: resolvedCustomerName,
+    customerName: resolvedCustomerName,
     date: reservation.reservationDate,
     time: reservation.reservationTime,
     people: reservation.peopleCount,
@@ -2197,6 +2215,10 @@ const ReservationDetailContent = ({
     branchNumber: reservation.branchNumber || BRANCH_NUMBER,
     message: reservation.message || null,
     preOrderItems: reservation.preOrderItems || null,
+    clientId: user?.clientId ?? null,
+    customerId: user?.clientId ?? null,
+    email: user?.email ?? null,
+    phone: user?.phone ?? null,
   };
   const qrImageSrc = `${QR_API_URL}?size=${QR_IMAGE_SIZE}&data=${encodeURIComponent(
     JSON.stringify(qrPayload)

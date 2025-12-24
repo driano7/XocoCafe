@@ -27,6 +27,7 @@
 
 import Link from '@/components/Link';
 import Tag from '@/components/Tag';
+import SupportBanner from '@/components/SupportBanner';
 import MainLayout from '@/layouts/MainLayout';
 import { getAllTags } from '@/lib/utils/contentlayer';
 import kebabCase from '@/lib/utils/kebabCase';
@@ -59,6 +60,7 @@ export default function Tags() {
           );
         })}
       </div>
+      <SupportBanner />
     </MainLayout>
   );
 }
