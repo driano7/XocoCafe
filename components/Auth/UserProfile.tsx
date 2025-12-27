@@ -27,14 +27,14 @@
 
 'use client';
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FaWhatsapp } from 'react-icons/fa';
 import siteMetadata from 'content/siteMetadata';
-import UserQrCard from '@/components/Auth/UserQrCard';
 import FavoritesSelect from '@/components/FavoritesSelect';
 import FavoriteItemsList from '@/components/FavoriteItemsList';
+import LoyaltyProgressCard from '@/components/LoyaltyProgressCard';
 import ConsumptionChart from '@/components/ConsumptionChart';
 import SessionTimeoutNotice from '@/components/SessionTimeoutNotice';
 import AddressManager from '@/components/Auth/AddressManager';
@@ -53,6 +53,7 @@ import { useClientFavorites } from '@/hooks/useClientFavorites';
 import { detectDeviceInfo, ensurePushPermission } from '@/lib/pushNotifications';
 import { useSnackbarNotifications } from '@/hooks/useSnackbarNotifications';
 import Snackbar from '@/components/Feedback/Snackbar';
+import { useLoyalty } from '@/hooks/useLoyalty';
 
 const FREE_COFFEE_NOTICE_KEY = 'xoco_free_coffee_notice';
 
@@ -78,6 +79,7 @@ export default function UserProfile() {
   const [deviceInfo, setDeviceInfo] = useState(() => detectDeviceInfo());
   const [loyaltyCoffeeCount, setLoyaltyCoffeeCount] = useState(() => user?.weeklyCoffeeCount ?? 0);
   const { snackbar, showSnackbar, dismissSnackbar } = useSnackbarNotifications();
+  const { stats: loyaltyStats, isLoading: isLoyaltyStatsLoading } = useLoyalty();
 
   const {
     register: registerProfile,
@@ -463,6 +465,35 @@ export default function UserProfile() {
     setIsPasswordModalOpen(false);
   }, [resetPassword]);
 
+  const qrUrl = useMemo(() => {
+    if (!user?.clientId) {
+      return null;
+    }
+    const favoriteBeverage =
+      resolveFavoriteLabel(user.favoriteColdDrink ?? user.favoriteHotDrink) ?? 'No registrado';
+    const favoriteFood = resolveFavoriteLabel(user.favoriteFood) ?? 'No registrado';
+    const qrPayload = {
+      'Id cliente': user.clientId,
+      'Nombre del cliente': user.firstName ?? 'No registrado',
+      Apellido: user.lastName ?? 'No registrado',
+      'Bebida favorita': favoriteBeverage,
+      'Alimento favorito': favoriteFood,
+      Número: user.phone ?? 'No registrado',
+      Mail: user.email ?? 'Sin correo',
+    };
+    const encoded = encodeURIComponent(JSON.stringify(qrPayload, null, 2));
+    return `/api/qr?size=220x220&data=${encoded}`;
+  }, [
+    user?.clientId,
+    user?.firstName,
+    user?.lastName,
+    user?.favoriteColdDrink,
+    user?.favoriteHotDrink,
+    user?.favoriteFood,
+    user?.phone,
+    user?.email,
+  ]);
+
   if (isLoading) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 text-center text-gray-700 dark:text-gray-200">
@@ -513,6 +544,32 @@ export default function UserProfile() {
     user.favoriteHotDrink ??
     null;
   const favoriteFoodMenuId = clientFavorites?.favorites?.food?.menuId ?? user.favoriteFood ?? null;
+  const loyaltyStampsGoal = clientFavorites?.loyalty?.stampsGoal ?? undefined;
+  const normalizedClientId = user.clientId?.trim().toLowerCase() ?? null;
+  const normalizedUserId = user.id ?? null;
+  const normalizedEmail = user.email?.trim().toLowerCase() ?? null;
+  const activeLoyaltyCustomer =
+    loyaltyStats?.customers.find((customer) => {
+      const customerClientId = customer.clientId?.trim().toLowerCase();
+      if (normalizedClientId && customerClientId && customerClientId === normalizedClientId) {
+        return true;
+      }
+      if (normalizedUserId && customer.userId === normalizedUserId) {
+        return true;
+      }
+      const customerEmail = customer.email?.trim().toLowerCase();
+      if (normalizedEmail && customerEmail && customerEmail === normalizedEmail) {
+        return true;
+      }
+      return false;
+    }) ?? null;
+  const loyaltyOrdersCount =
+    activeLoyaltyCustomer?.orders ?? clientFavorites?.loyalty?.ordersCount ?? null;
+  const loyaltyInteractionsCount =
+    activeLoyaltyCustomer?.totalInteractions ?? clientFavorites?.loyalty?.interactionsCount ?? null;
+  const loyaltyCustomerName =
+    [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || user.email || undefined;
+  const loyaltyCardLoading = isClientFavoritesLoading || isLoyaltyStatsLoading;
 
   return (
     <>
@@ -752,9 +809,18 @@ export default function UserProfile() {
           </div>
         </section>
 
-        <UserQrCard className={sectionCardClass} />
-
         <section className={sectionCardClass}>
+          <LoyaltyProgressCard
+            coffees={loyaltyCoffeeCount}
+            goal={loyaltyStampsGoal}
+            orders={loyaltyOrdersCount ?? undefined}
+            totalInteractions={loyaltyInteractionsCount ?? undefined}
+            customerName={loyaltyCustomerName}
+            isLoading={loyaltyCardLoading}
+            className="border-white/15"
+            qrUrl={qrUrl}
+            clientId={user.clientId ?? null}
+          />
           <FavoriteItemsList
             beverage={favoriteBeverageLabel === 'No registrado' ? null : favoriteBeverageLabel}
             food={favoriteFoodLabel === 'No registrado' ? null : favoriteFoodLabel}

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import classNames from 'classnames';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -11,6 +12,8 @@ interface LoyaltyProgressCardProps {
   customerName?: string | null;
   isLoading?: boolean;
   className?: string;
+  qrUrl?: string | null;
+  clientId?: string | null;
 }
 
 const RAW_TARGET = Number(process.env.NEXT_PUBLIC_LOYALTY_TARGET ?? 7);
@@ -24,6 +27,8 @@ export default function LoyaltyProgressCard({
   customerName,
   isLoading,
   className,
+  qrUrl,
+  clientId,
 }: LoyaltyProgressCardProps) {
   const normalized = Math.max(0, Math.min(goal, Math.floor(coffees ?? 0)));
   const progressPercent = useMemo(
@@ -108,12 +113,34 @@ export default function LoyaltyProgressCard({
         </div>
       </div>
 
+      {qrUrl && clientId && (
+        <div className="mt-6 flex flex-col items-center gap-3 text-center text-white/85">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.25em]">
+            Escanea este código para identificar tu cuenta rápidamente en sucursal.
+          </p>
+          <Image
+            src={qrUrl}
+            alt={`QR del cliente ${clientId}`}
+            width={220}
+            height={220}
+            className="h-48 w-48 rounded-2xl border border-white/60 bg-white/95 p-2 shadow-lg"
+          />
+          <p className="text-xs font-semibold uppercase tracking-[0.35em]">
+            ID · <span className="underline decoration-white/70">{clientId}</span>
+          </p>
+        </div>
+      )}
+
       <p className="mt-4 text-[11px] text-white/70">
-        {normalized >= goal
-          ? '¡Llevas los sellos completos! Canjea tu bebida en barra para reiniciar tu cuenta.'
-          : `Te faltan ${goal - normalized} ${
+        {normalized >= goal ? (
+          '¡Llevas los sellos completos! Canjea tu bebida en barra para reiniciar tu cuenta.'
+        ) : (
+          <span className="underline decoration-white/80 underline-offset-4">
+            {`Te faltan ${goal - normalized} ${
               goal - normalized === 1 ? 'sello' : 'sellos'
             } para el Americano en cortesía.`}
+          </span>
+        )}
       </p>
     </section>
   );

@@ -132,7 +132,7 @@ function parseBeverages(section: string): MenuItem[] {
     const cells = Array.from(rowMatch[1].matchAll(/<td>([\s\S]*?)<\/td>/gi)).map(
       ([, value]) => value ?? ''
     );
-    if (cells.length < 4) {
+    if (cells.length < 3) {
       continue;
     }
     const [rawName, rawMedium, rawLarge, rawCalories] = cells;
@@ -140,8 +140,16 @@ function parseBeverages(section: string): MenuItem[] {
     if (!nameContent) {
       continue;
     }
-    const symbolMatch = nameContent.match(/\((🔥|❄️)\)\s*$/);
-    const baseName = symbolMatch ? nameContent.replace(symbolMatch[0], '').trim() : nameContent;
+    const inlineCaloriesMatch = nameContent.match(/\s*-\s*\*?(\d+)\s*kcal\*?$/i);
+    const inlineCalories = inlineCaloriesMatch ? Number(inlineCaloriesMatch[1]) : null;
+    const sanitizedName = inlineCaloriesMatch
+      ? nameContent.replace(inlineCaloriesMatch[0], '').trim()
+      : nameContent;
+    const normalizedNameForLabel = sanitizedName || nameContent;
+    const symbolMatch = normalizedNameForLabel.match(/\((🔥|❄️)\)\s*$/);
+    const baseName = symbolMatch
+      ? normalizedNameForLabel.replace(symbolMatch[0], '').trim()
+      : normalizedNameForLabel;
     if (!baseName || /^\$/.test(baseName) || !/[a-záéíóúüñ]/i.test(baseName.replace(/[()]/g, ''))) {
       continue;
     }
@@ -149,7 +157,7 @@ function parseBeverages(section: string): MenuItem[] {
     const displayName = symbolMatch ? `${baseName} ${symbolMatch[1]}` : baseName;
     const mediumPrice = parsePrice(rawMedium);
     const largePrice = parsePrice(rawLarge);
-    const calories = parseCalories(rawCalories);
+    const calories = inlineCalories ?? parseCalories(rawCalories);
 
     let subcategory: MenuItem['subcategory'];
     const normalizedName = normalizeString(baseName);

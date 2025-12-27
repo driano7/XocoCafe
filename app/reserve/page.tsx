@@ -1316,13 +1316,15 @@ export default function ReservePage() {
                 </>
               )}
               <p className="px-1 pb-1 text-xs text-gray-500 dark:text-gray-400">
-                Fechas disponibles desde hoy hasta{' '}
-                {maxReservationDate.toLocaleDateString('es-MX', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })}
-                .
+                <span className="font-semibold underline decoration-primary-400/60 underline-offset-4">
+                  Fechas disponibles desde hoy hasta{' '}
+                  {maxReservationDate.toLocaleDateString('es-MX', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                  .
+                </span>
               </p>
             </div>
           </div>

@@ -43,7 +43,7 @@ export default function Header() {
   return (
     <SectionContainer>
       <header className="z-40 bg-transparent py-5 md:py-10">
-        <div className="mx-auto flex max-w-5xl items-center justify-between rounded-2xl border border-white/20 bg-white/70 px-4 py-3 text-base font-semibold text-gray-900 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-black/40 dark:text-white">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between rounded-2xl border border-white/20 bg-white/70 px-6 py-3 text-base font-semibold text-gray-900 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-black/40 dark:text-white">
           <div>
             <Link
               href="/"

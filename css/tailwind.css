@@ -240,4 +240,11 @@ input:-webkit-autofill:focus {
     padding: 0.35rem 0.45rem;
     font-size: 0.75rem;
   }
+
+  .menu-simple-prose th:first-child,
+  .menu-simple-prose td:first-child {
+    width: 42%;
+    min-width: 140px;
+    max-width: 160px;
+  }
 }
