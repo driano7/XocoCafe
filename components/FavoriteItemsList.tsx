@@ -31,9 +31,9 @@ export default function FavoriteItemsList({
   const wrapperClass =
     tone === 'dark'
       ? 'border-white/20 bg-white/5 text-white'
-      : 'border-primary-100/70 bg-white/90 text-gray-800';
-  const labelClass = tone === 'dark' ? 'text-white/60' : 'text-gray-500 dark:text-gray-400';
-  const valueClass = tone === 'dark' ? 'text-white' : 'text-gray-900 dark:text-gray-100';
+      : 'border-primary-100/70 bg-white/90 text-gray-800 dark:border-white/10 dark:bg-gray-800/80 dark:text-white';
+  const labelClass = tone === 'dark' ? 'text-white/60' : 'text-gray-500 dark:text-gray-300';
+  const valueClass = tone === 'dark' ? 'text-white' : 'text-gray-900 dark:text-white';
 
   return (
     <section

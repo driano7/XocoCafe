@@ -86,6 +86,12 @@ Xoco Café es un proyecto de café artesanal inspirado en la riqueza del café m
 - Metodologías de control de calidad.
 - Plan de compras y abastecimiento.
 
+## 🆕 Actualizaciones Recientes
+
+- **Paridad con POS en el dashboard.** El modal de pedidos ahora reutiliza un `OrderDetailPanel` inspirado en `OrderDetailContent`, mostrando quién atendió, método/referencia de pago y notas con los mismos badges del POS.
+- **Desencriptado AES-GCM en clientes externos.** Integramos `decryptField` para revelar nombres, teléfonos y colaboradores usando el correo del staff como llave derivada.
+- **Librería compartida para campos seguros.** `lib/secure-fields.ts` expone los helpers de cifrado/descifrado para cualquier módulo del front que necesite sincronizarse con el POS.
+
 ---
 
 # 💻 Sitio Web y Tecnologías
@@ -199,6 +205,12 @@ Xoco Café is an artisanal Mexican coffee project centered on sustainability, co
 - Supplier database.
 - Quality control methodologies.
 - Procurement and supply chain plan.
+
+## 🆕 Recent Updates
+
+- **POS-level order view inside the dashboard.** The orders modal now renders an `OrderDetailPanel` derived from the POS `OrderDetailContent`, so attendants, payment metadata, and badges stay identical to the in-store experience.
+- **AES-GCM decryption for external clients.** We wired `decryptField` into the dashboard so customer and staff snapshots decrypt on demand using the signed-in collaborator email as the PBKDF2 seed.
+- **Shared secure-fields helper.** `lib/secure-fields.ts` centralizes AES-GCM helpers so any frontend workflow stays in sync with the POS encryption scheme.
 
 ---
 

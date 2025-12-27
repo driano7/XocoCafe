@@ -34,53 +34,21 @@ import siteMetadata from 'content/siteMetadata';
 import Snackbar from '@/components/Feedback/Snackbar';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
-import { TicketAssignmentNotice } from '@/components/Orders/TicketAssignmentNotice';
+import { OrderDetailPanel } from '@/components/Orders/OrderDetailPanel';
 import { usePagination } from '@/hooks/use-pagination';
 import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
 import VirtualTicket from '@/components/Orders/VirtualTicket';
 import { useSnackbarNotifications, type SnackbarTone } from '@/hooks/useSnackbarNotifications';
-import { useOrders } from '@/hooks/useOrders';
+import { useOrders, type OrderRecord, type OrderStatus } from '@/hooks/useOrders';
 import { useTicketDetails } from '@/hooks/useTicketDetails';
 import { useClientFavorites } from '@/hooks/useClientFavorites';
 import { detectDeviceInfo, ensurePushPermission } from '@/lib/pushNotifications';
+import { decryptField } from '@/lib/secure-fields';
 
-interface Order {
-  id: string;
-  orderNumber?: string | null;
-  status: 'pending' | 'in_progress' | 'completed' | 'past';
-  ticketId?: string | null;
-  userEmail?: string | null;
-  customerName?: string | null;
-  posCustomerId?: string | null;
-  total?: number | null;
-  tipAmount?: number | null;
-  tipPercent?: number | null;
-  deliveryTipAmount?: number | null;
-  deliveryTipPercent?: number | null;
-  prepStatus?: 'pending' | 'in_progress' | 'completed' | null;
-  prepHandlerName?: string | null;
-  createdAt?: string | null;
-  updatedAt?: string | null;
-  type?: string | null;
-  items?: unknown;
-  qrPayload?: unknown;
-  shipping?: {
-    address?: {
-      street?: string;
-      city?: string;
-      state?: string;
-      postalCode?: string;
-      reference?: string;
-    };
-    contactPhone?: string;
-    isWhatsapp?: boolean;
-    addressId?: string | null;
-    deliveryTip?: {
-      amount?: number | null;
-      percent?: number | null;
-    } | null;
-  } | null;
-}
+type Order = OrderRecord & {
+  status: OrderStatus;
+  prepStatus?: OrderStatus | null;
+};
 
 const STATUS_LABELS: Record<Order['status'], string> = {
   pending: 'Pendiente',
@@ -657,6 +625,17 @@ export default function OrdersDashboardPage() {
     isLoading: isTicketLoading,
     error: ticketDetailsError,
   } = useTicketDetails(ticketIdentifier);
+  const [decryptedSnapshots, setDecryptedSnapshots] = useState<{
+    customerFirstName: string | null;
+    customerLastName: string | null;
+    customerPhone: string | null;
+    handlerName: string | null;
+  }>({
+    customerFirstName: null,
+    customerLastName: null,
+    customerPhone: null,
+    handlerName: null,
+  });
   const showMobileNotificationPrompt =
     notificationSupported &&
     (shouldDisplayPermissionPrompt || (deviceInfo.isIOS && notificationPermission === 'default'));
@@ -682,6 +661,80 @@ export default function OrdersDashboardPage() {
     const identifier = selectedOrder.ticketId ?? selectedOrder.orderNumber ?? selectedOrder.id;
     setTicketIdentifier((prev) => (prev === identifier ? prev : identifier));
   }, [selectedOrder]);
+
+  useEffect(() => {
+    const staffEmail = user?.email?.trim();
+    if (!ticketDetails || !staffEmail) {
+      setDecryptedSnapshots({
+        customerFirstName: null,
+        customerLastName: null,
+        customerPhone: null,
+        handlerName: null,
+      });
+      return;
+    }
+    let cancelled = false;
+    const encryptedCustomer = ticketDetails.customer as
+      | (typeof ticketDetails.customer & {
+          firstNameEncrypted?: string | null;
+          lastNameEncrypted?: string | null;
+          phoneEncrypted?: string | null;
+        })
+      | null;
+    const encryptedOrder = ticketDetails.order as
+      | (typeof ticketDetails.order & {
+          queuedByStaffNameEncrypted?: string | null;
+        })
+      | null;
+    if (
+      !encryptedCustomer?.firstNameEncrypted &&
+      !encryptedCustomer?.lastNameEncrypted &&
+      !encryptedCustomer?.phoneEncrypted &&
+      !encryptedOrder?.queuedByStaffNameEncrypted
+    ) {
+      setDecryptedSnapshots({
+        customerFirstName: null,
+        customerLastName: null,
+        customerPhone: null,
+        handlerName: null,
+      });
+      return;
+    }
+    const decryptValue = (value?: string | null) =>
+      value ? decryptField(value, staffEmail) : Promise.resolve(null);
+    const run = async () => {
+      try {
+        const [firstName, lastName, phone, handlerName] = await Promise.all([
+          decryptValue(encryptedCustomer?.firstNameEncrypted),
+          decryptValue(encryptedCustomer?.lastNameEncrypted),
+          decryptValue(encryptedCustomer?.phoneEncrypted),
+          decryptValue(encryptedOrder?.queuedByStaffNameEncrypted),
+        ]);
+        if (!cancelled) {
+          setDecryptedSnapshots({
+            customerFirstName: firstName,
+            customerLastName: lastName,
+            customerPhone: phone,
+            handlerName,
+          });
+        }
+      } catch (error) {
+        console.warn('[orders-dashboard] decrypt failed:', error);
+        if (!cancelled) {
+          setDecryptedSnapshots({
+            customerFirstName: null,
+            customerLastName: null,
+            customerPhone: null,
+            handlerName: null,
+          });
+        }
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [ticketDetails, user?.email]);
 
   const handleRefreshOrders = useCallback(() => {
     void refresh();
@@ -1415,56 +1468,23 @@ export default function OrdersDashboardPage() {
                 </button>
               </div>
 
-              <div className="space-y-3 text-sm text-gray-600 dark:text-gray-300">
-                <p>
-                  <span className="font-semibold text-gray-800 dark:text-gray-100">Estado:</span>{' '}
-                  {STATUS_LABELS[selectedOrderEffectiveStatus ?? selectedOrder.status]}
-                </p>
-                {selectedOrder.prepHandlerName && (
-                  <p>
-                    <span className="font-semibold text-gray-800 dark:text-gray-100">
-                      Preparado por:
-                    </span>{' '}
-                    {selectedOrder.prepHandlerName}
-                  </p>
-                )}
-                <p>
-                  <span className="font-semibold text-gray-800 dark:text-gray-100">Cliente:</span>{' '}
-                  {formatOrderCustomer(selectedOrder)}
-                </p>
-                <p>
-                  <span className="font-semibold text-gray-800 dark:text-gray-100">Creado:</span>{' '}
-                  {selectedOrder.createdAt
-                    ? new Date(selectedOrder.createdAt).toLocaleString('es-MX')
-                    : '---'}
-                </p>
-                <p>
-                  <span className="font-semibold text-gray-800 dark:text-gray-100">Total:</span>{' '}
-                  {formatCurrency(selectedOrder.total)}
-                </p>
-                {selectedOrder.deliveryTipAmount ? (
-                  <p>
-                    <span className="font-semibold text-gray-800 dark:text-gray-100">
-                      Propina de entrega:
-                    </span>{' '}
-                    {formatCurrency(selectedOrder.deliveryTipAmount)}
-                    {typeof selectedOrder.deliveryTipPercent === 'number'
-                      ? ` (${selectedOrder.deliveryTipPercent}%)`
-                      : ''}
-                  </p>
-                ) : null}
-              </div>
-              <div className="mt-5 space-y-4">
-                <TicketAssignmentNotice
-                  ticket={ticketDetails?.ticket}
-                  order={ticketDetails?.order}
-                  isLoading={isTicketLoading && Boolean(ticketIdentifier)}
-                />
+              <OrderDetailPanel
+                order={selectedOrder}
+                ticketDetails={ticketDetails}
+                decryptedCustomer={{
+                  firstName: decryptedSnapshots.customerFirstName,
+                  lastName: decryptedSnapshots.customerLastName,
+                  phone: decryptedSnapshots.customerPhone,
+                }}
+                decryptedHandlerName={decryptedSnapshots.handlerName}
+                isLoading={isTicketLoading && Boolean(ticketIdentifier)}
+              />
+              <div className="space-y-2 text-xs">
                 {ticketDetailsError && (
-                  <p className="text-xs text-red-600 dark:text-red-400">{ticketDetailsError}</p>
+                  <p className="text-red-600 dark:text-red-400">{ticketDetailsError}</p>
                 )}
                 {clientFavoritesError && (
-                  <p className="text-xs text-red-600 dark:text-red-400">{clientFavoritesError}</p>
+                  <p className="text-red-600 dark:text-red-400">{clientFavoritesError}</p>
                 )}
               </div>
 

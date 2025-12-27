@@ -27,7 +27,7 @@
 
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FaWhatsapp } from 'react-icons/fa';
@@ -78,6 +78,12 @@ export default function UserProfile() {
   const [pushPermissionInfo, setPushPermissionInfo] = useState<string | null>(null);
   const [deviceInfo, setDeviceInfo] = useState(() => detectDeviceInfo());
   const [loyaltyCoffeeCount, setLoyaltyCoffeeCount] = useState(() => user?.weeklyCoffeeCount ?? 0);
+  const loyaltyPanelRef = useRef<HTMLDivElement | null>(null);
+  const [isExportingLoyaltyPanel, setIsExportingLoyaltyPanel] = useState(false);
+  const [loyaltyPanelActionError, setLoyaltyPanelActionError] = useState<string | null>(null);
+  const [isWebShareAvailable, setIsWebShareAvailable] = useState(
+    typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+  );
   const { snackbar, showSnackbar, dismissSnackbar } = useSnackbarNotifications();
   const { stats: loyaltyStats, isLoading: isLoyaltyStatsLoading } = useLoyalty();
 
@@ -167,6 +173,12 @@ export default function UserProfile() {
   }, []);
 
   useEffect(() => {
+    setIsWebShareAvailable(
+      typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+    );
+  }, [deviceInfo]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
@@ -228,6 +240,163 @@ export default function UserProfile() {
       controller.abort();
     };
   }, [token]);
+
+  const waitForLoyaltyPanelAssets = useCallback(async () => {
+    if (!loyaltyPanelRef.current) {
+      return;
+    }
+    const images = Array.from(loyaltyPanelRef.current.querySelectorAll('img'));
+    await Promise.all(
+      images.map(
+        (image) =>
+          new Promise<void>((resolve) => {
+            if (image.complete && image.naturalWidth > 0) {
+              resolve();
+              return;
+            }
+            const handleResolve = () => {
+              image.removeEventListener('load', handleResolve);
+              image.removeEventListener('error', handleResolve);
+              resolve();
+            };
+            image.addEventListener('load', handleResolve);
+            image.addEventListener('error', handleResolve);
+          })
+      )
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }, []);
+
+  const dataUrlToBlob = useCallback((dataUrl: string): Blob => {
+    const [metadata, content] = dataUrl.split(',');
+    const mimeMatch = metadata.match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+    if (typeof window === 'undefined' || typeof window.atob !== 'function') {
+      throw new Error('Base64 decoder not available');
+    }
+    const byteString = window.atob(content);
+    const length = byteString.length;
+    const arrayBuffer = new ArrayBuffer(length);
+    const uintArray = new Uint8Array(arrayBuffer);
+    for (let index = 0; index < length; index += 1) {
+      uintArray[index] = byteString.charCodeAt(index);
+    }
+    return new Blob([uintArray], { type: mime });
+  }, []);
+
+  const captureLoyaltyPanelBlob = useCallback(async () => {
+    if (!loyaltyPanelRef.current) {
+      return null;
+    }
+    await waitForLoyaltyPanelAssets();
+    const html2canvas = (await import('html2canvas')).default;
+    const canvas = await html2canvas(loyaltyPanelRef.current, {
+      scale: 2,
+      backgroundColor: '#f5f3ef',
+      useCORS: true,
+    });
+    if (typeof canvas.toBlob !== 'function') {
+      try {
+        const dataUrl = canvas.toDataURL('image/png', 1);
+        return dataUrlToBlob(dataUrl);
+      } catch (error) {
+        console.error('Error convirtiendo el panel en imagen:', error);
+        return null;
+      }
+    }
+    return new Promise<Blob | null>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('No pudimos generar la imagen del programa semanal.'));
+            return;
+          }
+          resolve(blob);
+        },
+        'image/png',
+        1
+      );
+    });
+  }, [waitForLoyaltyPanelAssets, dataUrlToBlob]);
+
+  const downloadLoyaltyPanel = useCallback((blob: Blob, filename: string) => {
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = `${filename}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
+  }, []);
+
+  const shouldShareLoyaltyPanel = deviceInfo.isMobile && isWebShareAvailable;
+
+  const handleExportLoyaltyPanel = useCallback(async () => {
+    if (!loyaltyPanelRef.current) {
+      return;
+    }
+    setLoyaltyPanelActionError(null);
+    setIsExportingLoyaltyPanel(true);
+    try {
+      const blob = await captureLoyaltyPanelBlob();
+      if (!blob) {
+        throw new Error('capture_failed');
+      }
+      const filename = 'xoco-programa-semanal';
+      if (
+        shouldShareLoyaltyPanel &&
+        typeof navigator !== 'undefined' &&
+        typeof navigator.share === 'function'
+      ) {
+        const shareFile = new File([blob], `${filename}.png`, { type: 'image/png' });
+        if (navigator.canShare && !navigator.canShare({ files: [shareFile] })) {
+          throw new Error('share_not_supported');
+        }
+        try {
+          await navigator.share({
+            files: [shareFile],
+            title: 'Programa semanal Xoco Café',
+            text: 'Comparte tu avance del programa semanal y tus favoritos.',
+          });
+          setIsExportingLoyaltyPanel(false);
+          return;
+        } catch (shareError) {
+          if (
+            shareError instanceof DOMException &&
+            (shareError.name === 'AbortError' || shareError.name === 'NotAllowedError')
+          ) {
+            throw shareError;
+          }
+          console.error('Error compartiendo el panel:', shareError);
+          throw new Error('share_failed');
+        }
+      }
+      downloadLoyaltyPanel(blob, filename);
+    } catch (error) {
+      console.error('Error exportando programa semanal:', error);
+      if (
+        error instanceof DOMException &&
+        (error.name === 'AbortError' || error.name === 'NotAllowedError')
+      ) {
+        setLoyaltyPanelActionError('Cancelaste la acción antes de completarla.');
+      } else if (error instanceof Error && error.message === 'share_not_supported') {
+        setLoyaltyPanelActionError(
+          'Tu dispositivo no permite compartir este archivo. Intenta descargarlo desde este botón.'
+        );
+      } else if (error instanceof Error && error.message === 'share_failed') {
+        setLoyaltyPanelActionError(
+          'No pudimos compartir el panel en este dispositivo. Intenta nuevamente o descárgalo.'
+        );
+      } else {
+        setLoyaltyPanelActionError(
+          'No pudimos generar la imagen del programa semanal. Intenta de nuevo en unos segundos.'
+        );
+      }
+    } finally {
+      setIsExportingLoyaltyPanel(false);
+    }
+  }, [captureLoyaltyPanelBlob, downloadLoyaltyPanel, shouldShareLoyaltyPanel]);
 
   const updateConsentPreferences = useCallback(
     async (overrides: Partial<UpdateConsentInput>) => {
@@ -810,24 +979,47 @@ export default function UserProfile() {
         </section>
 
         <section className={sectionCardClass}>
-          <LoyaltyProgressCard
-            coffees={loyaltyCoffeeCount}
-            goal={loyaltyStampsGoal}
-            orders={loyaltyOrdersCount ?? undefined}
-            totalInteractions={loyaltyInteractionsCount ?? undefined}
-            customerName={loyaltyCustomerName}
-            isLoading={loyaltyCardLoading}
-            className="border-white/15"
-            qrUrl={qrUrl}
-            clientId={user.clientId ?? null}
-          />
-          <FavoriteItemsList
-            beverage={favoriteBeverageLabel === 'No registrado' ? null : favoriteBeverageLabel}
-            food={favoriteFoodLabel === 'No registrado' ? null : favoriteFoodLabel}
-            isLoading={isClientFavoritesLoading}
-            tone="dark"
-            className="border-white/10 bg-gradient-to-br from-[#13162b] via-[#1e233b] to-[#33243c]"
-          />
+          <div
+            ref={loyaltyPanelRef}
+            className="space-y-4 rounded-[32px] border border-white/20 bg-white/90 p-4 shadow-2xl dark:border-white/10 dark:bg-gray-900/70"
+          >
+            <LoyaltyProgressCard
+              coffees={loyaltyCoffeeCount}
+              goal={loyaltyStampsGoal}
+              orders={loyaltyOrdersCount ?? undefined}
+              totalInteractions={loyaltyInteractionsCount ?? undefined}
+              customerName={loyaltyCustomerName}
+              isLoading={loyaltyCardLoading}
+              className="border-white/15"
+              qrUrl={qrUrl}
+              clientId={user.clientId ?? null}
+            />
+            <FavoriteItemsList
+              beverage={favoriteBeverageLabel === 'No registrado' ? null : favoriteBeverageLabel}
+              food={favoriteFoodLabel === 'No registrado' ? null : favoriteFoodLabel}
+              isLoading={isClientFavoritesLoading}
+              tone="light"
+              className="bg-gradient-to-br from-white via-orange-50/60 to-white text-gray-900 dark:text-gray-100"
+            />
+          </div>
+
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => void handleExportLoyaltyPanel()}
+              className="w-full rounded-full bg-primary-600 px-5 py-3 text-sm font-semibold uppercase tracking-[0.25em] text-white shadow-lg transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-primary-500 dark:hover:bg-primary-400"
+              disabled={isExportingLoyaltyPanel}
+            >
+              {isExportingLoyaltyPanel
+                ? 'Generando...'
+                : shouldShareLoyaltyPanel
+                ? 'Compartir programa semanal'
+                : 'Descargar programa semanal'}
+            </button>
+          </div>
+          {loyaltyPanelActionError && (
+            <p className="text-xs text-red-600 dark:text-red-400">{loyaltyPanelActionError}</p>
+          )}
           <div className="rounded-2xl border border-white/30 bg-white/70 p-4 shadow-sm dark:border-white/10 dark:bg-gray-800/70">
             <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Personalízalos</h4>
             <p className="text-xs text-gray-600 dark:text-gray-400">

@@ -27,6 +27,8 @@
 
 'use client';
 
+import classNames from 'classnames';
+import { createPortal } from 'react-dom';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { MenuItem } from '@/lib/menuData';
 
@@ -75,12 +77,24 @@ export default function SearchableDropdown({
   allowClear = true,
 }: SearchableDropdownProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const dropdownPortalRef = useRef<HTMLDivElement | null>(null);
 
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState<number>(-1);
+  const [dropdownPosition, setDropdownPosition] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const normalizedQuery = normalize(query);
 
@@ -107,11 +121,43 @@ export default function SearchableDropdown({
     setActiveIndex(-1);
   }, []);
 
+  const updateDropdownPosition = useCallback(() => {
+    if (!buttonRef.current) {
+      return;
+    }
+    const rect = buttonRef.current.getBoundingClientRect();
+    setDropdownPosition({
+      top: rect.bottom + 8,
+      left: rect.left,
+      width: rect.width,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setDropdownPosition(null);
+      return;
+    }
+    updateDropdownPosition();
+    const handleReflow = () => {
+      updateDropdownPosition();
+    };
+    window.addEventListener('resize', handleReflow);
+    window.addEventListener('scroll', handleReflow, true);
+    return () => {
+      window.removeEventListener('resize', handleReflow);
+      window.removeEventListener('scroll', handleReflow, true);
+    };
+  }, [isOpen, updateDropdownPosition]);
+
   useEffect(() => {
     if (!isOpen) return;
 
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const isInsideContainer = containerRef.current?.contains(target) ?? false;
+      const isInsidePortal = dropdownPortalRef.current?.contains(target) ?? false;
+      if (!isInsideContainer && !isInsidePortal) {
         closeDropdown();
       }
     }
@@ -182,7 +228,10 @@ export default function SearchableDropdown({
   }, [activeIndex, isOpen]);
 
   return (
-    <div ref={containerRef} className="relative z-20 overflow-visible">
+    <div
+      ref={containerRef}
+      className={classNames('relative w-full overflow-visible', isOpen ? 'z-40' : 'z-10')}
+    >
       <label
         htmlFor={id}
         className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
@@ -191,9 +240,18 @@ export default function SearchableDropdown({
       </label>
       <div className="relative">
         <button
+          ref={buttonRef}
           id={id}
           type="button"
-          onClick={() => setIsOpen((prev) => !prev)}
+          onClick={() => {
+            setIsOpen((prev) => {
+              const next = !prev;
+              if (next) {
+                updateDropdownPosition();
+              }
+              return next;
+            });
+          }}
           onKeyDown={handleKeyDown}
           className="w-full flex justify-between items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
         >
@@ -210,80 +268,95 @@ export default function SearchableDropdown({
           </svg>
         </button>
 
-        {isOpen && (
-          <div
-            className="absolute z-50 mt-2 w-full rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800"
-            role="listbox"
-            aria-labelledby={id}
-          >
-            <div className="p-2 border-b border-gray-200 dark:border-gray-700">
-              <input
-                ref={inputRef}
-                type="text"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                placeholder="Buscar..."
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setActiveIndex(0);
-                }}
-              />
-            </div>
-
+        {isOpen &&
+          dropdownPosition &&
+          isMounted &&
+          typeof document !== 'undefined' &&
+          createPortal(
             <div
-              ref={listRef}
-              className="max-h-64 overflow-y-auto overscroll-contain p-1 touch-pan-y"
-              onKeyDown={handleListKeyDown}
-              role="presentation"
-              tabIndex={-1}
+              ref={(node) => {
+                dropdownPortalRef.current = node;
+              }}
+              className="fixed z-[999]"
+              style={{
+                top: dropdownPosition.top,
+                left: dropdownPosition.left,
+                width: dropdownPosition.width,
+              }}
+              role="listbox"
+              aria-labelledby={id}
             >
-              {filteredOptions.length === 0 && (
-                <p className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
-                  No hay resultados para “{query}”.
-                </p>
-              )}
+              <div className="mt-0 w-full rounded-md border border-gray-200 bg-white shadow-2xl dark:border-gray-600 dark:bg-gray-800">
+                <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    placeholder="Buscar..."
+                    value={query}
+                    onChange={(event) => {
+                      setQuery(event.target.value);
+                      setActiveIndex(0);
+                    }}
+                  />
+                </div>
 
-              {allowClear && selectedOption && (
-                <button
-                  type="button"
-                  className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-gray-700 rounded"
-                  onClick={() => {
-                    onChange('');
-                    closeDropdown();
-                  }}
+                <div
+                  ref={listRef}
+                  className="max-h-64 overflow-y-auto overscroll-contain p-1 touch-pan-y"
+                  onKeyDown={handleListKeyDown}
+                  role="presentation"
+                  tabIndex={-1}
                 >
-                  Quitar selección
-                </button>
-              )}
+                  {filteredOptions.length === 0 && (
+                    <p className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+                      No hay resultados para “{query}”.
+                    </p>
+                  )}
 
-              {filteredOptions.map((option, index) => {
-                const optionLabel = formatOptionLabel(option);
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    data-option
-                    className={`w-full text-left px-3 py-2 text-sm rounded ${
-                      option.id === value
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                        : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                    } ${activeIndex === index ? 'ring-1 ring-blue-500' : ''}`}
-                    onClick={() => handleSelect(option.id)}
-                  >
-                    <div className="flex flex-col">
-                      <span>{optionLabel}</span>
-                      {option.metadata?.calories && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {option.metadata.calories} kcal aprox
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+                  {allowClear && selectedOption && (
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-gray-700 rounded"
+                      onClick={() => {
+                        onChange('');
+                        closeDropdown();
+                      }}
+                    >
+                      Quitar selección
+                    </button>
+                  )}
+
+                  {filteredOptions.map((option, index) => {
+                    const optionLabel = formatOptionLabel(option);
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        data-option
+                        className={`w-full text-left px-3 py-2 text-sm rounded ${
+                          option.id === value
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                            : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                        } ${activeIndex === index ? 'ring-1 ring-blue-500' : ''}`}
+                        onClick={() => handleSelect(option.id)}
+                      >
+                        <div className="flex flex-col">
+                          <span>{optionLabel}</span>
+                          {option.metadata?.calories && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {option.metadata.calories} kcal aprox
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
       </div>
       {helperText && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{helperText}</p>}
     </div>

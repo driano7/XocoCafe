@@ -326,7 +326,7 @@ export default function OrderPage() {
       <div className="grid gap-8 lg:grid-cols-[1.2fr,0.8fr]">
         <section className="space-y-6">
           {user && (
-            <div className="space-y-3">
+            <div className="hidden" aria-hidden>
               <LoyaltyProgressCard
                 coffees={loyaltyWeeklyCoffees}
                 goal={loyaltyGoal}

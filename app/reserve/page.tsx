@@ -1522,7 +1522,7 @@ export default function ReservePage() {
           ) : (
             <Link
               href="/login"
-              className="rounded-full bg-primary-600 px-5 py-2.5 text-center text-sm font-semibold text-white shadow hover:bg-primary-700"
+              className="rounded-full bg-primary-600 px-5 py-2 text-center text-xs font-semibold tracking-[0.25em] uppercase text-white shadow hover:bg-primary-700"
             >
               Iniciar sesión
             </Link>

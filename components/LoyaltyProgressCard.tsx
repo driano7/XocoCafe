@@ -102,7 +102,11 @@ export default function LoyaltyProgressCard({
         })}
       </div>
 
-      <div className="mt-4 grid gap-2 text-xs uppercase tracking-[0.2em] text-white/80 sm:grid-cols-2">
+      <div className="mt-4 space-y-1 text-center text-xs uppercase tracking-[0.3em] text-white/80 sm:hidden">
+        <p className="text-[10px] text-white/60">Pedidos registrados / Interacciones totales</p>
+        <p className="text-lg font-semibold">{`${orders ?? '—'} / ${totalInteractions ?? '—'}`}</p>
+      </div>
+      <div className="mt-4 hidden gap-2 text-xs uppercase tracking-[0.2em] text-white/80 sm:grid sm:grid-cols-2">
         <div>
           <p className="text-[10px] text-white/60">Pedidos registrados</p>
           <p className="text-lg font-semibold">{orders ?? '—'}</p>
