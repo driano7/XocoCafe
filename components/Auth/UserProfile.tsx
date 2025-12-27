@@ -34,13 +34,12 @@ import { FaWhatsapp } from 'react-icons/fa';
 import siteMetadata from 'content/siteMetadata';
 import UserQrCard from '@/components/Auth/UserQrCard';
 import FavoritesSelect from '@/components/FavoritesSelect';
+import FavoriteItemsList from '@/components/FavoriteItemsList';
 import ConsumptionChart from '@/components/ConsumptionChart';
-import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
 import SessionTimeoutNotice from '@/components/SessionTimeoutNotice';
 import AddressManager from '@/components/Auth/AddressManager';
 import { useAuth } from './AuthProvider';
 import ShareExperienceForm from '@/components/Feedback/ShareExperienceForm';
-import LoyaltyProgramPanel from '@/components/LoyaltyProgramPanel';
 import {
   updateProfileSchema,
   updateConsentSchema,
@@ -50,9 +49,21 @@ import {
   type ChangePasswordInput,
 } from '@/lib/validations/auth';
 import { resolveFavoriteLabel } from '@/lib/menuFavorites';
+import { useClientFavorites } from '@/hooks/useClientFavorites';
+import { detectDeviceInfo, ensurePushPermission } from '@/lib/pushNotifications';
+import { useSnackbarNotifications } from '@/hooks/useSnackbarNotifications';
+import Snackbar from '@/components/Feedback/Snackbar';
+
+const FREE_COFFEE_NOTICE_KEY = 'xoco_free_coffee_notice';
 
 export default function UserProfile() {
   const { user, token, updateUser, isLoading } = useAuth();
+  const {
+    data: clientFavorites,
+    isLoading: isClientFavoritesLoading,
+    error: clientFavoritesError,
+    refresh: refreshClientFavorites = async () => {},
+  } = useClientFavorites(user?.clientId ?? null, token);
   const [isEditing, setIsEditing] = useState(false);
   const [message, setMessage] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
@@ -60,17 +71,13 @@ export default function UserProfile() {
     type: 'success' | 'error';
     message: string;
   } | null>(null);
-  const loyaltyReminder = useLoyaltyReminder({
-    userId: user?.id,
-    enrolled: user?.loyaltyEnrolled ?? false,
-    token,
-  });
-  const [loyaltyReminderAlert, setLoyaltyReminderAlert] = useState<{
-    type: 'success' | 'error';
-    message: string;
-  } | null>(null);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isUpdatingConsent, setIsUpdatingConsent] = useState(false);
+  const [pushPermissionInfo, setPushPermissionInfo] = useState<string | null>(null);
+  const [deviceInfo, setDeviceInfo] = useState(() => detectDeviceInfo());
+  const [loyaltyCoffeeCount, setLoyaltyCoffeeCount] = useState(() => user?.weeklyCoffeeCount ?? 0);
+  const { snackbar, showSnackbar, dismissSnackbar } = useSnackbarNotifications();
 
   const {
     register: registerProfile,
@@ -89,7 +96,12 @@ export default function UserProfile() {
     },
   });
 
-  const { register: registerConsent, reset: resetConsent } = useForm<UpdateConsentInput>({
+  const {
+    register: registerConsent,
+    reset: resetConsent,
+    watch: watchConsent,
+    setValue: setConsentValue,
+  } = useForm<UpdateConsentInput>({
     resolver: zodResolver(updateConsentSchema),
     defaultValues: {
       marketingEmail: user?.marketingEmail || false,
@@ -97,6 +109,8 @@ export default function UserProfile() {
       marketingPush: user?.marketingPush || false,
     },
   });
+  const marketingEmailValue = watchConsent('marketingEmail') ?? false;
+  const marketingPushValue = watchConsent('marketingPush') ?? false;
 
   const {
     register: registerPassword,
@@ -147,24 +161,136 @@ export default function UserProfile() {
   }, [user, prefillProfileForm, prefillConsentForm]);
 
   useEffect(() => {
-    if (!loyaltyReminderAlert) {
-      return undefined;
-    }
-    const timeout = setTimeout(() => setLoyaltyReminderAlert(null), 4000);
-    return () => clearTimeout(timeout);
-  }, [loyaltyReminderAlert]);
+    setDeviceInfo(detectDeviceInfo());
+  }, []);
 
-  const handleActivateLoyaltyReminder = useCallback(async () => {
-    const result = await loyaltyReminder.activate();
-    setLoyaltyReminderAlert({
-      type: result.success ? 'success' : 'error',
-      message:
-        result.message ??
-        (result.success
-          ? 'Activamos tu programa de lealtad. Ya puedes acumular sellos.'
-          : 'No pudimos activar tu programa de lealtad. Intenta más tarde.'),
-    });
-  }, [loyaltyReminder]);
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (loyaltyCoffeeCount >= 6) {
+      const hasNotified = window.sessionStorage.getItem(FREE_COFFEE_NOTICE_KEY);
+      if (!hasNotified) {
+        window.sessionStorage.setItem(FREE_COFFEE_NOTICE_KEY, 'yes');
+        showSnackbar('Tu próximo café americano es cortesía. Mantente al pendiente.', 'success', {
+          deviceNotification: {
+            title: 'Tu siguiente café es gratis ☕️',
+            body: 'Acumula un sello más para canjearlo en barra.',
+          },
+        });
+        void ensurePushPermission(deviceInfo);
+      }
+    } else {
+      window.sessionStorage.removeItem(FREE_COFFEE_NOTICE_KEY);
+    }
+  }, [deviceInfo, loyaltyCoffeeCount, showSnackbar]);
+
+  useEffect(() => {
+    if (typeof clientFavorites?.loyalty?.weeklyCoffeeCount === 'number') {
+      setLoyaltyCoffeeCount(clientFavorites.loyalty.weeklyCoffeeCount);
+    }
+  }, [clientFavorites?.loyalty?.weeklyCoffeeCount]);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    const controller = new AbortController();
+    const loadCoffeeCount = async () => {
+      try {
+        const response = await fetch('/api/user/coffee-count', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as {
+          success?: boolean;
+          data?: { weeklyCoffeeCount?: number | null };
+        };
+        if (payload?.success && typeof payload.data?.weeklyCoffeeCount === 'number') {
+          const normalized = Math.max(0, Math.min(7, payload.data.weeklyCoffeeCount));
+          setLoyaltyCoffeeCount(normalized);
+        }
+      } catch (error) {
+        if ((error as Error)?.name === 'AbortError') {
+          return;
+        }
+        console.error('Error sincronizando progreso de cafés:', error);
+      }
+    };
+
+    void loadCoffeeCount();
+    return () => {
+      controller.abort();
+    };
+  }, [token]);
+
+  const updateConsentPreferences = useCallback(
+    async (overrides: Partial<UpdateConsentInput>) => {
+      if (!token || !user) {
+        setPushPermissionInfo('Inicia sesión para actualizar tus preferencias.');
+        return false;
+      }
+      setIsUpdatingConsent(true);
+      setPushPermissionInfo(null);
+      try {
+        const payload: UpdateConsentInput = {
+          marketingEmail: overrides.marketingEmail ?? Boolean(user.marketingEmail),
+          marketingSms: overrides.marketingSms ?? Boolean(user.marketingSms),
+          marketingPush: overrides.marketingPush ?? Boolean(user.marketingPush),
+        };
+        const response = await fetch('/api/auth/consent', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        const result = await response.json();
+        if (result.success) {
+          updateUser(result.user);
+          prefillConsentForm(result.user);
+          return true;
+        }
+        setPushPermissionInfo(result.message ?? 'No pudimos actualizar tus preferencias.');
+        return false;
+      } catch (error) {
+        console.error('Error actualizando consentimientos:', error);
+        setPushPermissionInfo('Ocurrió un error al actualizar tus preferencias.');
+        return false;
+      } finally {
+        setIsUpdatingConsent(false);
+      }
+    },
+    [prefillConsentForm, token, updateUser, user]
+  );
+
+  const handlePushToggle = useCallback(
+    async (checked: boolean) => {
+      if (!user) return;
+      setConsentValue('marketingPush', checked);
+      if (checked) {
+        const permissionResult = await ensurePushPermission(deviceInfo);
+        setPushPermissionInfo(permissionResult.message);
+        if (!permissionResult.granted) {
+          setConsentValue('marketingPush', false);
+          return;
+        }
+      } else {
+        setPushPermissionInfo('No enviaremos notificaciones push hasta que vuelvas a activarlas.');
+      }
+      const success = await updateConsentPreferences({ marketingPush: checked });
+      if (!success) {
+        setConsentValue('marketingPush', !checked);
+      } else if (checked) {
+        setPushPermissionInfo('Activamos las notificaciones push de tu cuenta.');
+      }
+    },
+    [deviceInfo, setConsentValue, updateConsentPreferences, user]
+  );
 
   const onUpdateProfile = async (data: UpdateProfileInput) => {
     try {
@@ -363,23 +489,30 @@ export default function UserProfile() {
   const sectionCardClass =
     'flex w-full flex-col gap-4 rounded-3xl border border-white/30 bg-white/80 p-6 shadow-xl backdrop-blur-lg dark:border-white/5 dark:bg-gray-900/70';
   const favoriteBeverageLabel =
-    resolveFavoriteLabel(user.favoriteColdDrink ?? user.favoriteHotDrink) ?? 'No registrado';
-  const favoriteFoodLabel = resolveFavoriteLabel(user.favoriteFood) ?? 'No registrado';
-  const loyaltyStamps = Math.max(0, Math.min(7, user.weeklyCoffeeCount ?? 0));
-  const normalizeMetric = (value: unknown): number | null =>
-    typeof value === 'number' && Number.isFinite(value) ? value : null;
-  const monthlyMetrics = (user.monthlyMetrics ?? null) as Record<string, unknown> | null;
-  const userRecord = user as unknown as Record<string, unknown>;
-  const loyaltyOrdersCount =
-    normalizeMetric(monthlyMetrics?.['orders']) ??
-    normalizeMetric(monthlyMetrics?.['totalOrders']) ??
-    normalizeMetric(userRecord?.['ordersCount']);
-  const loyaltyInteractionsCount =
-    normalizeMetric(monthlyMetrics?.['interactions']) ??
-    normalizeMetric(monthlyMetrics?.['totalInteractions']) ??
-    normalizeMetric(userRecord?.['interactionsCount']);
-  const profileCustomerName =
-    [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;
+    clientFavorites?.favorites?.primaryBeverage?.label ??
+    clientFavorites?.favorites?.primaryBeverage?.value ??
+    clientFavorites?.favorites?.beverageCold?.label ??
+    clientFavorites?.favorites?.beverageCold?.value ??
+    clientFavorites?.favorites?.beverageHot?.label ??
+    clientFavorites?.favorites?.beverageHot?.value ??
+    resolveFavoriteLabel(user.favoriteColdDrink ?? user.favoriteHotDrink) ??
+    user.favoriteColdDrink ??
+    user.favoriteHotDrink ??
+    'No registrado';
+  const favoriteFoodLabel =
+    clientFavorites?.favorites?.food?.label ??
+    clientFavorites?.favorites?.food?.value ??
+    resolveFavoriteLabel(user.favoriteFood) ??
+    user.favoriteFood ??
+    'No registrado';
+  const favoriteBeverageMenuId =
+    clientFavorites?.favorites?.primaryBeverage?.menuId ??
+    clientFavorites?.favorites?.beverageCold?.menuId ??
+    clientFavorites?.favorites?.beverageHot?.menuId ??
+    user.favoriteColdDrink ??
+    user.favoriteHotDrink ??
+    null;
+  const favoriteFoodMenuId = clientFavorites?.favorites?.food?.menuId ?? user.favoriteFood ?? null;
 
   return (
     <>
@@ -621,43 +754,30 @@ export default function UserProfile() {
 
         <UserQrCard className={sectionCardClass} />
 
-        <LoyaltyProgramPanel
-          className={sectionCardClass}
-          stamps={loyaltyStamps}
-          customerName={profileCustomerName}
-          ordersCount={loyaltyOrdersCount ?? undefined}
-          interactionsCount={loyaltyInteractionsCount ?? undefined}
-          reminderAlert={loyaltyReminderAlert}
-          showReminderCard={loyaltyReminder.showReminder}
-          onActivateReminder={handleActivateLoyaltyReminder}
-          isActivatingReminder={loyaltyReminder.isActivating}
-        />
-
         <section className={sectionCardClass}>
-          <div className="rounded-[32px] border border-white/10 bg-gradient-to-br from-[#13162b] via-[#1e233b] to-[#33243c] p-5 text-white shadow-xl">
-            <p className="text-xs uppercase tracking-[0.35em] text-white/70">Favoritos</p>
-            <h3 className="mt-1 text-2xl font-semibold">Tus elecciones principales</h3>
-            <div className="mt-6 grid gap-6 sm:grid-cols-2">
-              <div className="rounded-2xl border border-white/20 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.3em] text-white/60">Bebida</p>
-                <p className="mt-2 text-lg font-semibold text-white">{favoriteBeverageLabel}</p>
-              </div>
-              <div className="rounded-2xl border border-white/20 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.3em] text-white/60">Alimento</p>
-                <p className="mt-2 text-lg font-semibold text-white">{favoriteFoodLabel}</p>
-              </div>
-            </div>
-            <p className="mt-4 text-sm text-white/70">
-              Actualiza tus favoritos para pedir más rápido desde cualquier dispositivo.
-            </p>
-          </div>
+          <FavoriteItemsList
+            beverage={favoriteBeverageLabel === 'No registrado' ? null : favoriteBeverageLabel}
+            food={favoriteFoodLabel === 'No registrado' ? null : favoriteFoodLabel}
+            isLoading={isClientFavoritesLoading}
+            tone="dark"
+            className="border-white/10 bg-gradient-to-br from-[#13162b] via-[#1e233b] to-[#33243c]"
+          />
           <div className="rounded-2xl border border-white/30 bg-white/70 p-4 shadow-sm dark:border-white/10 dark:bg-gray-800/70">
             <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Personalízalos</h4>
             <p className="text-xs text-gray-600 dark:text-gray-400">
               Selecciona tus bebidas y alimentos favoritos del menú.
             </p>
+            {clientFavoritesError && (
+              <p className="mt-2 text-xs text-red-500 dark:text-red-400">{clientFavoritesError}</p>
+            )}
             <div className="mt-4">
-              <FavoritesSelect />
+              <FavoritesSelect
+                initialBeverageId={favoriteBeverageMenuId}
+                initialFoodId={favoriteFoodMenuId}
+                initialFavorites={clientFavorites}
+                initialFavoritesLoading={isClientFavoritesLoading}
+                onUpdate={() => void refreshClientFavorites()}
+              />
             </div>
           </div>
         </section>
@@ -755,28 +875,14 @@ export default function UserProfile() {
                 id="marketingEmail"
                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 disabled
+                checked={marketingEmailValue}
+                readOnly
               />
               <label
                 htmlFor="marketingEmail"
                 className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
               >
-                Recibir ofertas por email
-              </label>
-            </div>
-
-            <div className="flex items-center">
-              <input
-                {...registerConsent('marketingSms')}
-                type="checkbox"
-                id="marketingSms"
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                disabled
-              />
-              <label
-                htmlFor="marketingSms"
-                className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
-              >
-                Recibir ofertas por SMS
+                Recibir ofertas por email (administrado por Xoco Café)
               </label>
             </div>
 
@@ -786,15 +892,20 @@ export default function UserProfile() {
                 type="checkbox"
                 id="marketingPush"
                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                disabled
+                checked={marketingPushValue}
+                onChange={(event) => handlePushToggle(event.target.checked)}
+                disabled={isUpdatingConsent}
               />
               <label
                 htmlFor="marketingPush"
                 className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
               >
-                Recibir notificaciones push
+                Recibir notificaciones push de pedidos y recompensas
               </label>
             </div>
+            {pushPermissionInfo && (
+              <p className="text-xs text-gray-600 dark:text-gray-400">{pushPermissionInfo}</p>
+            )}
           </div>
         </section>
 
@@ -919,6 +1030,8 @@ export default function UserProfile() {
           </button>
         </form>
       </ProfileModal>
+
+      <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
     </>
   );
 }

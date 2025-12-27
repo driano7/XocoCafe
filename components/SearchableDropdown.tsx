@@ -48,6 +48,22 @@ function normalize(value: string) {
     .toLowerCase();
 }
 
+function humanizeFromId(id: string) {
+  return id
+    .replace(/^(beverage|food|package)-/, '')
+    .split('-')
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
+}
+
+function formatOptionLabel(option: MenuItem) {
+  const rawLabel = option.label?.trim() ?? '';
+  if (rawLabel && !/^\$/.test(rawLabel)) {
+    return rawLabel;
+  }
+  return humanizeFromId(option.id);
+}
+
 export default function SearchableDropdown({
   id,
   label,
@@ -70,13 +86,17 @@ export default function SearchableDropdown({
 
   const sortedOptions = useMemo(
     () =>
-      [...options].sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' })),
+      [...options].sort((a, b) =>
+        formatOptionLabel(a).localeCompare(formatOptionLabel(b), 'es', { sensitivity: 'base' })
+      ),
     [options]
   );
 
   const filteredOptions = useMemo(() => {
     if (!normalizedQuery) return sortedOptions;
-    return sortedOptions.filter((option) => normalize(option.label).includes(normalizedQuery));
+    return sortedOptions.filter((option) =>
+      normalize(formatOptionLabel(option)).includes(normalizedQuery)
+    );
   }, [sortedOptions, normalizedQuery]);
 
   const selectedOption = options.find((option) => option.id === value) ?? null;
@@ -162,7 +182,7 @@ export default function SearchableDropdown({
   }, [activeIndex, isOpen]);
 
   return (
-    <div ref={containerRef}>
+    <div ref={containerRef} className="relative z-20 overflow-visible">
       <label
         htmlFor={id}
         className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
@@ -177,7 +197,7 @@ export default function SearchableDropdown({
           onKeyDown={handleKeyDown}
           className="w-full flex justify-between items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
         >
-          <span>{selectedOption ? selectedOption.label : placeholder}</span>
+          <span>{selectedOption ? formatOptionLabel(selectedOption) : placeholder}</span>
           <svg
             className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
             xmlns="http://www.w3.org/2000/svg"
@@ -192,7 +212,7 @@ export default function SearchableDropdown({
 
         {isOpen && (
           <div
-            className="absolute z-20 mt-2 w-full rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800"
+            className="absolute z-50 mt-2 w-full rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800"
             role="listbox"
             aria-labelledby={id}
           >
@@ -212,7 +232,7 @@ export default function SearchableDropdown({
 
             <div
               ref={listRef}
-              className="max-h-64 overflow-y-auto p-1"
+              className="max-h-64 overflow-y-auto overscroll-contain p-1 touch-pan-y"
               onKeyDown={handleListKeyDown}
               role="presentation"
               tabIndex={-1}
@@ -236,28 +256,31 @@ export default function SearchableDropdown({
                 </button>
               )}
 
-              {filteredOptions.map((option, index) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  data-option
-                  className={`w-full text-left px-3 py-2 text-sm rounded ${
-                    option.id === value
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                      : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                  } ${activeIndex === index ? 'ring-1 ring-blue-500' : ''}`}
-                  onClick={() => handleSelect(option.id)}
-                >
-                  <div className="flex flex-col">
-                    <span>{option.label}</span>
-                    {option.metadata?.calories && (
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {option.metadata.calories} kcal aprox
-                      </span>
-                    )}
-                  </div>
-                </button>
-              ))}
+              {filteredOptions.map((option, index) => {
+                const optionLabel = formatOptionLabel(option);
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    data-option
+                    className={`w-full text-left px-3 py-2 text-sm rounded ${
+                      option.id === value
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                    } ${activeIndex === index ? 'ring-1 ring-blue-500' : ''}`}
+                    onClick={() => handleSelect(option.id)}
+                  >
+                    <div className="flex flex-col">
+                      <span>{optionLabel}</span>
+                      {option.metadata?.calories && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {option.metadata.calories} kcal aprox
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

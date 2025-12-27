@@ -44,6 +44,8 @@ import { useOrders } from '@/hooks/useOrders';
 import { useLoyalty } from '@/hooks/useLoyalty';
 import { useTicketDetails } from '@/hooks/useTicketDetails';
 import { useClientFavorites } from '@/hooks/useClientFavorites';
+import FavoriteItemsList from '@/components/FavoriteItemsList';
+import { detectDeviceInfo, ensurePushPermission } from '@/lib/pushNotifications';
 
 interface Order {
   id: string;
@@ -664,72 +666,13 @@ export default function OrdersDashboardPage() {
     (shouldDisplayPermissionPrompt || (deviceInfo.isIOS && notificationPermission === 'default'));
 
   const handleRequestPushPermission = useCallback(async () => {
-    const persistMessage = (message: string, tone: SnackbarTone = 'info') => {
-      showSnackbar(message, tone);
-      setPushPermissionInfo(message);
-    };
-
-    if (!notificationSupported) {
-      if (deviceInfo.isIOS) {
-        try {
-          window.location.href = 'app-settings:';
-        } catch {
-          // ignore
-        }
-        persistMessage(
-          'iOS requiere activarlas desde Configuración → Safari → Notificaciones. Abre Ajustes y habilítalas para Xoco Café.'
-        );
-        return;
-      }
-      if (deviceInfo.isAndroid) {
-        persistMessage(
-          'Activa las notificaciones desde Ajustes → Apps y notificaciones → Xoco Café para recibir alertas.',
-          'warning'
-        );
-        return;
-      }
-      persistMessage(
-        'Este navegador no permite notificaciones push. Usa un navegador compatible o instala la app.',
-        'warning'
-      );
-      return;
+    const result = await ensurePushPermission(deviceInfo);
+    if (notificationSupported && result.status !== 'unsupported') {
+      await requestNotificationPermission();
     }
-
-    const result = await requestNotificationPermission();
-    if (result === 'granted') {
-      persistMessage('Activamos las notificaciones para este dispositivo.', 'success');
-      return;
-    }
-    if (result === 'denied') {
-      persistMessage(
-        'Tu navegador bloqueó las notificaciones. Revisa los ajustes de sitio o habilítalas manualmente.',
-        'warning'
-      );
-      return;
-    }
-
-    if (deviceInfo.isIOS) {
-      persistMessage(
-        'Apple no mostró la alerta. Abre Configuración → Safari → Notificaciones y habilítalas para Xoco Café.',
-        'info'
-      );
-      return;
-    }
-    if (deviceInfo.isAndroid) {
-      persistMessage(
-        'Android no mostró el aviso. Entra a Ajustes → Notificaciones → Xoco Café, habilítalas y vuelve a intentarlo.',
-        'info'
-      );
-      return;
-    }
-    persistMessage('No pudimos abrir el aviso de permisos. Intenta de nuevo más tarde.', 'error');
-  }, [
-    deviceInfo.isAndroid,
-    deviceInfo.isIOS,
-    notificationSupported,
-    requestNotificationPermission,
-    showSnackbar,
-  ]);
+    showSnackbar(result.message, result.tone);
+    setPushPermissionInfo(result.message);
+  }, [deviceInfo, notificationSupported, requestNotificationPermission, showSnackbar]);
 
   useEffect(() => {
     trackOrderStatuses(orders);
@@ -867,6 +810,7 @@ export default function OrdersDashboardPage() {
     data: clientFavorites,
     isLoading: isClientFavoritesLoading,
     error: clientFavoritesError,
+    refresh: refreshClientFavorites = async () => {},
   } = useClientFavorites(activeClientId, token);
   const activeLoyaltyCustomer = useMemo(() => {
     if (!loyaltyStats) {
@@ -898,6 +842,23 @@ export default function OrdersDashboardPage() {
   const loyaltyCoffees =
     loyaltyFromPos?.weeklyCoffeeCount ?? activeLoyaltyCustomer?.loyaltyCoffees ?? null;
   const combinedFavoritesLoading = isLoyaltyLoading || isClientFavoritesLoading;
+  useEffect(() => {
+    if (!selectedOrder?.id) {
+      return;
+    }
+    if (selectedOrderEffectiveStatus !== 'completed') {
+      return;
+    }
+    void refreshClientFavorites();
+  }, [refreshClientFavorites, selectedOrder?.id, selectedOrderEffectiveStatus]);
+  const favoriteBeverageDisplay =
+    clientFavorites?.favorites?.primaryBeverage?.label ??
+    clientFavorites?.favorites?.beverageCold?.label ??
+    clientFavorites?.favorites?.beverageHot?.label ??
+    activeLoyaltyCustomer?.favoriteBeverage ??
+    null;
+  const favoriteFoodDisplay =
+    clientFavorites?.favorites?.food?.label ?? activeLoyaltyCustomer?.favoriteFood ?? null;
 
   const handleLoyaltyActivation = useCallback(async () => {
     const result = await activateLoyaltyProgram();
@@ -954,28 +915,10 @@ export default function OrdersDashboardPage() {
     if (typeof navigator === 'undefined' || typeof window === 'undefined') {
       return;
     }
-    type WindowWithOpera = Window & { opera?: string };
-    const ua =
-      navigator.userAgent ||
-      navigator.vendor ||
-      ((window as WindowWithOpera).opera ? String((window as WindowWithOpera).opera) : '');
-    const isAndroid = /android/i.test(ua);
-    const isIPad =
-      /ipad/i.test(ua) ||
-      (/macintosh/i.test(ua) &&
-        typeof navigator.maxTouchPoints === 'number' &&
-        navigator.maxTouchPoints > 1);
-    const isIPhone = /iphone|ipod/i.test(ua);
-    const isMobile = isAndroid || isIPad || isIPhone;
-    const isIOS = isIPhone || isIPad;
-    setDeviceInfo({
-      isMobile,
-      isAndroid,
-      isIOS,
-      isIPadOS: isIPad,
-    });
+    const info = detectDeviceInfo();
+    setDeviceInfo(info);
     const supportsShare = typeof navigator.share === 'function';
-    setIsShareSupported(supportsShare && (isAndroid || isIPhone || isIPad));
+    setIsShareSupported(supportsShare && info.isMobile);
   }, []);
 
   useEffect(() => {
@@ -1566,6 +1509,14 @@ export default function OrdersDashboardPage() {
                 />
                 {ticketDetailsError && (
                   <p className="text-xs text-red-600 dark:text-red-400">{ticketDetailsError}</p>
+                )}
+                {shouldShowLoyaltyPanel && (
+                  <FavoriteItemsList
+                    beverage={favoriteBeverageDisplay}
+                    food={favoriteFoodDisplay}
+                    isLoading={combinedFavoritesLoading}
+                    tone="dark"
+                  />
                 )}
                 {shouldShowLoyaltyPanel && (
                   <LoyaltyProgressCard

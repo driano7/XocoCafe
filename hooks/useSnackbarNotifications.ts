@@ -117,20 +117,10 @@ export function useSnackbarNotifications(autoHideMs = 3000) {
     const ua = navigator.userAgent?.toLowerCase() ?? '';
     const isTouch = navigator.maxTouchPoints > 1;
     const isMobile = /android|iphone|ipad|ipod/.test(ua) || isTouch;
-    const isIOS =
-      /iphone|ipod|ipad/.test(ua) ||
-      (/macintosh/i.test(navigator.userAgent || '') &&
-        typeof navigator.maxTouchPoints === 'number' &&
-        navigator.maxTouchPoints > 1);
-    if (!isMobile) {
-      return;
-    }
-    if (isIOS) {
+    if (isMobile) {
       setManualPromptRequired(true);
-      return;
     }
-    void requestPermission();
-  }, [effectivePermission, requestPermission]);
+  }, [effectivePermission]);
 
   const emitDeviceNotification = useMemo(() => {
     if (!notificationSupported) {

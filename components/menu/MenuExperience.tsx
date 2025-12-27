@@ -6,6 +6,7 @@ import { menuItems } from '@/data/menuItems';
 import MenuGalleryGrid from '@/components/menu/MenuGalleryGrid';
 import ReelCarousel from '@/components/menu/ReelCarousel';
 import { components as mdxComponents } from '@/components/MDXComponents';
+import SupportBanner from '@/components/SupportBanner';
 
 type MenuExperienceProps = {
   simpleCode: string;
@@ -71,6 +72,7 @@ export default function MenuExperience({ simpleCode, simpleContent }: MenuExperi
           <MenuGalleryGrid items={menuItems} />
         )}
       </section>
+      <SupportBanner />
     </div>
   );
 }

@@ -33,10 +33,10 @@ import { useRouter } from 'next/navigation';
 import CheckoutForm from '@/components/Order/CheckoutForm';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import { useCartStore } from '@/hooks/useCartStore';
-import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
-import LoyaltyProgramPanel from '@/components/LoyaltyProgramPanel';
 import SearchableDropdown from '@/components/SearchableDropdown';
 import { beverageOptions, foodOptions, getMenuItemById, packageOptions } from '@/lib/menuData';
+import LoyaltyProgressCard from '@/components/LoyaltyProgressCard';
+import { useClientFavorites } from '@/hooks/useClientFavorites';
 import type { AddressInput } from '@/lib/validations/auth';
 
 const formatCurrency = (value: number) =>
@@ -51,32 +51,23 @@ export default function OrderPage() {
   const router = useRouter();
   const { items, addItem, increment, decrement, removeItem, subtotal, itemCount, clearCart } =
     useCartStore();
-  const loyaltyReminder = useLoyaltyReminder({
-    userId: user?.id,
-    enrolled: user?.loyaltyEnrolled ?? false,
-    token,
-  });
-  const [loyaltyReminderAlert, setLoyaltyReminderAlert] = useState<{
-    type: 'success' | 'error';
-    message: string;
-  } | null>(null);
-  const loyaltyStamps = Math.max(0, Math.min(7, user?.weeklyCoffeeCount ?? 0));
-  const normalizeMetric = (value: unknown): number | null =>
-    typeof value === 'number' && Number.isFinite(value) ? value : null;
-  const monthlyMetrics = (user?.monthlyMetrics ?? null) as Record<string, unknown> | null;
-  const userRecord = (user ?? null) as Record<string, unknown> | null;
-  const loyaltyOrdersCount =
-    normalizeMetric(monthlyMetrics?.['orders']) ??
-    normalizeMetric(monthlyMetrics?.['totalOrders']) ??
-    normalizeMetric(userRecord?.['ordersCount']);
-  const loyaltyInteractionsCount =
-    normalizeMetric(monthlyMetrics?.['interactions']) ??
-    normalizeMetric(monthlyMetrics?.['totalInteractions']) ??
-    normalizeMetric(userRecord?.['interactionsCount']);
   const [selectedBeverageId, setSelectedBeverageId] = useState('');
   const [selectedBeverageSize, setSelectedBeverageSize] = useState<string | null>(null);
   const [selectedFoodId, setSelectedFoodId] = useState('');
   const [selectedPackageId, setSelectedPackageId] = useState('');
+  const { data: clientFavorites, isLoading: isOrderFavoritesLoading } = useClientFavorites(
+    user?.clientId ?? null,
+    token
+  );
+  const loyaltyWeeklyCoffees =
+    clientFavorites?.loyalty?.weeklyCoffeeCount ?? user?.weeklyCoffeeCount ?? 0;
+  const loyaltyGoal = clientFavorites?.loyalty?.stampsGoal ?? 7;
+  const loyaltyOrdersCount = clientFavorites?.loyalty?.ordersCount ?? null;
+  const loyaltyInteractions = clientFavorites?.loyalty?.interactionsCount ?? null;
+  const loyaltyCardName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() ||
+    user?.clientId ||
+    undefined;
   const selectedBeverage = selectedBeverageId ? getMenuItemById(selectedBeverageId) : null;
   const beverageSizeList = selectedBeverage?.metadata?.availableSizes;
   const selectedBeverageSizes = selectedBeverage
@@ -100,17 +91,27 @@ export default function OrderPage() {
     [updateUser, user]
   );
 
-  const handleActivateLoyaltyReminder = async () => {
-    const result = await loyaltyReminder.activate();
-    setLoyaltyReminderAlert({
-      type: result.success ? 'success' : 'error',
-      message:
-        result.message ??
-        (result.success
-          ? 'Activamos tu programa de lealtad. Ya puedes acumular sellos.'
-          : 'No pudimos activar tu programa de lealtad. Intenta más tarde.'),
-    });
-  };
+  const determineRewardLineId = useCallback(
+    (currentItems: typeof items) => {
+      if (!user?.weeklyCoffeeCount || user.weeklyCoffeeCount < 6) {
+        return null;
+      }
+      const beverages = currentItems
+        .filter((item) => item.category === 'beverage')
+        .sort((a, b) => a.lineId.localeCompare(b.lineId));
+      if (beverages.length < 1) {
+        return null;
+      }
+      return beverages[beverages.length - 1].lineId;
+    },
+    [user?.weeklyCoffeeCount]
+  );
+
+  const [rewardLineId, setRewardLineId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRewardLineId(determineRewardLineId(items));
+  }, [determineRewardLineId, items]);
 
   const handleQuickAdd = (menuId: string, options?: { size?: string | null }) => {
     const menuItem = getMenuItemById(menuId);
@@ -188,14 +189,6 @@ export default function OrderPage() {
       setSelectedBeverageSize(null);
     }
   }, [selectedBeverageId]);
-
-  useEffect(() => {
-    if (!loyaltyReminderAlert) {
-      return undefined;
-    }
-    const timeout = setTimeout(() => setLoyaltyReminderAlert(null), 4000);
-    return () => clearTimeout(timeout);
-  }, [loyaltyReminderAlert]);
 
   useEffect(() => {
     router.prefetch('/dashboard/pedidos');
@@ -332,23 +325,23 @@ export default function OrderPage() {
 
       <div className="grid gap-8 lg:grid-cols-[1.2fr,0.8fr]">
         <section className="space-y-6">
+          {user && (
+            <div className="space-y-3">
+              <LoyaltyProgressCard
+                coffees={loyaltyWeeklyCoffees}
+                goal={loyaltyGoal}
+                orders={loyaltyOrdersCount ?? undefined}
+                totalInteractions={loyaltyInteractions ?? undefined}
+                customerName={loyaltyCardName}
+                isLoading={isOrderFavoritesLoading}
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Recuerda: los pedidos registrados como “Público general” no acumulan sellos de
+                lealtad. Identifícate con tu ID para seguir sumando cafés.
+              </p>
+            </div>
+          )}
           {quickAddSection}
-          <LoyaltyProgramPanel
-            as="div"
-            className="rounded-2xl border border-gray-200 bg-white p-5 shadow-lg dark:border-gray-700 dark:bg-gray-900"
-            stamps={loyaltyStamps}
-            customerName={
-              [user?.firstName, user?.lastName].filter(Boolean).join(' ') ||
-              user?.email ||
-              undefined
-            }
-            ordersCount={loyaltyOrdersCount ?? undefined}
-            interactionsCount={loyaltyInteractionsCount ?? undefined}
-            reminderAlert={loyaltyReminderAlert}
-            showReminderCard={loyaltyReminder.showReminder}
-            onActivateReminder={handleActivateLoyaltyReminder}
-            isActivatingReminder={loyaltyReminder.isActivating}
-          />
         </section>
 
         <aside className="rounded-2xl border border-gray-200 bg-white p-5 shadow-lg dark:border-gray-700 dark:bg-gray-900">
@@ -376,7 +369,12 @@ export default function OrderPage() {
                 >
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                      {item.name}
+                      {item.name}{' '}
+                      {rewardLineId === item.lineId && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-800">
+                          Cortesía
+                        </span>
+                      )}
                     </p>
                     {item.size && (
                       <p className="text-[11px] text-gray-500 dark:text-gray-400">
@@ -388,7 +386,9 @@ export default function OrderPage() {
                         Incluye: {item.packageItems.join(', ')}
                       </p>
                     ) : null}
-                    <p className="text-xs text-gray-500">{formatCurrency(item.price)}</p>
+                    <p className="text-xs text-gray-500">
+                      {rewardLineId === item.lineId ? 'Gratis' : formatCurrency(item.price)}
+                    </p>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -412,7 +412,9 @@ export default function OrderPage() {
                   </div>
 
                   <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                    {formatCurrency(item.price * item.quantity)}
+                    {rewardLineId === item.lineId
+                      ? 'Gratis'
+                      : formatCurrency(item.price * item.quantity)}
                   </div>
 
                   <button

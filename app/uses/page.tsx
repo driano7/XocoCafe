@@ -29,7 +29,6 @@
 
 import MainLayout from '@/layouts/MainLayout';
 import MenuExperience from '@/components/menu/MenuExperience';
-import SupportBanner from '@/components/SupportBanner';
 import { allAuthors } from 'contentlayer/generated';
 import { coreContent } from '@/lib/utils/contentlayer';
 
@@ -105,9 +104,6 @@ export default function Uses() {
     <MainLayout>
       <div className="min-h-screen bg-[#05070f]">
         <MenuExperience simpleCode={author.body.code} simpleContent={simpleContent} />
-        <div className="mx-auto w-full max-w-6xl px-3 pb-16 sm:px-6 lg:px-0">
-          <SupportBanner />
-        </div>
       </div>
     </MainLayout>
   );

@@ -30,10 +30,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import SearchableDropdown from '@/components/SearchableDropdown';
 import { beverageOptions, foodOptions, getMenuItemById } from '@/lib/menuData';
+import { useClientFavorites, type ClientFavoritesPayload } from '@/hooks/useClientFavorites';
 import { useAuth } from './Auth/AuthProvider';
 
 interface FavoritesSelectProps {
   onUpdate?: () => void;
+  initialBeverageId?: string | null;
+  initialFoodId?: string | null;
+  initialFavorites?: ClientFavoritesPayload | null;
+  initialFavoritesLoading?: boolean;
 }
 
 interface FavoriteState {
@@ -49,6 +54,23 @@ function normalizeLabel(value: string) {
     .trim();
 }
 
+function humanizeId(id: string) {
+  return id
+    .replace(/^(beverage|food|package)-/, '')
+    .split('-')
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
+}
+
+function resolveMenuLabel(menuItem: ReturnType<typeof getMenuItemById>): string {
+  if (!menuItem) return 'Sin seleccionar';
+  const label = menuItem.label?.trim();
+  if (label && !/^\$/.test(label)) {
+    return label;
+  }
+  return humanizeId(menuItem.id);
+}
+
 function resolveMenuId(value: string | null | undefined, category: 'beverage' | 'food'): string {
   if (!value) return '';
   const candidate = value.trim();
@@ -62,33 +84,123 @@ function resolveMenuId(value: string | null | undefined, category: 'beverage' | 
   const matchByLabel = options.find(
     (option) => normalizeLabel(option.label) === normalizedCandidate
   );
-  return matchByLabel?.id ?? '';
+  if (matchByLabel) {
+    return matchByLabel.id;
+  }
+
+  const condensedCandidate = normalizedCandidate.replace(/[^a-z0-9]/g, '');
+  const looseMatch = options.find((option) => {
+    const normalizedOption = normalizeLabel(option.label);
+    if (
+      normalizedOption.includes(normalizedCandidate) ||
+      normalizedCandidate.includes(normalizedOption)
+    ) {
+      return true;
+    }
+    const condensedOption = normalizedOption.replace(/[^a-z0-9]/g, '');
+    return (
+      condensedOption.includes(condensedCandidate) || condensedCandidate.includes(condensedOption)
+    );
+  });
+  return looseMatch?.id ?? '';
 }
 
-export default function FavoritesSelect({ onUpdate }: FavoritesSelectProps) {
+export default function FavoritesSelect({
+  onUpdate,
+  initialBeverageId,
+  initialFoodId,
+  initialFavorites,
+  initialFavoritesLoading = false,
+}: FavoritesSelectProps) {
   const { user, token, updateUser } = useAuth();
+  const shouldHydrateFromHook = !initialFavorites;
+  const targetClientId = shouldHydrateFromHook ? user?.clientId ?? null : null;
+  const {
+    data: fetchedFavorites,
+    isLoading: fetchedFavoritesLoading,
+    error: fetchedFavoritesError,
+    refresh: refreshFetchedFavorites,
+  } = useClientFavorites(targetClientId, token);
+  const resolvedFavorites = initialFavorites ?? fetchedFavorites ?? null;
+  const isFavoritesLoading =
+    Boolean(initialFavoritesLoading) || (shouldHydrateFromHook && fetchedFavoritesLoading);
+  const favoritesError = shouldHydrateFromHook ? fetchedFavoritesError : null;
   const [isUpdating, setIsUpdating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const remoteBeverageId = useMemo(() => {
+    if (!resolvedFavorites) return initialBeverageId ?? null;
+    const primary = resolvedFavorites.favorites.primaryBeverage;
+    const cold = resolvedFavorites.favorites.beverageCold;
+    const hot = resolvedFavorites.favorites.beverageHot;
+    return (
+      primary.menuId ??
+      primary.value ??
+      cold.menuId ??
+      cold.value ??
+      hot.menuId ??
+      hot.value ??
+      initialBeverageId ??
+      null
+    );
+  }, [initialBeverageId, resolvedFavorites]);
+  const remoteFoodId = useMemo(() => {
+    if (!resolvedFavorites) return initialFoodId ?? null;
+    const food = resolvedFavorites.favorites.food;
+    return food.menuId ?? food.value ?? initialFoodId ?? null;
+  }, [initialFoodId, resolvedFavorites]);
+  const normalizedBeverageId = useMemo(
+    () =>
+      resolveMenuId(
+        remoteBeverageId ?? user?.favoriteColdDrink ?? user?.favoriteHotDrink,
+        'beverage'
+      ),
+    [remoteBeverageId, user?.favoriteColdDrink, user?.favoriteHotDrink]
+  );
+  const normalizedFoodId = useMemo(
+    () => resolveMenuId(remoteFoodId ?? user?.favoriteFood, 'food'),
+    [remoteFoodId, user?.favoriteFood]
+  );
   const [favorites, setFavorites] = useState<FavoriteState>({
-    favoriteBeverageId: resolveMenuId(user?.favoriteColdDrink, 'beverage'),
-    favoriteFoodId: resolveMenuId(user?.favoriteFood, 'food'),
+    favoriteBeverageId: normalizedBeverageId,
+    favoriteFoodId: normalizedFoodId,
   });
 
   useEffect(() => {
-    setFavorites({
-      favoriteBeverageId: resolveMenuId(user?.favoriteColdDrink, 'beverage'),
-      favoriteFoodId: resolveMenuId(user?.favoriteFood, 'food'),
+    setFavorites((previous) => {
+      if (
+        previous.favoriteBeverageId === normalizedBeverageId &&
+        previous.favoriteFoodId === normalizedFoodId
+      ) {
+        return previous;
+      }
+      return {
+        favoriteBeverageId: normalizedBeverageId,
+        favoriteFoodId: normalizedFoodId,
+      };
     });
-  }, [user?.favoriteColdDrink, user?.favoriteFood]);
+  }, [normalizedBeverageId, normalizedFoodId]);
 
   const favoriteSummary = useMemo(() => {
     const beverage = getMenuItemById(favorites.favoriteBeverageId);
     const food = getMenuItemById(favorites.favoriteFoodId);
     return {
-      beverageLabel: beverage?.label ?? 'Sin seleccionar',
-      foodLabel: food?.label ?? 'Sin seleccionar',
+      beverageLabel: resolveMenuLabel(beverage),
+      foodLabel: resolveMenuLabel(food),
     };
   }, [favorites.favoriteBeverageId, favorites.favoriteFoodId]);
+  const loyaltyInfo = resolvedFavorites?.loyalty ?? null;
+  const loyaltyStatus = useMemo(() => {
+    if (!loyaltyInfo) {
+      return null;
+    }
+    if (loyaltyInfo.remainingForReward <= 0) {
+      return 'Tu siguiente café se descuenta automáticamente al completar un pedido elegible.';
+    }
+    if (loyaltyInfo.remainingForReward === 1) {
+      return 'Te falta 1 café para activar la cortesía de la semana.';
+    }
+    return `Te faltan ${loyaltyInfo.remainingForReward} cafés para la cortesía.`;
+  }, [loyaltyInfo]);
 
   const handleUpdate = async () => {
     if (!token) return;
@@ -110,6 +222,9 @@ export default function FavoritesSelect({ onUpdate }: FavoritesSelectProps) {
       const result = await response.json();
       if (result.success) {
         updateUser(result.user);
+        if (shouldHydrateFromHook) {
+          await refreshFetchedFavorites().catch(() => null);
+        }
         onUpdate?.();
         setMessage('Favoritos actualizados exitosamente');
       } else {
@@ -163,6 +278,13 @@ export default function FavoritesSelect({ onUpdate }: FavoritesSelectProps) {
         />
       </div>
 
+      {isFavoritesLoading && (
+        <p className="text-xs text-gray-500 dark:text-gray-400" role="status">
+          Sincronizando tus preferencias guardadas…
+        </p>
+      )}
+      {favoritesError && <p className="text-xs text-red-600 dark:text-red-400">{favoritesError}</p>}
+
       <button
         onClick={handleUpdate}
         disabled={isUpdating}
@@ -175,6 +297,18 @@ export default function FavoritesSelect({ onUpdate }: FavoritesSelectProps) {
         <p className="text-sm text-blue-600 dark:text-blue-400" role="status">
           {message}
         </p>
+      )}
+
+      {loyaltyInfo && (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 text-sm text-blue-900 dark:border-blue-400/30 dark:bg-blue-900/10 dark:text-blue-100">
+          <p className="text-xs uppercase tracking-[0.3em] text-blue-700/70 dark:text-blue-200">
+            Programa de lealtad
+          </p>
+          <p className="mt-1 font-semibold text-lg">
+            {loyaltyInfo.weeklyCoffeeCount}/{loyaltyInfo.stampsGoal} cafés registrados esta semana
+          </p>
+          {loyaltyStatus && <p className="mt-1 text-sm">{loyaltyStatus}</p>}
+        </div>
       )}
     </div>
   );

@@ -30,6 +30,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import type { AuthUser } from '@/lib/validations/auth';
 import { useAnalyticsContext } from '@/components/Analytics/AnalyticsProvider';
+import { detectDeviceInfo, ensurePushPermission, type DeviceInfo } from '@/lib/pushNotifications';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -42,6 +43,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const INACTIVITY_LIMIT_MS = 5 * 60 * 1000;
+const PUSH_PROMPT_KEY = 'xoco_push_prompted';
 
 export function useAuth() {
   const context = useContext(AuthContext);
@@ -59,6 +61,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [deviceInfo, setDeviceInfo] = useState<DeviceInfo>(() => detectDeviceInfo());
 
   // Obtener contexto de analítica de forma segura
   const analyticsContext = useAnalyticsContext();
@@ -73,6 +76,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } else {
       setIsLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    setDeviceInfo(detectDeviceInfo());
   }, []);
 
   const verifyToken = async (tokenToVerify: string) => {
@@ -104,6 +111,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(false);
     }
   };
+
+  const syncMarketingPushPreference = useCallback(
+    async (marketingPush: boolean) => {
+      if (!token || !user) return;
+      try {
+        const response = await fetch('/api/auth/consent', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            marketingEmail: Boolean(user.marketingEmail),
+            marketingSms: Boolean(user.marketingSms),
+            marketingPush,
+          }),
+        });
+        const result = await response.json();
+        if (result.success) {
+          setUser(result.user);
+        }
+      } catch (error) {
+        console.error('Error actualizando preferencia push:', error);
+      }
+    },
+    [token, user]
+  );
 
   const login = (newToken: string, newUser: AuthUser) => {
     setToken(newToken);
@@ -165,6 +199,43 @@ export function AuthProvider({ children }: AuthProviderProps) {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof Notification === 'undefined') {
+      return;
+    }
+    if (!user || !token) {
+      return;
+    }
+    const alreadyPrompted = window.localStorage.getItem(PUSH_PROMPT_KEY);
+    if (alreadyPrompted) {
+      return;
+    }
+    if (user.marketingPush || Notification.permission !== 'default') {
+      window.localStorage.setItem(PUSH_PROMPT_KEY, 'yes');
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      const wantsPush = window.confirm(
+        '¿Quieres recibir notificaciones push sobre tus pedidos y recompensas de Xoco Café?'
+      );
+      window.localStorage.setItem(PUSH_PROMPT_KEY, 'yes');
+      if (!wantsPush) {
+        void syncMarketingPushPreference(false);
+        return;
+      }
+      void (async () => {
+        const permissionResult = await ensurePushPermission(deviceInfo);
+        window.alert(permissionResult.message);
+        if (permissionResult.granted) {
+          await syncMarketingPushPreference(true);
+        } else {
+          await syncMarketingPushPreference(false);
+        }
+      })();
+    }, 800);
+    return () => window.clearTimeout(timeout);
+  }, [deviceInfo, syncMarketingPushPreference, token, user]);
 
   useEffect(() => {
     if (!token) return undefined;

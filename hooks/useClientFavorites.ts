@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-interface FavoriteEntry {
+export interface FavoriteEntry {
   label: string | null;
   value: string | null;
   menuId: string | null;
 }
 
-interface ClientFavoritesPayload {
+export interface ClientFavoritesPayload {
   clientId: string;
   favorites: {
     beverageCold: FavoriteEntry;
@@ -20,6 +20,8 @@ interface ClientFavoritesPayload {
     weeklyCoffeeCount: number;
     remainingForReward: number;
     stampsGoal: number;
+    ordersCount?: number | null;
+    interactionsCount?: number | null;
   };
 }
 
@@ -27,6 +29,7 @@ interface ClientFavoritesHookResult {
   data: ClientFavoritesPayload | null;
   isLoading: boolean;
   error: string | null;
+  refresh: () => Promise<void>;
 }
 
 export function useClientFavorites(
@@ -37,18 +40,14 @@ export function useClientFavorites(
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!clientId || !token) {
-      setData(null);
-      setIsLoading(false);
-      setError(null);
-      return;
-    }
-
-    let cancelled = false;
-    const controller = new AbortController();
-
-    const loadFavorites = async () => {
+  const loadFavorites = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!clientId || !token) {
+        setData(null);
+        setIsLoading(false);
+        setError(null);
+        return;
+      }
       setIsLoading(true);
       setError(null);
       try {
@@ -57,7 +56,7 @@ export function useClientFavorites(
             Authorization: `Bearer ${token}`,
           },
           cache: 'no-store',
-          signal: controller.signal,
+          signal,
         });
         const payload = (await response.json()) as {
           success?: boolean;
@@ -67,9 +66,7 @@ export function useClientFavorites(
         if (!response.ok || !payload?.success || !payload.data) {
           throw new Error(payload?.message ?? 'No pudimos cargar preferencias del cliente');
         }
-        if (!cancelled) {
-          setData(payload.data);
-        }
+        setData(payload.data);
       } catch (caughtError) {
         if ((caughtError as Error)?.name === 'AbortError') {
           return;
@@ -78,24 +75,35 @@ export function useClientFavorites(
           caughtError instanceof Error
             ? caughtError.message
             : 'No pudimos cargar preferencias del cliente';
-        if (!cancelled) {
-          setError(message);
-          setData(null);
-        }
+        setError(message);
+        setData(null);
       } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
+        setIsLoading(false);
       }
-    };
+    },
+    [clientId, token]
+  );
 
-    void loadFavorites();
-
+  useEffect(() => {
+    if (!clientId || !token) {
+      setData(null);
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
+    const controller = new AbortController();
+    void loadFavorites(controller.signal);
     return () => {
-      cancelled = true;
       controller.abort();
     };
-  }, [clientId, token]);
+  }, [clientId, token, loadFavorites]);
 
-  return { data, isLoading, error };
+  return {
+    data,
+    isLoading,
+    error,
+    refresh: async () => {
+      await loadFavorites();
+    },
+  };
 }

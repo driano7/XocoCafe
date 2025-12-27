@@ -66,6 +66,13 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
         ? hotFavorite
         : describeFavorite(data.favoriteColdDrink ?? data.favoriteHotDrink);
     const weeklyCoffeeCount = Math.max(0, data.weeklyCoffeeCount ?? 0);
+    const [{ count: ordersCount }, { count: interactionsCount }] = await Promise.all([
+      supabase.from('orders').select('id', { count: 'exact', head: true }).eq('userId', data.id),
+      supabase
+        .from('loyalty_points')
+        .select('id', { count: 'exact', head: true })
+        .eq('userId', data.id),
+    ]);
 
     return NextResponse.json({
       success: true,
@@ -81,6 +88,8 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
           weeklyCoffeeCount,
           remainingForReward: Math.max(0, MAX_STAMPS - weeklyCoffeeCount),
           stampsGoal: MAX_STAMPS,
+          ordersCount: ordersCount ?? null,
+          interactionsCount: interactionsCount ?? null,
         },
       },
     });

@@ -125,7 +125,7 @@ export default function SupportBanner() {
           </p>
         </div>
         {SOCIAL_LINKS.length > 0 && (
-          <ul className="flex flex-wrap items-center gap-3">
+          <ul className="flex list-none flex-wrap items-center gap-3">
             {SOCIAL_LINKS.map(({ label, href, Icon }) => (
               <li key={label}>
                 <a

@@ -31,6 +31,28 @@ import { verifyToken } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { insertLoyaltyEntry } from '@/lib/loyalty';
 
+const MAX_STAMPS = 7;
+const LOYALTY_ELIGIBLE_PRODUCTS = ['beverage-cafe-mexicano'];
+
+type OrderItemRow = {
+  productId?: string | null;
+  quantity?: number | string | null;
+};
+
+type WeeklyOrderRow = {
+  items?: OrderItemRow[] | null;
+};
+
+const getStartOfWeek = () => {
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setHours(0, 0, 0, 0);
+  const day = startOfWeek.getDay();
+  const diff = (day + 6) % 7; // lunes como inicio
+  startOfWeek.setDate(startOfWeek.getDate() - diff);
+  return startOfWeek;
+};
+
 const authenticate = (request: NextRequest) => {
   const authHeader = request.headers.get('authorization');
   const token = authHeader?.replace('Bearer ', '');
@@ -61,47 +83,66 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('weeklyCoffeeCount')
-      .eq('id', auth.decoded.userId)
-      .maybeSingle();
+    const startOfWeek = getStartOfWeek();
+    const startOfWeekIso = startOfWeek.toISOString();
 
-    if (error) {
-      throw new Error(error.message);
+    const [{ data: user, error: userError }, { data: weeklyOrders, error: ordersError }] =
+      await Promise.all([
+        supabase
+          .from('users')
+          .select('weeklyCoffeeCount')
+          .eq('id', auth.decoded.userId)
+          .maybeSingle(),
+        supabase
+          .from('orders')
+          .select('id,createdAt,items:order_items(productId,quantity)')
+          .eq('userId', auth.decoded.userId)
+          .gte('createdAt', startOfWeekIso),
+      ]);
+
+    if (userError) {
+      throw new Error(userError.message);
     }
 
-    let weeklyCoffeeCount = user?.weeklyCoffeeCount ?? null;
+    if (ordersError) {
+      throw new Error(ordersError.message);
+    }
 
-    if (weeklyCoffeeCount === null || weeklyCoffeeCount === undefined) {
-      const now = new Date();
-      const startOfWeek = new Date(now);
-      startOfWeek.setHours(0, 0, 0, 0);
-      const day = startOfWeek.getDay();
-      const diff = (day + 6) % 7; // lunes como inicio
-      startOfWeek.setDate(startOfWeek.getDate() - diff);
+    const eligibleCoffeeCount = (weeklyOrders ?? []).reduce((orderAcc, order) => {
+      const typedOrder = order as WeeklyOrderRow;
+      const items = Array.isArray(typedOrder.items) ? typedOrder.items : [];
+      const orderTotal = items.reduce((itemAcc, item) => {
+        if (!item?.productId) return itemAcc;
+        if (!LOYALTY_ELIGIBLE_PRODUCTS.includes(item.productId)) {
+          return itemAcc;
+        }
+        const quantity =
+          typeof item.quantity === 'number'
+            ? item.quantity
+            : Number.parseInt(String(item.quantity ?? 0), 10) || 0;
+        return itemAcc + Math.max(0, quantity);
+      }, 0);
+      return orderAcc + orderTotal;
+    }, 0);
+    const normalizedCoffeeCount = Math.min(eligibleCoffeeCount, MAX_STAMPS);
 
-      const { count: loyaltyCount, error: loyaltyError } = await supabase
-        .from('loyalty_points')
-        .select('id', { count: 'exact', head: true })
-        .eq('userId', auth.decoded.userId)
-        .eq('reason', 'coffee_increment')
-        .gte('createdAt', startOfWeek.toISOString());
-
-      if (loyaltyError) {
-        throw new Error(loyaltyError.message);
-      }
-
-      weeklyCoffeeCount = loyaltyCount ?? 0;
+    if (user && (user.weeklyCoffeeCount ?? 0) !== normalizedCoffeeCount) {
+      await supabase
+        .from('users')
+        .update({
+          weeklyCoffeeCount: normalizedCoffeeCount,
+          updatedAt: new Date().toISOString(),
+        })
+        .eq('id', auth.decoded.userId);
     }
 
     return NextResponse.json({
       success: true,
       data: {
-        weeklyCoffeeCount: Math.min(weeklyCoffeeCount ?? 0, 7),
+        weeklyCoffeeCount: normalizedCoffeeCount,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error obteniendo contador de cafés:', error);
     return NextResponse.json(
       { success: false, message: 'Error interno del servidor' },
@@ -139,7 +180,7 @@ export async function POST(request: NextRequest) {
     }
 
     const previousCount = user.weeklyCoffeeCount ?? 0;
-    const newCount = Math.min(previousCount + increment, 7); // Máximo 7
+    const newCount = Math.min(previousCount + increment, MAX_STAMPS); // Máximo 7
 
     const { data: updatedUser, error: updateError } = await supabase
       .from('users')
@@ -179,7 +220,7 @@ export async function POST(request: NextRequest) {
     let rewardEarned = false;
     let finalCount = updatedUser.weeklyCoffeeCount;
 
-    if (newCount >= 7) {
+    if (newCount >= MAX_STAMPS) {
       rewardEarned = true;
 
       await insertLoyaltyEntry({
@@ -222,7 +263,7 @@ export async function POST(request: NextRequest) {
           : null,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error actualizando contador de cafés:', error);
     return NextResponse.json(
       { success: false, message: 'Error interno del servidor' },
@@ -300,7 +341,7 @@ export async function PUT(request: NextRequest) {
         message: 'Contador semanal reiniciado',
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error reseteando contador de cafés:', error);
     return NextResponse.json(
       { success: false, message: 'Error interno del servidor' },

@@ -192,7 +192,7 @@ input:-webkit-autofill:focus {
 
 .menu-simple-prose table {
   width: 100%;
-  min-width: 680px;
+  min-width: 720px;
   border-collapse: collapse;
   margin-bottom: 1.5rem;
 }
@@ -232,12 +232,12 @@ input:-webkit-autofill:focus {
 
 @media (max-width: 640px) {
   .menu-simple-prose table {
-    min-width: 620px;
+    min-width: 680px;
   }
 
   .menu-simple-prose th,
   .menu-simple-prose td {
-    padding: 0.45rem;
-    font-size: 0.8rem;
+    padding: 0.35rem 0.45rem;
+    font-size: 0.75rem;
   }
 }

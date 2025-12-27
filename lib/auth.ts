@@ -27,7 +27,7 @@
 
 import { randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { type JwtPayload } from 'jsonwebtoken';
 import { supabase } from '@/lib/supabase';
 import { decryptUserData } from '@/lib/encryption';
 import { decryptAddressRow, type AddressRow } from '@/lib/address-vault';
@@ -35,7 +35,40 @@ import type { AuthUser } from './validations/auth';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
 const JWT_EXPIRES_IN = '7d';
+const COLUMN_MISSING_REGEX = /column .* does not exist/i;
+const ADDRESS_ENCRYPTED_FIELDS_CAMEL =
+  'id,"userId",label,nickname,type,"isDefault",payload,payloadIv,payloadTag,payloadSalt,street,city,state,"postalCode",country,reference,additionalInfo,"createdAt","updatedAt"';
+const ADDRESS_ENCRYPTED_FIELDS_SNAKE =
+  'id,"userId",label,nickname,type,"isDefault",payload,payload_iv,payload_tag,payload_salt,street,city,state,"postalCode",country,reference,additionalInfo,"createdAt","updatedAt"';
+const ADDRESS_LEGACY_FIELDS =
+  'id,"userId",type,street,city,state,"postalCode",country,reference,additionalInfo,"isDefault","createdAt","updatedAt"';
 const nowIso = () => new Date().toISOString();
+
+const ADDRESS_SELECT_VARIANTS = [
+  '*',
+  ADDRESS_ENCRYPTED_FIELDS_CAMEL,
+  ADDRESS_ENCRYPTED_FIELDS_SNAKE,
+  ADDRESS_LEGACY_FIELDS,
+];
+
+const fetchAddressRows = async (userId: string): Promise<AddressRow[]> => {
+  let lastError: { message?: string } | null = null;
+  for (const fields of ADDRESS_SELECT_VARIANTS) {
+    const { data, error } = await supabase.from('addresses').select(fields).eq('userId', userId);
+    if (!error) {
+      return (data ?? []) as unknown as AddressRow[];
+    }
+    lastError = error;
+    if (!COLUMN_MISSING_REGEX.test(error.message ?? '')) {
+      throw new Error(`Error al obtener direcciones del usuario: ${error.message}`);
+    }
+  }
+  throw new Error(
+    `Error al obtener direcciones del usuario: ${
+      lastError?.message ?? 'columnas incompatibles en la tabla addresses'
+    }`
+  );
+};
 
 async function getSignedAvatarUrl(path?: string | null): Promise<string | null> {
   if (!path) return null;
@@ -83,12 +116,19 @@ export function verifyToken(
   token: string
 ): { userId: string; email: string; clientId: string } | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    return {
-      userId: decoded.userId,
-      email: decoded.email,
-      clientId: decoded.clientId,
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload | string;
+    if (!decoded || typeof decoded === 'string') {
+      return null;
+    }
+    const { userId, email, clientId } = decoded as Partial<JwtPayload> & {
+      userId?: string;
+      email?: string;
+      clientId?: string;
     };
+    if (!userId || !email || !clientId) {
+      return null;
+    }
+    return { userId, email, clientId };
   } catch (error) {
     return null;
   }
@@ -177,27 +217,17 @@ export async function getUserById(id: string) {
 
   if (!user) return null;
 
-  const [
-    { data: addressRows, error: addressesError },
-    { data: loyaltyPoints, error: loyaltyError },
-    { data: orders, error: ordersError },
-  ] = await Promise.all([
-    supabase
-      .from('addresses')
-      .select(
-        'id,userId,label,nickname,type,street,city,state,postalCode,country,isDefault,payload,payloadIv,payloadTag,payloadSalt,createdAt,updatedAt'
-      )
-      .eq('userId', id),
-    supabase.from('loyalty_points').select('*').eq('userId', id),
-    supabase
-      .from('orders')
-      .select('id,orderNumber,status,total,currency,createdAt,updatedAt,items:order_items(*)')
-      .eq('userId', id),
-  ]);
+  const [{ data: loyaltyPoints, error: loyaltyError }, { data: orders, error: ordersError }] =
+    await Promise.all([
+      supabase.from('loyalty_points').select('*').eq('userId', id),
+      supabase
+        .from('orders')
+        .select('id,orderNumber,status,total,currency,createdAt,updatedAt,items:order_items(*)')
+        .eq('userId', id),
+    ]);
 
-  if (addressesError) {
-    throw new Error(`Error al obtener direcciones del usuario: ${addressesError.message}`);
-  }
+  const addressRows = await fetchAddressRows(id);
+
   if (loyaltyError) {
     throw new Error(`Error al obtener puntos de lealtad: ${loyaltyError.message}`);
   }
@@ -208,8 +238,7 @@ export async function getUserById(id: string) {
   // Descifrar datos sensibles
   const decryptedData = decryptUserData(user.email, user);
   const avatarSignedUrl = await getSignedAvatarUrl(user.avatarUrl as string | null);
-  const addresses =
-    addressRows?.map((row) => decryptAddressRow(user.email, row as AddressRow)) ?? [];
+  const addresses = addressRows.map((row) => decryptAddressRow(user.email, row));
 
   // Convertir null a undefined para campos opcionales
   return {
@@ -232,7 +261,6 @@ export async function getUserById(id: string) {
     orders,
   };
 }
-
 // Actualizar último login
 export async function updateLastLogin(userId: string): Promise<void> {
   const { error } = await supabase.from('users').update({ lastLoginAt: nowIso() }).eq('id', userId);
@@ -245,7 +273,7 @@ export async function updateLastLogin(userId: string): Promise<void> {
 export async function logDataRetentionAction(
   userId: string,
   action: string,
-  details?: any
+  details?: Record<string, unknown> | null
 ): Promise<void> {
   const { error } = await supabase.from('data_retention_logs').insert({
     id: randomUUID(),
@@ -261,28 +289,24 @@ export async function logDataRetentionAction(
 
 // Exportar datos del usuario (GDPR)
 export async function exportUserData(userId: string) {
-  const [userResult, addressesResult, ordersResult, loyaltyPointsResult] = await Promise.all([
+  const [userResult, ordersResult, loyaltyPointsResult] = await Promise.all([
     supabase.from('users').select('*').eq('id', userId).maybeSingle(),
-    supabase
-      .from('addresses')
-      .select(
-        'id,userId,label,nickname,type,street,city,state,postalCode,country,reference,additionalInfo,isDefault,payload,payloadIv,payloadTag,payloadSalt,createdAt,updatedAt'
-      )
-      .eq('userId', userId),
     supabase.from('orders').select('*, items:order_items(*)').eq('userId', userId),
     supabase.from('loyalty_points').select('*').eq('userId', userId),
   ]);
 
   if (userResult.error) throw userResult.error;
-  if (addressesResult.error) throw addressesResult.error;
   if (ordersResult.error) throw ordersResult.error;
   if (loyaltyPointsResult.error) throw loyaltyPointsResult.error;
 
+  const addressRows: AddressRow[] = userResult.data ? await fetchAddressRows(userId) : [];
+  const decryptedAddresses = userResult.data?.email
+    ? addressRows.map((row) => decryptAddressRow(userResult.data!.email, row))
+    : addressRows;
+
   return {
     ...userResult.data,
-    addresses: (addressesResult.data ?? []).map((row) =>
-      userResult.data?.email ? decryptAddressRow(userResult.data.email, row as AddressRow) : row
-    ),
+    addresses: decryptedAddresses,
     orders: ordersResult.data,
     loyaltyPoints: loyaltyPointsResult.data,
     avatarUrl: userResult.data?.avatarUrl ?? null,
@@ -402,7 +426,7 @@ export async function cleanupInactiveUsers({
     try {
       await deleteUserData(user.id);
       deletedUserIds.push(user.id);
-    } catch (deletionError: any) {
+    } catch (deletionError: unknown) {
       console.error('No pudimos eliminar datos del usuario inactivo:', user.id, deletionError);
       failures.push({
         userId: user.id,

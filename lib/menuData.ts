@@ -42,6 +42,7 @@ export interface MenuItem {
     description?: string;
     items?: string[];
     loyaltyExclusion?: boolean;
+    temperature?: '🔥' | '❄️' | null;
   };
 }
 
@@ -124,26 +125,39 @@ function parseCalories(rawCalories: string | null | undefined): number | null {
 }
 
 function parseBeverages(section: string): MenuItem[] {
-  const rowsRegex =
-    /<tr>\s*<td>(.*?)<\/td>\s*<td>(.*?)<\/td>\s*<td>(.*?)<\/td>\s*<td>(.*?)<\/td>\s*<td>(.*?)<\/td>\s*<\/tr>/gis;
-
+  const rowRegex = /<tr>([\s\S]*?)<\/tr>/gi;
   const beverages: MenuItem[] = [];
 
-  for (const match of section.matchAll(rowsRegex)) {
-    const [, rawSymbol, rawName, rawMedium, rawLarge, rawCalories] = match;
-    const name = stripHtml(rawName);
-    if (!name) continue;
-
-    const symbol = stripHtml(rawSymbol);
+  for (const rowMatch of section.matchAll(rowRegex)) {
+    const cells = Array.from(rowMatch[1].matchAll(/<td>([\s\S]*?)<\/td>/gi)).map(
+      ([, value]) => value ?? ''
+    );
+    if (cells.length < 4) {
+      continue;
+    }
+    const [rawName, rawMedium, rawLarge, rawCalories] = cells;
+    const nameContent = stripHtml(rawName).trim();
+    if (!nameContent) {
+      continue;
+    }
+    const symbolMatch = nameContent.match(/\((🔥|❄️)\)\s*$/);
+    const baseName = symbolMatch ? nameContent.replace(symbolMatch[0], '').trim() : nameContent;
+    if (!baseName || /^\$/.test(baseName) || !/[a-záéíóúüñ]/i.test(baseName.replace(/[()]/g, ''))) {
+      continue;
+    }
+    const temperatureSymbol = (symbolMatch?.[1] as '🔥' | '❄️' | undefined) ?? null;
+    const displayName = symbolMatch ? `${baseName} ${symbolMatch[1]}` : baseName;
     const mediumPrice = parsePrice(rawMedium);
     const largePrice = parsePrice(rawLarge);
     const calories = parseCalories(rawCalories);
 
     let subcategory: MenuItem['subcategory'];
-    const normalizedName = normalizeString(name);
+    const normalizedName = normalizeString(baseName);
     if (HOT_BEVERAGES.has(normalizedName)) subcategory = 'hot';
     else if (COLD_BEVERAGES.has(normalizedName)) subcategory = 'cold';
-    else subcategory = symbol.includes('🔥') ? 'hot' : symbol.includes('❄️') ? 'cold' : undefined;
+    else
+      subcategory =
+        temperatureSymbol === '🔥' ? 'hot' : temperatureSymbol === '❄️' ? 'cold' : undefined;
 
     let availableSizes: string[] = [];
     if (UNIQUE_SIZE_BEVERAGES.has(normalizedName)) {
@@ -158,8 +172,8 @@ function parseBeverages(section: string): MenuItem[] {
     const defaultSize = availableSizes[0];
 
     beverages.push({
-      id: `beverage-${slugify(name)}`,
-      label: name,
+      id: `beverage-${slugify(displayName)}`,
+      label: displayName,
       category: 'beverage',
       subcategory,
       price: mediumPrice ?? largePrice ?? null,
@@ -169,6 +183,7 @@ function parseBeverages(section: string): MenuItem[] {
         calories,
         availableSizes,
         defaultSize,
+        temperature: temperatureSymbol,
       },
     });
   }
