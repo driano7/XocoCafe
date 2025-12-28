@@ -27,7 +27,7 @@
 
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import type { OrderRecord } from '@/hooks/useOrders';
 import type { TicketDetailsPayload } from '@/hooks/useTicketDetails';
 
@@ -50,13 +50,6 @@ const PAYMENT_REFERENCE_TYPE_LABELS: Record<string, string> = {
   transaction_id: 'Transferencia',
   text: 'Referencia',
   card_last4: 'Tarjeta',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pendiente',
-  in_progress: 'En preparación',
-  completed: 'Entregado',
-  past: 'Histórico',
 };
 
 const COMMENT_METADATA_KEYS = [
@@ -97,12 +90,6 @@ interface OrderDetailPanelProps {
   isLoading?: boolean;
   className?: string;
 }
-
-const formatCurrency = (value?: number | null) =>
-  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value ?? 0);
-
-const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 
 const toTrimmedString = (value: unknown) =>
   typeof value === 'string' ? value.trim() || null : null;
@@ -188,8 +175,59 @@ const maskPaymentReference = (value?: string | null) => {
   return trimmed;
 };
 
-const getOrderDisplayCode = (order: OrderRecord, ticketDetails?: TicketDetailsPayload | null) =>
-  ticketDetails?.ticket?.ticketCode ?? order.ticketId ?? order.orderNumber ?? order.id;
+const shortenReference = (value: string) => {
+  const trimmed = value.trim();
+  if (trimmed.length <= 10) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, 6)}…${trimmed.slice(-4)}`;
+};
+
+const formatPaymentTraceSummary = (
+  reference?: string | null,
+  type?: string | null,
+  methodLabel?: string | null
+) => {
+  if (!reference) {
+    return null;
+  }
+  const trimmed = reference.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const normalizedType = type?.toLowerCase() ?? '';
+  if (normalizedType === 'evm_address') {
+    return `Wallet ${shortenReference(trimmed)}`;
+  }
+  if (normalizedType === 'ens_name') {
+    return `ENS ${shortenReference(trimmed)}`;
+  }
+  if (normalizedType === 'lightning_invoice') {
+    return `Hash ${shortenReference(trimmed)}`;
+  }
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length >= 4) {
+    const last4 = digits.slice(-4);
+    const normalizedMethod = methodLabel
+      ?.normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+    if (normalizedMethod?.includes('debito')) {
+      return `Débito terminación ${last4}`;
+    }
+    if (normalizedMethod?.includes('credito')) {
+      return `Crédito terminación ${last4}`;
+    }
+    if (normalizedMethod?.includes('transfer')) {
+      return `Transferencia referencia ${last4}`;
+    }
+    return `Terminación ${last4}`;
+  }
+  if (trimmed.length > 6) {
+    return `Referencia ${shortenReference(trimmed)}`;
+  }
+  return trimmed;
+};
 
 const DetailRow = ({ label, value }: { label: string; value: ReactNode }) => (
   <div className="flex items-start justify-between text-sm text-gray-600 dark:text-gray-200">
@@ -210,35 +248,59 @@ const OrderNotesCard = ({ note, label }: { note: string; label: string }) => (
 export function OrderDetailPanel({
   order,
   ticketDetails,
-  decryptedCustomer,
   decryptedHandlerName,
-  isLoading,
   className,
 }: OrderDetailPanelProps) {
   const ticket = ticketDetails?.ticket;
   const orderSnapshot = ticketDetails?.order;
   const metadata = orderSnapshot?.metadata;
-  const customerPayload = ticketDetails?.customer ?? null;
+  const enhancedOrder = order as OrderRecord & {
+    queuedByStaffName?: string | null;
+    queuedPaymentMethod?: string | null;
+    queuedPaymentReference?: string | null;
+    queuedPaymentReferenceType?: string | null;
+    user?: {
+      firstName?: string | null;
+      lastName?: string | null;
+      phone?: string | null;
+      email?: string | null;
+    } | null;
+  };
 
+  const orderQueuedByStaffName = toTrimmedString(enhancedOrder.queuedByStaffName);
+  const rawPaymentMethod =
+    toTrimmedString(enhancedOrder.queuedPaymentMethod) ??
+    toTrimmedString(orderSnapshot?.queuedPaymentMethod) ??
+    toTrimmedString(ticket?.paymentMethod) ??
+    null;
+  const paymentMethod = resolveMethodLabel(rawPaymentMethod);
+  const paymentReference =
+    toTrimmedString(enhancedOrder.queuedPaymentReference) ??
+    toTrimmedString(orderSnapshot?.queuedPaymentReference) ??
+    toTrimmedString(ticket?.paymentReference) ??
+    null;
+  const paymentReferenceTypeRaw =
+    toTrimmedString(enhancedOrder.queuedPaymentReferenceType) ??
+    toTrimmedString(orderSnapshot?.queuedPaymentReferenceType) ??
+    toTrimmedString(ticket?.paymentReferenceType) ??
+    null;
+  const paymentReferenceTypeLabel =
+    PAYMENT_REFERENCE_TYPE_LABELS[
+      (paymentReferenceTypeRaw ?? '') as keyof typeof PAYMENT_REFERENCE_TYPE_LABELS
+    ] ?? null;
+  const maskedReference = maskPaymentReference(paymentReference);
+  const paymentTraceSummary = formatPaymentTraceSummary(
+    paymentReference,
+    paymentReferenceTypeRaw,
+    paymentMethod
+  );
   const assignedStaff = decryptedHandlerName
     ? decryptedHandlerName
-    : orderSnapshot?.queuedByStaffName ??
+    : orderQueuedByStaffName ??
+      orderSnapshot?.queuedByStaffName ??
       ticket?.handledByStaffName ??
       order.prepHandlerName ??
       null;
-
-  const paymentMethod = resolveMethodLabel(
-    orderSnapshot?.queuedPaymentMethod ?? ticket?.paymentMethod ?? null
-  );
-  const paymentReference =
-    ticket?.paymentReference ?? orderSnapshot?.queuedPaymentReference ?? null;
-  const paymentReferenceTypeLabel =
-    PAYMENT_REFERENCE_TYPE_LABELS[
-      (ticket?.paymentReferenceType ??
-        orderSnapshot?.queuedPaymentReferenceType ??
-        '') as keyof typeof PAYMENT_REFERENCE_TYPE_LABELS
-    ] ?? null;
-  const maskedReference = maskPaymentReference(paymentReference);
   const handlerStatusBadge =
     order.status === 'in_progress'
       ? 'En preparación'
@@ -246,52 +308,10 @@ export function OrderDetailPanel({
       ? 'Entregado'
       : null;
 
-  const customerName = useMemo(() => {
-    const first =
-      decryptedCustomer?.firstName ?? customerPayload?.firstName ?? customerPayload?.name ?? null;
-    const last = decryptedCustomer?.lastName ?? customerPayload?.lastName ?? null;
-    const label = [first, last].filter(Boolean).join(' ').trim();
-    if (label) {
-      return label;
-    }
-    return order.customerName ?? order.userEmail ?? 'Cliente';
-  }, [
-    customerPayload?.firstName,
-    customerPayload?.lastName,
-    customerPayload?.name,
-    decryptedCustomer?.firstName,
-    decryptedCustomer?.lastName,
-    order.customerName,
-    order.userEmail,
-  ]);
-
-  const customerPhone =
-    decryptedCustomer?.phone ??
-    (customerPayload?.phone && customerPayload.phone.trim().length ? customerPayload.phone : null);
-
   const customerNotes = extractCustomerNotes(metadata);
   const staffNotes = extractStaffNotes(metadata);
   const generalNotes = extractGeneralNotes(orderSnapshot);
   const fallbackNotes = !customerNotes && !staffNotes ? generalNotes : null;
-
-  const totalAmount = orderSnapshot?.total ?? order.total ?? 0;
-  const tipAmount =
-    typeof order.tipAmount === 'number'
-      ? order.tipAmount
-      : typeof ticket?.tipAmount === 'number'
-      ? ticket.tipAmount ?? 0
-      : null;
-  const tipPercent =
-    typeof order.tipPercent === 'number'
-      ? order.tipPercent
-      : typeof ticket?.tipPercent === 'number'
-      ? ticket.tipPercent ?? null
-      : null;
-
-  const itemsCount = ticketDetails?.items?.reduce((total, item) => total + item.quantity, 0);
-
-  const showPaymentSections = order.status !== 'completed';
-  const showTipDetails = Boolean(tipAmount && tipAmount > 0);
 
   return (
     <section
@@ -300,49 +320,9 @@ export function OrderDetailPanel({
       }`}
     >
       <header>
-        <p className="text-xs uppercase tracking-[0.35em] text-primary-500">
-          {getOrderDisplayCode(order, ticketDetails)}
-        </p>
         <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Detalle del pedido</h3>
-        <p className="text-xs text-gray-500 dark:text-gray-300">
-          {isLoading ? 'Consultando...' : formatDate(orderSnapshot?.createdAt ?? order.createdAt)}
-        </p>
       </header>
       <div className="grid gap-3 rounded-2xl border border-gray-100 bg-gray-50/80 p-4 dark:border-white/10 dark:bg-white/5">
-        <DetailRow
-          label="Cliente"
-          value={
-            <span className="font-semibold text-gray-900 dark:text-white">{customerName}</span>
-          }
-        />
-        {customerPhone && <DetailRow label="Contacto" value={customerPhone} />}
-        <DetailRow label="Ticket POS" value={getOrderDisplayCode(order, ticketDetails)} />
-        <DetailRow
-          label="Estado"
-          value={
-            <span className="font-semibold text-gray-900 dark:text-white">
-              {STATUS_LABELS[order.status] ?? order.status}
-            </span>
-          }
-        />
-        <DetailRow label="Total" value={formatCurrency(totalAmount)} />
-        {showTipDetails && (
-          <DetailRow
-            label="Propina"
-            value={
-              <span className="text-primary-700 dark:text-primary-200">
-                {formatCurrency(tipAmount)}
-                {typeof tipPercent === 'number' ? ` (${tipPercent.toFixed(1)}%)` : ''}
-              </span>
-            }
-          />
-        )}
-        {typeof itemsCount === 'number' && itemsCount > 0 && (
-          <DetailRow
-            label="Artículos"
-            value={`${itemsCount} ${itemsCount === 1 ? 'artículo' : 'artículos'}`}
-          />
-        )}
         <DetailRow
           label="Atendió"
           value={
@@ -360,36 +340,44 @@ export function OrderDetailPanel({
             )
           }
         />
-        {showPaymentSections && (
-          <DetailRow
-            label="Método de pago"
-            value={
-              <span className="font-semibold text-gray-900 dark:text-white">{paymentMethod}</span>
-            }
-          />
-        )}
-        {showPaymentSections && (
-          <DetailRow
-            label="Referencia"
-            value={
-              paymentReference ? (
-                <span
-                  className="font-semibold text-gray-900 dark:text-white"
-                  title={paymentReference}
-                >
-                  {maskedReference ?? paymentReference}
-                  {paymentReferenceTypeLabel && (
-                    <span className="ml-2 rounded-full bg-gray-200 px-2 py-[2px] text-[10px] uppercase tracking-[0.2em] text-gray-700 dark:bg-white/10 dark:text-white">
-                      {paymentReferenceTypeLabel}
-                    </span>
-                  )}
-                </span>
-              ) : (
-                <span className="text-xs text-gray-500 dark:text-gray-400">Pendiente</span>
-              )
-            }
-          />
-        )}
+        <DetailRow
+          label="Método de pago"
+          value={
+            <span className="font-semibold text-gray-900 dark:text-white">{paymentMethod}</span>
+          }
+        />
+        <DetailRow
+          label="Resumen"
+          value={
+            paymentTraceSummary ? (
+              <span className="text-right text-gray-900 dark:text-gray-100">
+                {paymentTraceSummary}
+              </span>
+            ) : (
+              <span className="text-xs text-gray-500 dark:text-gray-400">Sin datos</span>
+            )
+          }
+        />
+        <DetailRow
+          label="Referencia"
+          value={
+            paymentReference ? (
+              <span
+                className="font-semibold text-gray-900 dark:text-white"
+                title={paymentReference}
+              >
+                {maskedReference ?? paymentReference}
+                {paymentReferenceTypeLabel && (
+                  <span className="ml-2 rounded-full bg-gray-200 px-2 py-[2px] text-[10px] uppercase tracking-[0.2em] text-gray-700 dark:bg-white/10 dark:text-white">
+                    {paymentReferenceTypeLabel}
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span className="text-xs text-gray-500 dark:text-gray-400">Pendiente</span>
+            )
+          }
+        />
       </div>
       {customerNotes && <OrderNotesCard note={customerNotes} label="Comentario del cliente" />}
       {staffNotes && <OrderNotesCard note={staffNotes} label="Notas internas" />}

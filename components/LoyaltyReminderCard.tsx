@@ -61,7 +61,7 @@ export default function LoyaltyReminderCard({
             void onActivate();
           }}
           disabled={isLoading}
-          className="inline-flex items-center justify-center rounded-full bg-primary-600 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.3em] text-white shadow transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-primary-400"
+          className="inline-flex items-center justify-center rounded-full bg-primary-600 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-white shadow transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-primary-400"
         >
           {isLoading ? 'Activando...' : 'Tarjeta de lealtad'}
         </button>

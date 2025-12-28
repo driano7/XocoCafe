@@ -243,7 +243,7 @@ export default function FavoritesSelect({
     <div className="w-full space-y-4">
       <div>
         <h3 className="text-lg font-medium text-gray-900 dark:text-white">Mis Favoritos</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-gray-600 dark:text-gray-300">
           Personaliza tus bebidas y alimentos favoritos de nuestro menú.
         </p>
       </div>
@@ -300,14 +300,16 @@ export default function FavoritesSelect({
       )}
 
       {loyaltyInfo && (
-        <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 text-sm text-blue-900 dark:border-blue-400/30 dark:bg-blue-900/10 dark:text-blue-100">
-          <p className="text-xs uppercase tracking-[0.3em] text-blue-700/70 dark:text-blue-200">
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 text-sm text-blue-900 dark:border-blue-500/40 dark:bg-gray-900/50 dark:text-blue-100">
+          <p className="text-xs uppercase tracking-[0.3em] text-blue-700/70 dark:text-blue-200/70">
             Programa de lealtad
           </p>
-          <p className="mt-1 font-semibold text-lg">
+          <p className="mt-1 font-semibold text-lg text-gray-900 dark:text-white">
             {loyaltyInfo.weeklyCoffeeCount}/{loyaltyInfo.stampsGoal} cafés registrados esta semana
           </p>
-          {loyaltyStatus && <p className="mt-1 text-sm">{loyaltyStatus}</p>}
+          {loyaltyStatus && (
+            <p className="mt-1 text-sm text-blue-800 dark:text-blue-200">{loyaltyStatus}</p>
+          )}
         </div>
       )}
     </div>

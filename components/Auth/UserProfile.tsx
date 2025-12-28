@@ -308,7 +308,7 @@ export default function UserProfile() {
       canvas.toBlob(
         (blob) => {
           if (!blob) {
-            reject(new Error('No pudimos generar la imagen del programa semanal.'));
+            reject(new Error('No pudimos generar la imagen del programa de lealtad.'));
             return;
           }
           resolve(blob);
@@ -343,7 +343,7 @@ export default function UserProfile() {
       if (!blob) {
         throw new Error('capture_failed');
       }
-      const filename = 'xoco-programa-semanal';
+      const filename = 'xoco-programa-lealtad';
       if (
         shouldShareLoyaltyPanel &&
         typeof navigator !== 'undefined' &&
@@ -356,8 +356,8 @@ export default function UserProfile() {
         try {
           await navigator.share({
             files: [shareFile],
-            title: 'Programa semanal Xoco Café',
-            text: 'Comparte tu avance del programa semanal y tus favoritos.',
+            title: 'Programa de lealtad Xoco Café',
+            text: 'Comparte tu avance del programa de lealtad y tus favoritos.',
           });
           setIsExportingLoyaltyPanel(false);
           return;
@@ -374,7 +374,7 @@ export default function UserProfile() {
       }
       downloadLoyaltyPanel(blob, filename);
     } catch (error) {
-      console.error('Error exportando programa semanal:', error);
+      console.error('Error exportando programa de lealtad:', error);
       if (
         error instanceof DOMException &&
         (error.name === 'AbortError' || error.name === 'NotAllowedError')
@@ -390,7 +390,7 @@ export default function UserProfile() {
         );
       } else {
         setLoyaltyPanelActionError(
-          'No pudimos generar la imagen del programa semanal. Intenta de nuevo en unos segundos.'
+          'No pudimos generar la imagen del programa de lealtad. Intenta de nuevo en unos segundos.'
         );
       }
     } finally {
@@ -1013,8 +1013,8 @@ export default function UserProfile() {
               {isExportingLoyaltyPanel
                 ? 'Generando...'
                 : shouldShareLoyaltyPanel
-                ? 'Compartir programa semanal'
-                : 'Descargar programa semanal'}
+                ? 'Compartir programa de lealtad'
+                : 'Descargar programa de lealtad'}
             </button>
           </div>
           {loyaltyPanelActionError && (

@@ -1202,7 +1202,7 @@ export default function ReservePage() {
         <SessionTimeoutNotice context="reservations" redirectDelayMs={300000} />
         <a
           href="/login"
-          className="mt-6 inline-flex min-w-[280px] items-center justify-center rounded-full bg-primary-600 px-10 py-5 text-2xl font-black uppercase tracking-[0.35em] text-white shadow-2xl transition hover:bg-primary-700"
+          className="mt-6 inline-flex min-w-[220px] items-center justify-center rounded-full bg-primary-600 px-8 py-4 text-xl font-bold uppercase tracking-[0.25em] text-white shadow-xl transition hover:bg-primary-700"
         >
           Iniciar sesión
         </a>

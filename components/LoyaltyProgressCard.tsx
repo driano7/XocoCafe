@@ -60,7 +60,9 @@ export default function LoyaltyProgressCard({
     >
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.35em] text-white/80">Programa semanal</p>
+          <p className="text-[11px] uppercase tracking-[0.35em] text-white/80">
+            Programa de lealtad
+          </p>
           <h3 className="text-2xl font-semibold">{customerName?.trim() || 'Cliente'}</h3>
           <p className="text-xs text-white/75">Sello por cada bebida registrada</p>
         </div>

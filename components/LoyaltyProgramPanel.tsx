@@ -77,7 +77,7 @@ export default function LoyaltyProgramPanel({
     >
       <div className="flex flex-col gap-1">
         <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/70">
-          Programa semanal
+          Programa de lealtad
         </p>
         <h3 className="text-2xl font-bold text-white">{customerName ?? 'Cliente Xoco Café'}</h3>
         <p className="text-sm text-white/70">Sello por cada bebida registrada.</p>
