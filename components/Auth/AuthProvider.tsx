@@ -182,7 +182,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       localStorage.removeItem('authToken');
       if (typeof window !== 'undefined') {
         window.setTimeout(() => {
-          window.location.replace('/');
+          window.location.replace('/login');
         }, 800);
       }
     }

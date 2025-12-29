@@ -981,7 +981,7 @@ export default function UserProfile() {
         <section className={sectionCardClass}>
           <div
             ref={loyaltyPanelRef}
-            className="space-y-4 rounded-[32px] border border-white/20 bg-white/90 p-4 shadow-2xl dark:border-white/10 dark:bg-gray-900/70"
+            className="space-y-4 rounded-[32px] border border-white/30 bg-white/10 p-4 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/40"
           >
             <LoyaltyProgressCard
               coffees={loyaltyCoffeeCount}
@@ -999,28 +999,30 @@ export default function UserProfile() {
               food={favoriteFoodLabel === 'No registrado' ? null : favoriteFoodLabel}
               isLoading={isClientFavoritesLoading}
               tone="light"
-              className="bg-gradient-to-br from-white via-orange-50/60 to-white text-gray-900 dark:text-gray-100"
+              className="rounded-2xl border border-white/30 bg-white/70 p-4 text-gray-900 shadow-lg backdrop-blur-md dark:border-white/10 dark:bg-gray-950/70 dark:text-white"
             />
           </div>
 
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-            <button
-              type="button"
-              onClick={() => void handleExportLoyaltyPanel()}
-              className="w-full rounded-full bg-primary-600 px-5 py-3 text-sm font-semibold uppercase tracking-[0.25em] text-white shadow-lg transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-primary-500 dark:hover:bg-primary-400"
-              disabled={isExportingLoyaltyPanel}
-            >
-              {isExportingLoyaltyPanel
-                ? 'Generando...'
-                : shouldShareLoyaltyPanel
-                ? 'Compartir programa de lealtad'
-                : 'Descargar programa de lealtad'}
-            </button>
+          <div className="mt-4 rounded-3xl border border-white/30 bg-white/10 p-4 backdrop-blur-md dark:border-white/10 dark:bg-gray-900/40">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => void handleExportLoyaltyPanel()}
+                className="w-full rounded-full bg-primary-600 px-5 py-3 text-sm font-semibold uppercase tracking-[0.25em] text-white shadow-lg transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-primary-500 dark:hover:bg-primary-400"
+                disabled={isExportingLoyaltyPanel}
+              >
+                {isExportingLoyaltyPanel
+                  ? 'Generando...'
+                  : shouldShareLoyaltyPanel
+                  ? 'Compartir programa de lealtad'
+                  : 'Descargar programa de lealtad'}
+              </button>
+            </div>
           </div>
           {loyaltyPanelActionError && (
             <p className="text-xs text-red-600 dark:text-red-400">{loyaltyPanelActionError}</p>
           )}
-          <div className="rounded-2xl border border-white/30 bg-white/70 p-4 shadow-sm dark:border-white/10 dark:bg-gray-800/70">
+          <div className="rounded-2xl border border-white/30 bg-white/70 p-4 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-gray-900/60">
             <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Personalízalos</h4>
             <p className="text-xs text-gray-600 dark:text-gray-400">
               Selecciona tus bebidas y alimentos favoritos del menú.
@@ -1035,6 +1037,7 @@ export default function UserProfile() {
                 initialFavorites={clientFavorites}
                 initialFavoritesLoading={isClientFavoritesLoading}
                 onUpdate={() => void refreshClientFavorites()}
+                variant="default"
               />
             </div>
           </div>

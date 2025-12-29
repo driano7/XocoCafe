@@ -57,11 +57,9 @@ export default function FavoriteOnboardingPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-3xl">
-        <div className="rounded-lg bg-white p-8 shadow dark:bg-gray-800">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            ¡Personaliza tu experiencia!
-          </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+        <div className="rounded-2xl border border-gray-800 bg-gray-950/90 p-8 shadow-2xl">
+          <h1 className="mb-2 text-2xl font-bold text-white">¡Personaliza tu experiencia!</h1>
+          <p className="mb-6 text-sm text-gray-300">
             Como último paso opcional, selecciona tu bebida y alimento favorito del menú. Podrás
             modificarlos más adelante desde tu perfil.
           </p>
@@ -76,7 +74,7 @@ export default function FavoriteOnboardingPage() {
             <button
               type="button"
               onClick={() => router.replace('/profile')}
-              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+              className="inline-flex items-center rounded-md border border-white/30 bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/15"
             >
               Omitir por ahora
             </button>

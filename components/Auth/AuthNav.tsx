@@ -59,8 +59,12 @@ export default function AuthNav() {
 
   return (
     <div className="flex items-center space-x-4">
-      <Link href="/login" className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400">
-        Iniciar Sesión
+      <Link
+        href="/login"
+        className="group relative inline-flex overflow-hidden rounded-full border border-current px-4 py-1.5 text-sm font-semibold text-current transition-colors duration-300 dark:text-white"
+      >
+        <span className="absolute inset-0 scale-0 rounded-full bg-current opacity-10 transition-transform duration-300 group-hover:scale-100" />
+        <span className="relative">Iniciar Sesión</span>
       </Link>
     </div>
   );

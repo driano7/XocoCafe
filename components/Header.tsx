@@ -27,67 +27,107 @@
 
 'use client';
 
+import AuthNav from '@/components/Auth/AuthNav';
 import classNames from 'classnames';
 import headerNavLinks from 'content/headerNavLinks';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import CommandPalette from './CommandPalette/CommandPalette';
 import MobileNav from './MobileNav';
-import SectionContainer from './SectionContainer';
 import ThemeSwitch from './ThemeSwitch';
-import AuthNav from './Auth/AuthNav';
 
 export default function Header() {
   const pathName = usePathname();
+  const [isVisible, setIsVisible] = useState(false);
+  const [forceVisible, setForceVisible] = useState(false);
+
+  useEffect(() => {
+    const updateForceVisible = () => {
+      const scrollableSpace = document.documentElement.scrollHeight - window.innerHeight;
+      setForceVisible(scrollableSpace < 120);
+    };
+    updateForceVisible();
+    window.addEventListener('resize', updateForceVisible);
+    return () => window.removeEventListener('resize', updateForceVisible);
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsVisible(forceVisible || window.scrollY > 16);
+    };
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [forceVisible]);
 
   return (
-    <SectionContainer className="lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl">
-      <header className="z-40 bg-transparent py-5 md:py-10">
-        <div className="mx-auto flex w-full flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/20 bg-white/70 px-6 py-3 text-base font-semibold text-gray-900 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-black/40 dark:text-white md:px-8 md:flex-nowrap">
-          <div className="shrink-0">
-            <Link
-              href="/"
-              className={classNames(
-                'horizontal-underline hidden text-3xl font-extrabold sm:block',
-                {
-                  'horizontal-underline-active': pathName === '/',
-                }
-              )}
-              aria-label="Xoco Café"
-            >
-              Xoco
-            </Link>
-          </div>
-          <div className="flex flex-1 items-center justify-end gap-4 text-base leading-5">
-            <div className="hidden items-center gap-4 sm:flex lg:gap-6">
-              {headerNavLinks.map(({ title, href }) => {
-                const active = href === '/' ? pathName === '/' : pathName?.startsWith(href);
-                return (
-                  <Link
-                    prefetch
-                    key={title}
-                    href={href}
-                    className={classNames('horizontal-underline text-base', {
-                      'horizontal-underline-active': active,
-                    })}
-                    aria-label={title}
-                  >
-                    <span className="font-semibold tracking-wide text-gray-900 dark:text-gray-100">
-                      {title}
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-2 sm:gap-3">
-              <AuthNav />
-              <CommandPalette />
-              <ThemeSwitch />
-              <MobileNav />
-            </div>
+    <div className="pointer-events-none fixed inset-x-0 top-4 z-40 flex justify-center px-4 sm:px-6 lg:px-8">
+      <header
+        className={classNames(
+          'pointer-events-auto flex w-[min(1100px,100%)] items-center gap-4 rounded-3xl border px-5 py-3 text-sm font-semibold shadow-2xl transition-all duration-500 backdrop-blur-md',
+          'text-gray-900 dark:text-white',
+          isVisible
+            ? 'border-black/5 bg-white/80 dark:border-white/10 dark:bg-black/60'
+            : 'border-transparent bg-transparent opacity-0 pointer-events-none -translate-y-8'
+        )}
+      >
+        <div className="shrink-0">
+          <Link
+            href="/"
+            className={classNames(
+              'text-2xl font-black tracking-tight transition-transform duration-200 hover:-translate-y-0.5',
+              pathName === '/' ? 'text-primary-600 dark:text-primary-200' : ''
+            )}
+            aria-label="Xoco Café"
+          >
+            Xoco
+          </Link>
+        </div>
+        <div className="flex flex-1 items-center justify-end gap-4">
+          <nav className="hidden items-center gap-4 sm:flex lg:gap-6">
+            {headerNavLinks.map(({ title, href }) => {
+              const active = href === '/' ? pathName === '/' : pathName?.startsWith(href);
+              return (
+                <Link
+                  prefetch
+                  key={title}
+                  href={href}
+                  className={classNames(
+                    'group relative inline-flex flex-col items-center gap-1 text-base font-semibold tracking-wide text-gray-700 transition duration-300 dark:text-gray-200',
+                    active ? 'text-primary-600 dark:text-primary-200' : ''
+                  )}
+                  aria-label={title}
+                >
+                  <span className="transition-transform duration-200 group-hover:-translate-y-0.5">
+                    {title}
+                  </span>
+                  <span
+                    className={classNames(
+                      'h-1 w-1 rounded-full bg-current transition-all duration-200',
+                      active
+                        ? 'translate-y-0 opacity-100'
+                        : 'translate-y-1 opacity-0 group-hover:translate-y-0 group-hover:opacity-100'
+                    )}
+                  />
+                  <span
+                    className={classNames(
+                      'absolute -bottom-1 left-0 h-px w-full origin-left scale-x-0 bg-current transition-transform duration-300',
+                      'group-hover:scale-x-100'
+                    )}
+                  />
+                </Link>
+              );
+            })}
+          </nav>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <AuthNav />
+            <CommandPalette />
+            <ThemeSwitch />
+            <MobileNav />
           </div>
         </div>
       </header>
-    </SectionContainer>
+    </div>
   );
 }

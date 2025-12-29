@@ -29,15 +29,9 @@ import siteMetadata from 'content/siteMetadata';
 import Link from 'next/link';
 import { Suspense } from 'react';
 //import { AiFillLinkedin } from 'react-icons/ai';
-import { FaTiktok, FaSpotify, FaInstagram, FaTwitter, FaWhatsapp } from 'react-icons/fa';
 import SectionContainer from './SectionContainer';
 import NowPlaying from './Spotify/NowPlaying';
-
-const SOCIAL_ICON_CLASSES =
-  'group relative flex h-10 w-10 items-center justify-center rounded-full text-base text-current transition-all duration-300 ease-out hover:-translate-y-1 hover:text-primary-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:hover:text-primary-200 sm:h-10 sm:w-10 sm:text-lg';
-
-const SOCIAL_ICON_GLOW =
-  'pointer-events-none absolute inset-0 rounded-full bg-primary-500/15 opacity-0 transition-opacity duration-300 group-hover:opacity-100';
+import FooterSocials from './FooterSocials';
 
 export default function Footer() {
   return (
@@ -66,68 +60,15 @@ export default function Footer() {
                 <Link href="/">{siteMetadata.title}</Link>
               </li>
             </ul>
-            <ul className="flex cursor-pointer items-center space-x-3 sm:space-x-5">
-              <li>
-                <a
-                  href={siteMetadata.tiktok}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="tiktok"
-                  className={SOCIAL_ICON_CLASSES}
-                >
-                  <span className={SOCIAL_ICON_GLOW} />
-                  <FaTiktok />
-                </a>
-              </li>
-              <li>
-                <a
-                  href={siteMetadata.instagram}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="github"
-                  className={SOCIAL_ICON_CLASSES}
-                >
-                  <span className={SOCIAL_ICON_GLOW} />
-                  <FaInstagram />
-                </a>
-              </li>
-              <li>
-                <a
-                  href={siteMetadata.twitter}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="twitter"
-                  className={SOCIAL_ICON_CLASSES}
-                >
-                  <span className={SOCIAL_ICON_GLOW} />
-                  <FaTwitter />
-                </a>
-              </li>
-              <li>
-                <a
-                  href={siteMetadata.spotify}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="spotify"
-                  className={SOCIAL_ICON_CLASSES}
-                >
-                  <span className={SOCIAL_ICON_GLOW} />
-                  <FaSpotify />
-                </a>
-              </li>
-              <li>
-                <a
-                  href={siteMetadata.whats}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="steam"
-                  className={SOCIAL_ICON_CLASSES}
-                >
-                  <span className={SOCIAL_ICON_GLOW} />
-                  <FaWhatsapp />
-                </a>
-              </li>
-            </ul>
+            <FooterSocials
+              links={[
+                { label: 'tiktok', href: siteMetadata.tiktok, icon: 'tiktok' },
+                { label: 'instagram', href: siteMetadata.instagram, icon: 'instagram' },
+                { label: 'twitter', href: siteMetadata.twitter, icon: 'twitter' },
+                { label: 'spotify', href: siteMetadata.spotify, icon: 'spotify' },
+                { label: 'whatsapp', href: siteMetadata.whats, icon: 'whatsapp' },
+              ]}
+            />
           </div>
         </div>
       </footer>

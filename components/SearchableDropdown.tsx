@@ -41,6 +41,7 @@ interface SearchableDropdownProps {
   placeholder?: string;
   helperText?: string;
   allowClear?: boolean;
+  variant?: 'default' | 'contrast';
 }
 
 function normalize(value: string) {
@@ -75,6 +76,7 @@ export default function SearchableDropdown({
   placeholder = 'Seleccionar...',
   helperText,
   allowClear = true,
+  variant = 'default',
 }: SearchableDropdownProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -227,6 +229,8 @@ export default function SearchableDropdown({
     activeNode?.scrollIntoView({ block: 'nearest' });
   }, [activeIndex, isOpen]);
 
+  const isContrast = variant === 'contrast';
+
   return (
     <div
       ref={containerRef}
@@ -234,7 +238,10 @@ export default function SearchableDropdown({
     >
       <label
         htmlFor={id}
-        className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-100"
+        className={classNames(
+          'mb-2 block text-sm font-medium',
+          isContrast ? 'text-white' : 'text-gray-700 dark:text-gray-100'
+        )}
       >
         {label}
       </label>
@@ -253,7 +260,12 @@ export default function SearchableDropdown({
             });
           }}
           onKeyDown={handleKeyDown}
-          className="flex w-full items-center justify-between rounded-md border border-gray-300 px-3 py-2 text-left shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-500 dark:bg-gray-800 dark:text-white"
+          className={classNames(
+            'flex w-full items-center justify-between rounded-md border px-3 py-2 text-left shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500',
+            isContrast
+              ? 'border-white/30 bg-white/10 text-white hover:bg-white/15 focus:ring-offset-2 focus:ring-offset-gray-900'
+              : 'border-gray-300 text-gray-900 dark:border-gray-500 dark:bg-gray-800 dark:text-white'
+          )}
         >
           <span>{selectedOption ? formatOptionLabel(selectedOption) : placeholder}</span>
           <svg
@@ -286,12 +298,29 @@ export default function SearchableDropdown({
               role="listbox"
               aria-labelledby={id}
             >
-              <div className="mt-0 w-full rounded-md border border-gray-200 bg-white shadow-2xl dark:border-gray-600 dark:bg-gray-800">
-                <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+              <div
+                className={classNames(
+                  'mt-0 w-full rounded-md border shadow-2xl',
+                  isContrast
+                    ? 'border-gray-700 bg-gray-900 text-white'
+                    : 'border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800'
+                )}
+              >
+                <div
+                  className={classNames(
+                    'p-2 border-b',
+                    isContrast ? 'border-gray-700' : 'border-gray-200 dark:border-gray-700'
+                  )}
+                >
                   <input
                     ref={inputRef}
                     type="text"
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className={classNames(
+                      'w-full rounded-md border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500',
+                      isContrast
+                        ? 'border-gray-700 bg-gray-800 text-white placeholder:text-gray-400'
+                        : 'border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white'
+                    )}
                     placeholder="Buscar..."
                     value={query}
                     onChange={(event) => {
@@ -303,13 +332,20 @@ export default function SearchableDropdown({
 
                 <div
                   ref={listRef}
-                  className="max-h-64 overflow-y-auto overscroll-contain p-1 touch-pan-y"
+                  className={classNames(
+                    'max-h-64 overflow-y-auto overscroll-contain p-1 touch-pan-y'
+                  )}
                   onKeyDown={handleListKeyDown}
                   role="presentation"
                   tabIndex={-1}
                 >
                   {filteredOptions.length === 0 && (
-                    <p className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+                    <p
+                      className={classNames(
+                        'px-3 py-2 text-sm',
+                        isContrast ? 'text-gray-400' : 'text-gray-500 dark:text-gray-400'
+                      )}
+                    >
                       No hay resultados para “{query}”.
                     </p>
                   )}
@@ -317,7 +353,12 @@ export default function SearchableDropdown({
                   {allowClear && selectedOption && (
                     <button
                       type="button"
-                      className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-gray-700 rounded"
+                      className={classNames(
+                        'w-full text-left px-3 py-2 text-sm rounded',
+                        isContrast
+                          ? 'text-blue-200 hover:bg-white/5'
+                          : 'text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-gray-700'
+                      )}
                       onClick={() => {
                         onChange('');
                         closeDropdown();
@@ -337,6 +378,8 @@ export default function SearchableDropdown({
                         className={`w-full text-left px-3 py-2 text-sm rounded ${
                           option.id === value
                             ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                            : isContrast
+                            ? 'hover:bg-white/5'
                             : 'hover:bg-gray-100 dark:hover:bg-gray-700'
                         } ${activeIndex === index ? 'ring-1 ring-blue-500' : ''}`}
                         onClick={() => handleSelect(option.id)}
@@ -344,7 +387,12 @@ export default function SearchableDropdown({
                         <div className="flex flex-col">
                           <span>{optionLabel}</span>
                           {option.metadata?.calories && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                            <span
+                              className={classNames(
+                                'text-xs',
+                                isContrast ? 'text-gray-400' : 'text-gray-500 dark:text-gray-400'
+                              )}
+                            >
                               {option.metadata.calories} kcal aprox
                             </span>
                           )}
@@ -358,7 +406,16 @@ export default function SearchableDropdown({
             document.body
           )}
       </div>
-      {helperText && <p className="mt-1 text-xs text-gray-500 dark:text-gray-300">{helperText}</p>}
+      {helperText && (
+        <p
+          className={classNames(
+            'mt-1 text-xs',
+            isContrast ? 'text-gray-300' : 'text-gray-500 dark:text-gray-300'
+          )}
+        >
+          {helperText}
+        </p>
+      )}
     </div>
   );
 }

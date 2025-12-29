@@ -30,14 +30,26 @@
 import { useContext, useEffect, useRef } from 'react';
 import { ScrollContext } from '@/components/Providers/ScrollProvider';
 
-function opacityForBlock(sectionProgress: number, blockNumber: number) {
-  const progress = sectionProgress - blockNumber;
+const WORDS = [
+  { text: 'Minimalista.', offset: 0 },
+  { text: 'Intencional.', offset: 0.45 },
+  { text: 'Vanguardista.', offset: 0.9 },
+  { text: 'Sensorial.', offset: 1.35 },
+];
 
-  if (progress >= 0 && progress < 1) {
-    return 1;
-  }
-
-  return 0.2;
+function blockAnimation(sectionProgress: number, blockNumber: number) {
+  const offset = WORDS[blockNumber]?.offset ?? blockNumber * 0.5;
+  const relativeProgress = sectionProgress - offset - 0.2;
+  const clamped = Math.max(0, Math.min(1, relativeProgress));
+  const opacity = Math.max(0.15, clamped);
+  const blur = (1 - clamped) * 10;
+  const translateY = (1 - clamped) * 18;
+  return {
+    opacity,
+    filter: `blur(${blur}px)`,
+    transform: `translateY(${translateY}px)`,
+    transition: 'opacity 0.6s ease-out, filter 0.6s ease-out, transform 0.6s ease-out',
+  };
 }
 
 export default function Intro() {
@@ -82,28 +94,16 @@ export default function Intro() {
       id="intro"
     >
       <div className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-6 py-16 text-3xl font-semibold tracking-tight sm:px-8 sm:py-20 sm:text-4xl md:py-24 md:text-5xl lg:px-20 lg:py-28 lg:text-6xl">
-        <div className="w-full text-center leading-tight sm:text-left sm:leading-[1.15]">
-          <div className="introText" style={{ opacity: opacityForBlock(progress, 0) }}>
-            Minimalista.
-          </div>
-          <span
-            className="introText inline-block after:content-['_']"
-            style={{ opacity: opacityForBlock(progress, 1) }}
-          >
-            Intencional.
-          </span>
-          <span
-            className="introText inline-block after:content-['_']"
-            style={{ opacity: opacityForBlock(progress, 2) }}
-          >
-            Vanguardista.
-          </span>
-          <span
-            className="introText inline-block"
-            style={{ opacity: opacityForBlock(progress, 3) }}
-          >
-            Sensorial.
-          </span>
+        <div className="w-full space-y-4 text-center leading-tight sm:text-left sm:leading-[1.15]">
+          {WORDS.map(({ text }, index) => (
+            <span
+              key={text}
+              className="introText inline-flex items-baseline gap-3 pr-3 text-balance"
+              style={blockAnimation(progress, index)}
+            >
+              <span className="whitespace-nowrap">{text}</span>
+            </span>
+          ))}
         </div>
 
         <div className="mt-12 w-full">

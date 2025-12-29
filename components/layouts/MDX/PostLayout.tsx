@@ -25,6 +25,7 @@
  * --------------------------------------------------------------------
  */
 
+import AnimatedHeading from '@/components/AnimatedHeading';
 import PageTitle from '@/components/PageTitle';
 import PostNavigation from '@/components/PostNavigation';
 import { CoreContent } from '@/lib/utils/contentlayer';
@@ -52,7 +53,9 @@ export default function PostLayout({ content, children, next, prev }: Props) {
   return (
     <article>
       <header className="space-y-1 rounded-lg bg-primary-500 py-4 px-2 text-center sm:py-6 md:py-10">
-        <PageTitle>{title}</PageTitle>
+        <PageTitle>
+          <AnimatedHeading text={title} />
+        </PageTitle>
         <dl>
           <dt className="sr-only">Published on</dt>
           <dd className="flex flex-col justify-center text-base font-medium leading-6 text-white sm:flex-row sm:space-x-2">

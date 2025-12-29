@@ -25,6 +25,7 @@
  * --------------------------------------------------------------------
  */
 
+import AnimatedHeading from '@/components/AnimatedHeading';
 import Link from '@/components/Link';
 import Tag from '@/components/Tag';
 import SupportBanner from '@/components/SupportBanner';
@@ -41,7 +42,7 @@ export default function Tags() {
     <MainLayout>
       <div className="space-y-2 rounded-lg pt-8 pb-3 md:space-y-5">
         <h1 className="text-3xl font-extrabold leading-9 tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl sm:leading-10 md:text-5xl md:leading-14">
-          Tags
+          <AnimatedHeading text="Tags" />
         </h1>
       </div>
       <div className="flex flex-wrap gap-3">

@@ -102,7 +102,7 @@ export default function Uses() {
 
   return (
     <MainLayout>
-      <div className="min-h-screen bg-[#05070f]">
+      <div className="min-h-screen bg-white transition-colors dark:bg-[#05070f]">
         <MenuExperience simpleCode={author.body.code} simpleContent={simpleContent} />
       </div>
     </MainLayout>

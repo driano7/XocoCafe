@@ -39,6 +39,7 @@ interface FavoritesSelectProps {
   initialFoodId?: string | null;
   initialFavorites?: ClientFavoritesPayload | null;
   initialFavoritesLoading?: boolean;
+  variant?: 'default' | 'contrast';
 }
 
 interface FavoriteState {
@@ -60,6 +61,10 @@ function humanizeId(id: string) {
     .split('-')
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(' ');
+}
+
+function cx(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(' ');
 }
 
 function resolveMenuLabel(menuItem: ReturnType<typeof getMenuItemById>): string {
@@ -111,6 +116,7 @@ export default function FavoritesSelect({
   initialFoodId,
   initialFavorites,
   initialFavoritesLoading = false,
+  variant = 'contrast',
 }: FavoritesSelectProps) {
   const { user, token, updateUser } = useAuth();
   const shouldHydrateFromHook = !initialFavorites;
@@ -239,11 +245,27 @@ export default function FavoritesSelect({
     }
   };
 
+  const isContrastVariant = variant === 'contrast';
+
   return (
-    <div className="w-full space-y-4">
+    <div
+      className={cx(
+        'w-full space-y-6 rounded-2xl p-6 shadow-lg',
+        isContrastVariant
+          ? 'border border-gray-800 bg-gray-900/95 text-white'
+          : 'border border-gray-200 bg-white/95 text-gray-900 dark:border-white/10 dark:bg-gray-900/70 dark:text-white'
+      )}
+    >
       <div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">Mis Favoritos</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-300">
+        <h3 className={cx('text-lg font-semibold', isContrastVariant ? 'text-white' : '')}>
+          Mis Favoritos
+        </h3>
+        <p
+          className={cx(
+            'text-sm',
+            isContrastVariant ? 'text-gray-300' : 'text-gray-600 dark:text-gray-300'
+          )}
+        >
           Personaliza tus bebidas y alimentos favoritos de nuestro menú.
         </p>
       </div>
@@ -254,6 +276,7 @@ export default function FavoritesSelect({
           label="Bebida favorita"
           options={beverageOptions}
           value={favorites.favoriteBeverageId}
+          variant={isContrastVariant ? 'contrast' : 'default'}
           onChange={(value) =>
             setFavorites((prev) => ({
               ...prev,
@@ -268,6 +291,7 @@ export default function FavoritesSelect({
           label="Alimento favorito"
           options={foodOptions}
           value={favorites.favoriteFoodId}
+          variant={isContrastVariant ? 'contrast' : 'default'}
           onChange={(value) =>
             setFavorites((prev) => ({
               ...prev,
@@ -279,22 +303,28 @@ export default function FavoritesSelect({
       </div>
 
       {isFavoritesLoading && (
-        <p className="text-xs text-gray-500 dark:text-gray-400" role="status">
+        <p
+          className={cx(
+            'text-xs',
+            isContrastVariant ? 'text-gray-300' : 'text-gray-500 dark:text-gray-300'
+          )}
+          role="status"
+        >
           Sincronizando tus preferencias guardadas…
         </p>
       )}
-      {favoritesError && <p className="text-xs text-red-600 dark:text-red-400">{favoritesError}</p>}
+      {favoritesError && <p className="text-xs text-red-300 dark:text-red-400">{favoritesError}</p>}
 
       <button
         onClick={handleUpdate}
         disabled={isUpdating}
-        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="rounded-md bg-blue-500 px-4 py-2 font-medium text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isUpdating ? 'Actualizando...' : 'Guardar favoritos'}
       </button>
 
       {message && (
-        <p className="text-sm text-blue-600 dark:text-blue-400" role="status">
+        <p className="text-sm text-blue-300" role="status">
           {message}
         </p>
       )}
