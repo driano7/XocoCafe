@@ -599,7 +599,10 @@ export default function OrdersDashboardPage() {
     isIPadOS: false,
   });
   const [isShareSupported, setIsShareSupported] = useState(false);
-  const canShareTicket = isShareSupported && (deviceInfo.isAndroid || deviceInfo.isIOS);
+  const [ticketShareBlob, setTicketShareBlob] = useState<Blob | null>(null);
+  const [isPreparingShareBlob, setIsPreparingShareBlob] = useState(false);
+  const isShareCapableDevice = isShareSupported && (deviceInfo.isAndroid || deviceInfo.isIOS);
+  const canShareTicket = isShareCapableDevice && Boolean(ticketShareBlob);
   const shouldShowShareButton = deviceInfo.isMobile;
   const ticketRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
@@ -653,15 +656,6 @@ export default function OrdersDashboardPage() {
   useEffect(() => {
     trackOrderStatuses(orders);
   }, [orders, trackOrderStatuses]);
-
-  useEffect(() => {
-    if (!selectedOrder) {
-      setTicketIdentifier(null);
-      return;
-    }
-    const identifier = selectedOrder.ticketId ?? selectedOrder.orderNumber ?? selectedOrder.id;
-    setTicketIdentifier((prev) => (prev === identifier ? prev : identifier));
-  }, [selectedOrder]);
 
   useEffect(() => {
     const staffEmail = user?.email?.trim();
@@ -1007,6 +1001,31 @@ export default function OrdersDashboardPage() {
     if (!selectedOrder) return 'ticket-xoco-cafe';
     return (selectedOrder.ticketId ?? selectedOrder.orderNumber ?? selectedOrder.id).toString();
   }, [selectedOrder]);
+  const refreshTicketShareBlob = useCallback(async () => {
+    setIsPreparingShareBlob(true);
+    try {
+      await new Promise((resolve) => window.setTimeout(resolve, 120));
+      const blob = await captureTicketAsBlob();
+      setTicketShareBlob(blob);
+    } catch (error) {
+      console.error('Error generando ticket para compartir:', error);
+      setTicketShareBlob(null);
+    } finally {
+      setIsPreparingShareBlob(false);
+    }
+  }, [captureTicketAsBlob]);
+
+  useEffect(() => {
+    if (!selectedOrder) {
+      setTicketIdentifier(null);
+      setTicketShareBlob(null);
+      setIsPreparingShareBlob(false);
+      return;
+    }
+    const identifier = selectedOrder.ticketId ?? selectedOrder.orderNumber ?? selectedOrder.id;
+    setTicketIdentifier((prev) => (prev === identifier ? prev : identifier));
+    void refreshTicketShareBlob();
+  }, [refreshTicketShareBlob, selectedOrder]);
 
   const triggerDownload = useCallback(
     (blob: Blob, filename: string) => {
@@ -1144,14 +1163,18 @@ export default function OrdersDashboardPage() {
       setTicketActionError('Tu navegador no permite compartir directamente este archivo.');
       return;
     }
+    if (!ticketShareBlob) {
+      setTicketActionError(
+        'Estamos preparando tu ticket para compartir. Inténtalo en unos segundos.'
+      );
+      return;
+    }
     setTicketActionError(null);
     setIsProcessingTicket(true);
     try {
-      const blob = await captureTicketAsBlob();
-      if (!blob) {
-        throw new Error('No pudimos generar el ticket');
-      }
-      const file = new File([blob], `${buildTicketFileName()}.png`, { type: 'image/png' });
+      const file = new File([ticketShareBlob], `${buildTicketFileName()}.png`, {
+        type: 'image/png',
+      });
       if (navigator.canShare && !navigator.canShare({ files: [file] })) {
         throw new Error('El dispositivo no soporta compartir archivos');
       }
@@ -1174,12 +1197,12 @@ export default function OrdersDashboardPage() {
     }
   }, [
     buildTicketFileName,
-    captureTicketAsBlob,
     deviceInfo.isAndroid,
     deviceInfo.isIOS,
     selectedOrder,
     isShareSupported,
     runWithShareGuard,
+    ticketShareBlob,
   ]);
 
   useEffect(() => {
@@ -1434,7 +1457,7 @@ export default function OrdersDashboardPage() {
           ref={overlayRef}
           className={classNames(
             'fixed inset-0 z-[60] flex bg-black/60',
-            'px-3 pb-[calc(128px+env(safe-area-inset-bottom))] pt-[calc(15vh+72px)] sm:px-4 sm:py-6',
+            'px-3 pb-[calc(128px+env(safe-area-inset-bottom))] pt-[calc(20vh+96px)] sm:px-4 sm:py-6',
             'items-start justify-center sm:items-center'
           )}
           onClick={handleOverlayClick}
@@ -1446,7 +1469,7 @@ export default function OrdersDashboardPage() {
             className={classNames(
               'flex w-full max-w-md flex-col overflow-hidden border border-white/30 bg-white/90 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-gray-900/80',
               'rounded-t-3xl sm:rounded-3xl',
-              'h-[calc(100vh-120px-15vh)] max-h-[calc(100vh-120px-15vh)] sm:h-[calc(100vh-96px)] sm:max-h-[calc(100vh-96px)]'
+              'h-[calc(100vh-120px-20vh)] max-h-[calc(100vh-120px-20vh)] sm:h-[calc(100vh-96px)] sm:max-h-[calc(100vh-96px)]'
             )}
           >
             <div
@@ -1572,13 +1595,24 @@ export default function OrdersDashboardPage() {
                       disabled={isProcessingTicket || !canShareTicket}
                       className="w-full rounded-full border border-primary-200 px-4 py-3 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-primary-500/60 dark:text-primary-200 dark:hover:bg-primary-500/10"
                     >
-                      {canShareTicket ? 'Compartir ticket' : 'Compartir no disponible'}
+                      {isProcessingTicket
+                        ? 'Compartiendo ticket…'
+                        : canShareTicket
+                        ? 'Compartir ticket'
+                        : isShareCapableDevice
+                        ? isPreparingShareBlob
+                          ? 'Preparando ticket…'
+                          : 'Ticket no disponible'
+                        : 'Compartir no disponible'}
                     </button>
                   )}
                   {shouldShowShareButton && !canShareTicket && (
                     <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                      Tu navegador no soporta compartir archivos. Usa la descarga para guardar tu
-                      ticket.
+                      {isShareCapableDevice
+                        ? isPreparingShareBlob
+                          ? 'Generando una vista previa del ticket para compartir…'
+                          : 'No pudimos preparar el ticket para compartir. Usa la descarga para guardarlo.'
+                        : 'Tu navegador no soporta compartir archivos. Usa la descarga para guardar tu ticket.'}
                     </p>
                   )}
                   {ticketActionError && (
