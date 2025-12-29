@@ -34,6 +34,25 @@ const run = promisify(sqliteDb.run.bind(sqliteDb));
 
 const tableColumnsCache = new Map();
 
+const PRIORITY_TABLES = new Set([
+  'users',
+  'orders',
+  'order_items',
+  'tickets',
+  'reservations',
+  'loyalty_points',
+  'customer_consumption',
+]);
+
+const cronHeartbeatConfig = {
+  table: process.env.SUPABASE_CRON_HEARTBEAT_TABLE ?? 'sync_jobs_status',
+  jobColumn: process.env.SUPABASE_CRON_HEARTBEAT_NAME_COLUMN ?? 'job_name',
+  timestampColumn: process.env.SUPABASE_CRON_HEARTBEAT_TS_COLUMN ?? 'last_completed_at',
+  jobName: process.env.SUPABASE_CRON_HEARTBEAT_JOB ?? 'supabase-nightly-import',
+  maxAgeMinutes: Number(process.env.SUPABASE_CRON_HEARTBEAT_MAX_MINUTES ?? '180'),
+  required: process.env.SUPABASE_CRON_HEARTBEAT_REQUIRED !== 'false',
+};
+
 const SYNC_TABLES = [
   { name: 'users', pk: 'id', updatedColumn: 'updatedAt' },
   { name: 'addresses', pk: 'id', updatedColumn: 'updatedAt' },
@@ -193,7 +212,68 @@ async function pushSqliteChanges(table, since) {
   return rows.length ? lastCursor : since;
 }
 
+async function ensureSupabaseCronHeartbeat() {
+  if (!cronHeartbeatConfig.required) {
+    return;
+  }
+
+  if (!cronHeartbeatConfig.table || !cronHeartbeatConfig.jobColumn || !cronHeartbeatConfig.timestampColumn) {
+    console.warn('⚠️  Cron heartbeat config incomplete; skipping heartbeat validation.');
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from(cronHeartbeatConfig.table)
+    .select(`${cronHeartbeatConfig.jobColumn},${cronHeartbeatConfig.timestampColumn}`)
+    .eq(cronHeartbeatConfig.jobColumn, cronHeartbeatConfig.jobName)
+    .maybeSingle();
+
+  if (error) {
+    const isMissingTable =
+      error.code === '42P01' || (error.message && /relation .* does not exist/i.test(error.message));
+    if (isMissingTable) {
+      console.warn(
+        `⚠️  Supabase cron heartbeat table "${cronHeartbeatConfig.table}" not found. ` +
+          'Set SUPABASE_CRON_HEARTBEAT_REQUIRED=false to bypass this check.'
+      );
+      if (cronHeartbeatConfig.required) {
+        throw new Error('Supabase cron heartbeat table is required but missing.');
+      }
+      return;
+    }
+    throw new Error(`Failed to read Supabase cron heartbeat: ${error.message}`);
+  }
+
+  if (!data || !data[cronHeartbeatConfig.timestampColumn]) {
+    throw new Error(
+      `Supabase cron heartbeat "${cronHeartbeatConfig.jobName}" missing timestamp ` +
+        `(${cronHeartbeatConfig.timestampColumn}).`
+    );
+  }
+
+  const lastRun = new Date(data[cronHeartbeatConfig.timestampColumn]);
+  if (Number.isNaN(lastRun.getTime())) {
+    throw new Error(
+      `Supabase cron heartbeat timestamp is invalid: ${data[cronHeartbeatConfig.timestampColumn]}`
+    );
+  }
+
+  const ageMinutes = (Date.now() - lastRun.getTime()) / 60000;
+  if (ageMinutes > cronHeartbeatConfig.maxAgeMinutes) {
+    throw new Error(
+      `Supabase cron heartbeat is too old (${ageMinutes.toFixed(1)} min). ` +
+        'Wait for the nightly import before pulling data into SQLite.'
+    );
+  }
+  console.log(
+    `✅ Supabase cron heartbeat "${cronHeartbeatConfig.jobName}" seen ${ageMinutes.toFixed(
+      1
+    )} min ago.`
+  );
+}
+
 async function main() {
+  await ensureSupabaseCronHeartbeat();
   await ensureSyncStateTable();
   for (const table of SYNC_TABLES) {
     table.columnSet = await getColumnSet(table.name);
@@ -224,11 +304,21 @@ async function main() {
 
     let lastSqlitePush = state.lastSqlitePush;
     let pushSucceeded = false;
-    try {
-      lastSqlitePush = await pushSqliteChanges(table, state.lastSqlitePush);
-      pushSucceeded = true;
-    } catch (error) {
-      console.warn(`⚠️  Supabase push skipped for ${table.name}: ${error.message}`);
+    const shouldPush =
+      pullSucceeded || !PRIORITY_TABLES.has(table.name) || table.fullRefresh === true;
+
+    if (shouldPush) {
+      try {
+        lastSqlitePush = await pushSqliteChanges(table, state.lastSqlitePush);
+        pushSucceeded = true;
+      } catch (error) {
+        console.warn(`⚠️  Supabase push skipped for ${table.name}: ${error.message}`);
+      }
+    } else {
+      console.log(
+        `⏸️  Skipping SQLite -> Supabase push for ${table.name} because Supabase ` +
+          'pull did not succeed in this run.'
+      );
     }
 
     await updateSyncState(table.name, {

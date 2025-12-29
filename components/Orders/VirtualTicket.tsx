@@ -745,6 +745,8 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
               className="h-44 w-44 rounded-2xl border border-gray-200 bg-white p-2"
               unoptimized
               crossOrigin="anonymous"
+              priority
+              loading="eager"
             />
             <p className="text-center text-xs text-gray-500">
               Escanea este código para facilitar la entrega.

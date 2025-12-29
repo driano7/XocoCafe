@@ -10,7 +10,7 @@
     "serve": "next start",
     "lint": "next lint --fix --dir pages --dir components --dir lib --dir layouts --dir scripts",
     "prepare": "husky install",
-    "sync:sqlite": "node --env-file=.env scripts/sync-supabase-sqlite.mjs"
+    "sync:sqlite": "node --env-file=.env.local scripts/sync-supabase-sqlite.mjs"
   },
   "engines": {
     "node": ">=18"

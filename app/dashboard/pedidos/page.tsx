@@ -1200,16 +1200,23 @@ export default function OrdersDashboardPage() {
       const file = new File([blob], `${buildTicketFileName()}.png`, {
         type: 'image/png',
       });
-      if (navigator.canShare && !navigator.canShare({ files: [file] })) {
-        throw new Error('El dispositivo no soporta compartir archivos');
-      }
-      await runWithShareGuard(() =>
-        navigator.share({
-          files: [file],
-          title: 'Ticket digital Xoco Café',
-          text: 'Comparte tu ticket con otra persona o guárdalo en tu galería.',
-        })
-      );
+      const sharePayload =
+        navigator.canShare && navigator.canShare({ files: [file] })
+          ? {
+              files: [file],
+              title: 'Ticket digital Xoco Café',
+              text: 'Comparte tu ticket con otra persona o guárdalo en tu galería.',
+            }
+          : (() => {
+              const objectUrl = URL.createObjectURL(blob);
+              setTimeout(() => URL.revokeObjectURL(objectUrl), 6_000);
+              return {
+                url: objectUrl,
+                title: 'Ticket digital Xoco Café',
+                text: 'Comparte este enlace para descargar tu ticket.',
+              };
+            })();
+      await runWithShareGuard(() => navigator.share(sharePayload));
     } catch (error) {
       console.error('Error compartiendo ticket:', error);
       if (error instanceof Error && error.message === 'share_aborted_visibility') {
@@ -1483,7 +1490,7 @@ export default function OrdersDashboardPage() {
           ref={overlayRef}
           className={classNames(
             'fixed inset-0 z-[60] flex bg-black/60',
-            'px-3 pb-[calc(144px+env(safe-area-inset-bottom))] pt-[calc(30vh+128px)] sm:px-4 sm:py-6',
+            'px-3 pb-[calc(132px+env(safe-area-inset-bottom))] pt-[calc(22vh+108px)] sm:px-4 sm:py-6',
             'items-start justify-center sm:items-center'
           )}
           onClick={handleOverlayClick}
@@ -1495,7 +1502,7 @@ export default function OrdersDashboardPage() {
             className={classNames(
               'flex w-full max-w-md flex-col overflow-hidden border border-white/30 bg-white/90 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-gray-900/80',
               'rounded-t-3xl sm:rounded-3xl',
-              'h-[calc(100vh-128px-30vh)] max-h-[calc(100vh-128px-30vh)] sm:h-[calc(100vh-96px)] sm:max-h-[calc(100vh-96px)]'
+              'h-[calc(100vh-120px-22vh)] max-h-[calc(100vh-120px-22vh)] sm:h-[calc(100vh-96px)] sm:max-h-[calc(100vh-96px)]'
             )}
           >
             <div
