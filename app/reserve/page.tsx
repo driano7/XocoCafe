@@ -553,14 +553,10 @@ export default function ReservePage() {
   }, []);
 
   useEffect(() => {
-    if (!showReservationForm) {
+    if (!showReservationForm || !isMobileDevice) {
       return;
     }
     if (typeof window === 'undefined') {
-      return;
-    }
-    const isMobileViewport = window.matchMedia('(max-width: 768px)').matches;
-    if (!isMobileViewport) {
       return;
     }
     const target = reservationFormRef.current;
@@ -568,16 +564,27 @@ export default function ReservePage() {
       return;
     }
     window.requestAnimationFrame(() => {
-      const top =
-        target.getBoundingClientRect().top +
-        window.scrollY -
-        Math.max(96, window.innerHeight * 0.12);
+      const headerOffset = Math.max(window.innerHeight * 0.2, 140);
+      const top = Math.max(target.getBoundingClientRect().top + window.scrollY - headerOffset, 0);
       window.scrollTo({
         top,
         behavior: 'smooth',
       });
     });
-  }, [showReservationForm]);
+  }, [isMobileDevice, showReservationForm]);
+
+  useEffect(() => {
+    if (!selectedReservation || !isMobileDevice) {
+      return;
+    }
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
+  }, [isMobileDevice, selectedReservation]);
 
   const {
     pendingReservations,
@@ -2143,7 +2150,7 @@ const DetailModal = ({ children, onClose }: { children: ReactNode; onClose: () =
     <div
       className={classNames(
         'fixed inset-0 z-50 flex justify-center',
-        'px-3 pb-[calc(128px+env(safe-area-inset-bottom))] pt-[calc(20vh+96px)] sm:px-5 sm:pt-0 sm:pb-0',
+        'px-3 pb-[calc(144px+env(safe-area-inset-bottom))] pt-[calc(30vh+128px)] sm:px-5 sm:pt-0 sm:pb-0',
         'items-start sm:items-center'
       )}
     >
@@ -2163,7 +2170,7 @@ const DetailModal = ({ children, onClose }: { children: ReactNode; onClose: () =
         className={classNames(
           'relative z-10 w-full max-w-3xl overflow-y-auto border border-[#462b20] bg-[#2a170f] text-white shadow-[0_45px_95px_rgba(0,0,0,0.85)]',
           'rounded-t-[34px] sm:rounded-[34px]',
-          'max-h-[calc(100vh-120px-20vh)] h-[calc(100vh-120px-20vh)] sm:max-h-[90vh] sm:h-auto',
+          'max-h-[calc(100vh-128px-30vh)] h-[calc(100vh-128px-30vh)] sm:max-h-[90vh] sm:h-auto',
           'p-6 sm:p-7'
         )}
       >
