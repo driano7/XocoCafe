@@ -25,12 +25,9 @@
  * --------------------------------------------------------------------
  */
 
-import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { insertLoyaltyEntry } from '@/lib/loyalty';
-
 const MAX_STAMPS = 7;
 const LOYALTY_ELIGIBLE_PRODUCTS = ['beverage-cafe-mexicano'];
 
@@ -200,42 +197,10 @@ export async function POST(request: NextRequest) {
       throw new Error('No se pudo recuperar la actualización del usuario');
     }
 
-    const incrementMetadata = {
-      increment,
-      previousCount,
-      newCount,
-      action: 'increment',
-      source: 'loyalty_flip_card',
-      occurredAt: new Date().toISOString(),
-    };
-
-    await insertLoyaltyEntry({
-      id: randomUUID(),
-      userId: auth.decoded.userId,
-      points: updatedUser.weeklyCoffeeCount,
-      reason: 'coffee_increment',
-      metadata: incrementMetadata,
-    });
-
     let rewardEarned = false;
     let finalCount = updatedUser.weeklyCoffeeCount;
-
     if (newCount >= MAX_STAMPS) {
       rewardEarned = true;
-
-      await insertLoyaltyEntry({
-        id: randomUUID(),
-        userId: auth.decoded.userId,
-        points: updatedUser.weeklyCoffeeCount,
-        reason: 'coffee_reward',
-        metadata: {
-          action: 'reward_claimed',
-          previousCount: newCount,
-          source: 'loyalty_flip_card',
-          occurredAt: new Date().toISOString(),
-        },
-      });
-
       const { data: resetResult, error: resetError } = await supabase
         .from('users')
         .update({
@@ -291,18 +256,6 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Token inválido' }, { status: 401 });
     }
 
-    const { data: user, error: fetchError } = await supabase
-      .from('users')
-      .select('weeklyCoffeeCount')
-      .eq('id', decoded.userId)
-      .maybeSingle();
-
-    if (fetchError) {
-      throw new Error(fetchError.message);
-    }
-
-    const previousCount = user?.weeklyCoffeeCount ?? 0;
-
     const { data: updatedUser, error } = await supabase
       .from('users')
       .update({
@@ -320,19 +273,6 @@ export async function PUT(request: NextRequest) {
     if (!updatedUser) {
       throw new Error('No se pudo recuperar la actualización del usuario');
     }
-
-    await insertLoyaltyEntry({
-      id: randomUUID(),
-      userId: decoded.userId,
-      points: updatedUser.weeklyCoffeeCount,
-      reason: 'coffee_reset',
-      metadata: {
-        action: 'reset',
-        previousCount,
-        source: 'loyalty_flip_card',
-        occurredAt: new Date().toISOString(),
-      },
-    });
 
     return NextResponse.json({
       success: true,

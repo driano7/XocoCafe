@@ -25,12 +25,9 @@
  * --------------------------------------------------------------------
  */
 
-import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { insertLoyaltyEntry } from '@/lib/loyalty';
-
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -75,18 +72,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    await insertLoyaltyEntry({
-      id: randomUUID(),
-      userId: decoded.userId,
-      points: 0,
-      reason: 'program_activation',
-      metadata: {
-        action: 'activation',
-        source: 'loyalty_activation_prompt',
-        occurredAt: new Date().toISOString(),
-      },
-    });
-
     const { error: updateError } = await supabase
       .from('users')
       .update({ loyaltyActivatedAt: activationTimestamp })
@@ -100,7 +85,7 @@ export async function POST(request: NextRequest) {
       message: '¡Listo! Activamos tu programa de lealtad.',
       alreadyActive: false,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error activando programa de lealtad:', error);
     return NextResponse.json(
       { success: false, message: 'No pudimos activar tu programa de lealtad.' },
