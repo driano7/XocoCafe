@@ -108,7 +108,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
                     <AndroidViewportFix />
                     <Header />
                     <LenisProvider>
-                      <main className="pt-16 pb-3 sm:pt-20 sm:pb-10 lg:pt-24 lg:pb-16">
+                      <main className="pt-20 pb-4 sm:pt-20 sm:pb-10 lg:pt-24 lg:pb-16">
                         <PageTransition>{children}</PageTransition>
                       </main>
                     </LenisProvider>

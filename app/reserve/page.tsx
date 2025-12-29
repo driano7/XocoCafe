@@ -27,6 +27,7 @@
 
 'use client';
 
+import classNames from 'classnames';
 import Image from 'next/image';
 import {
   useCallback,
@@ -2110,7 +2111,13 @@ const DetailModal = ({ children, onClose }: { children: ReactNode; onClose: () =
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-5">
+    <div
+      className={classNames(
+        'fixed inset-0 z-50 flex justify-center',
+        'px-3 pt-24 pb-4 sm:px-5 sm:pt-0 sm:pb-0',
+        'items-start sm:items-center'
+      )}
+    >
       <div
         className="absolute inset-0 bg-black/70"
         role="button"
@@ -2123,7 +2130,14 @@ const DetailModal = ({ children, onClose }: { children: ReactNode; onClose: () =
           }
         }}
       />
-      <div className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[34px] border border-[#462b20] bg-[#2a170f] p-7 text-white shadow-[0_45px_95px_rgba(0,0,0,0.85)]">
+      <div
+        className={classNames(
+          'relative z-10 w-full max-w-3xl overflow-y-auto border border-[#462b20] bg-[#2a170f] text-white shadow-[0_45px_95px_rgba(0,0,0,0.85)]',
+          'rounded-t-[34px] sm:rounded-[34px]',
+          'max-h-[calc(100vh-120px)] h-[calc(100vh-120px)] sm:max-h-[90vh] sm:h-auto',
+          'p-6 sm:p-7'
+        )}
+      >
         <button
           type="button"
           onClick={onClose}

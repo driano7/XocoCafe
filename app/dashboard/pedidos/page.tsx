@@ -27,6 +27,7 @@
 
 'use client';
 
+import classNames from 'classnames';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FaWhatsapp } from 'react-icons/fa';
@@ -1431,15 +1432,22 @@ export default function OrdersDashboardPage() {
       {selectedOrder && (
         <div
           ref={overlayRef}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 py-6 sm:px-4"
+          className={classNames(
+            'fixed inset-0 z-50 flex bg-black/60',
+            'px-3 pt-24 pb-4 sm:px-4 sm:pt-6 sm:pb-6',
+            'items-start justify-center sm:items-center'
+          )}
           onClick={handleOverlayClick}
           onKeyDown={handleOverlayKeyDown}
           role="presentation"
           tabIndex={-1}
         >
           <div
-            className="flex w-full max-w-md flex-col overflow-hidden rounded-3xl border border-white/30 bg-white/90 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-gray-900/80"
-            style={{ maxHeight: 'calc(100vh - 96px)', height: 'calc(100vh - 96px)' }}
+            className={classNames(
+              'flex w-full max-w-md flex-col overflow-hidden border border-white/30 bg-white/90 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-gray-900/80',
+              'rounded-t-3xl sm:rounded-3xl',
+              'h-[calc(100vh-120px)] max-h-[calc(100vh-120px)] sm:h-[calc(100vh-96px)] sm:max-h-[calc(100vh-96px)]'
+            )}
           >
             <div
               className="scrollable flex-1 overscroll-contain px-5 py-5"

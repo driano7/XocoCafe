@@ -41,6 +41,8 @@ export default function Header() {
   const pathName = usePathname();
   const [isVisible, setIsVisible] = useState(false);
   const [forceVisible, setForceVisible] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileDelayElapsed, setMobileDelayElapsed] = useState(true);
 
   useEffect(() => {
     const updateForceVisible = () => {
@@ -53,13 +55,40 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.matchMedia('(max-width: 640px)').matches);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setMobileDelayElapsed(true);
+      return undefined;
+    }
+    setMobileDelayElapsed(false);
+    setIsVisible(true);
+    const timer = window.setTimeout(() => {
+      setMobileDelayElapsed(true);
+      setIsVisible(forceVisible || window.scrollY > 16);
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [isMobile, forceVisible]);
+
+  useEffect(() => {
     const handleScroll = () => {
+      if (isMobile && !mobileDelayElapsed) {
+        setIsVisible(true);
+        return;
+      }
       setIsVisible(forceVisible || window.scrollY > 16);
     };
     handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [forceVisible]);
+  }, [forceVisible, isMobile, mobileDelayElapsed]);
 
   return (
     <div className="pointer-events-none fixed inset-x-0 top-4 z-40 flex justify-center px-4 sm:px-6 lg:px-8">

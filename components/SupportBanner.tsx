@@ -7,6 +7,7 @@
 
 'use client';
 
+import classNames from 'classnames';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FaBitcoin, FaInstagram, FaSpotify, FaTiktok, FaTwitter, FaWhatsapp } from 'react-icons/fa';
 import { SiEthereum } from 'react-icons/si';
@@ -14,6 +15,12 @@ import { HiOutlineBanknotes } from 'react-icons/hi2';
 import siteMetadata from 'content/siteMetadata';
 import TypewriterText from '@/components/TypewriterText';
 import { motion } from 'framer-motion';
+
+const SOCIAL_ICON_CLASSES =
+  'group relative flex h-12 w-12 items-center justify-center rounded-full border border-white/30 text-xl text-white transition-all duration-300 hover:-translate-y-1 hover:border-white hover:bg-white/10';
+
+const SOCIAL_GLOW_CLASSES =
+  'pointer-events-none absolute inset-0 rounded-full bg-white/15 opacity-0 transition-opacity duration-300 group-hover:opacity-100';
 
 const SOCIAL_LINKS = [
   { label: 'TikTok', href: siteMetadata.tiktok, Icon: FaTiktok },
@@ -53,6 +60,9 @@ export default function SupportBanner() {
   const [copyFeedback, setCopyFeedback] = useState<CopyFeedback | null>(null);
   const [shouldAnimateHeading, setShouldAnimateHeading] = useState(false);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const socialListRef = useRef<HTMLUListElement | null>(null);
+  const [socialsVisible, setSocialsVisible] = useState(false);
+  const [socialsHasBeenVisible, setSocialsHasBeenVisible] = useState(false);
   const donationVariants = {
     hidden: { opacity: 0, y: 30, scale: 0.96 },
     visible: (index: number) => ({
@@ -133,6 +143,25 @@ export default function SupportBanner() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const target = socialListRef.current;
+    if (!target) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry) return;
+        if (entry.isIntersecting) {
+          setSocialsVisible(true);
+          setSocialsHasBeenVisible(true);
+        } else {
+          setSocialsVisible(false);
+        }
+      },
+      { threshold: 0.3 }
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <section className="not-prose mt-12 space-y-10 rounded-3xl bg-primary-500 px-6 py-10 text-white shadow-2xl">
       <div className="grid gap-6 md:grid-cols-2 md:items-center">
@@ -153,21 +182,35 @@ export default function SupportBanner() {
           </p>
         </div>
         {SOCIAL_LINKS.length > 0 && (
-          <ul className="flex list-none flex-wrap items-center gap-3 text-white">
-            {SOCIAL_LINKS.map(({ label, href, Icon }) => (
-              <li key={label}>
-                <a
-                  href={href!}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={label}
-                  className="group relative flex h-12 w-12 items-center justify-center rounded-full border border-white/30 text-xl text-white transition hover:border-white hover:bg-white/10"
+          <ul
+            ref={socialListRef}
+            className="flex list-none flex-wrap items-center gap-3 text-white"
+            aria-label="Redes sociales"
+          >
+            {SOCIAL_LINKS.map(({ label, href, Icon }, index) => {
+              const visibilityClass =
+                socialsHasBeenVisible && socialsVisible
+                  ? 'translate-y-0 opacity-100'
+                  : 'translate-y-3 opacity-0';
+              return (
+                <li
+                  key={label}
+                  className={classNames('transform transition-all duration-500', visibilityClass)}
+                  style={{ transitionDelay: `${index * 120}ms` }}
                 >
-                  <span className="absolute inset-0 rounded-full bg-white/10 opacity-0 transition group-hover:opacity-100" />
-                  <Icon className="text-white" />
-                </a>
-              </li>
-            ))}
+                  <a
+                    href={href!}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={label}
+                    className={SOCIAL_ICON_CLASSES}
+                  >
+                    <span className={SOCIAL_GLOW_CLASSES} />
+                    <Icon className="text-white" />
+                  </a>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
