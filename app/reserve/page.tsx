@@ -2114,7 +2114,7 @@ const DetailModal = ({ children, onClose }: { children: ReactNode; onClose: () =
     <div
       className={classNames(
         'fixed inset-0 z-50 flex justify-center',
-        'px-3 pt-24 pb-4 sm:px-5 sm:pt-0 sm:pb-0',
+        'px-3 pb-4 pt-[calc(15vh+72px)] sm:px-5 sm:pt-0 sm:pb-0',
         'items-start sm:items-center'
       )}
     >
