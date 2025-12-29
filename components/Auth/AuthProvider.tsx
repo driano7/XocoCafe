@@ -181,9 +181,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(null);
       localStorage.removeItem('authToken');
       if (typeof window !== 'undefined') {
-        window.setTimeout(() => {
-          window.location.replace('/login');
-        }, 800);
+        window.location.replace('/login');
       }
     }
   }, [analyticsContext, token, user]);

@@ -975,7 +975,7 @@ export default function OrdersDashboardPage() {
     await waitForTicketAssets();
     const html2canvas = (await import('html2canvas')).default;
     const canvas = await html2canvas(ticketRef.current, {
-      scale: 2,
+      scale: 1.5,
       backgroundColor: '#ffffff',
       useCORS: true,
     });
@@ -1433,8 +1433,8 @@ export default function OrdersDashboardPage() {
         <div
           ref={overlayRef}
           className={classNames(
-            'fixed inset-0 z-50 flex bg-black/60',
-            'px-3 pb-4 pt-[calc(15vh+72px)] sm:px-4 sm:py-6',
+            'fixed inset-0 z-[60] flex bg-black/60',
+            'px-3 pb-[calc(128px+env(safe-area-inset-bottom))] pt-[calc(15vh+72px)] sm:px-4 sm:py-6',
             'items-start justify-center sm:items-center'
           )}
           onClick={handleOverlayClick}
@@ -1450,7 +1450,7 @@ export default function OrdersDashboardPage() {
             )}
           >
             <div
-              className="scrollable flex-1 overscroll-contain px-5 py-5"
+              className="scrollable flex-1 overscroll-contain px-4 pb-24 pt-5 sm:px-5 sm:pb-6"
               aria-labelledby="order-detail-title"
               style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
               onWheelCapture={(event) => event.stopPropagation()}

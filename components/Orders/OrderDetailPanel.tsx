@@ -150,7 +150,7 @@ const extractStaffNotes = (metadata?: unknown) =>
 
 const resolveMethodLabel = (value?: string | null) => {
   if (!value) {
-    return 'Pendiente por definir';
+    return 'Pendiente';
   }
   const normalized = value.trim().toLowerCase();
   return PAYMENT_METHOD_LABELS[normalized] ?? value;
@@ -315,14 +315,14 @@ export function OrderDetailPanel({
 
   return (
     <section
-      className={`space-y-4 rounded-3xl border border-gray-200 bg-white/90 p-5 text-sm shadow-lg dark:border-white/10 dark:bg-gray-900/70 dark:text-gray-100 ${
+      className={`space-y-3 rounded-[28px] border border-gray-200 bg-white/90 p-4 text-[13px] shadow-lg dark:border-white/10 dark:bg-gray-900/70 dark:text-gray-100 sm:space-y-4 sm:p-5 sm:text-sm ${
         className ?? ''
       }`}
     >
       <header>
         <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Detalle del pedido</h3>
       </header>
-      <div className="grid gap-3 rounded-2xl border border-gray-100 bg-gray-50/80 p-4 dark:border-white/10 dark:bg-white/5">
+      <div className="grid gap-2.5 rounded-2xl border border-gray-100 bg-gray-50/80 p-3 dark:border-white/10 dark:bg-white/5 sm:gap-3 sm:p-4">
         <DetailRow
           label="Atendió"
           value={
