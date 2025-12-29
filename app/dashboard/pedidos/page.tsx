@@ -603,7 +603,7 @@ export default function OrdersDashboardPage() {
   const [isPreparingShareBlob, setIsPreparingShareBlob] = useState(false);
   const isShareCapableDevice = isShareSupported && (deviceInfo.isAndroid || deviceInfo.isIOS);
   const isTicketShareReady = Boolean(ticketShareBlob);
-  const shouldShowShareButton = deviceInfo.isMobile;
+  const shouldShowShareButton = false;
   const ticketRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const isAuthenticated = Boolean(user && token);
@@ -1490,7 +1490,7 @@ export default function OrdersDashboardPage() {
           ref={overlayRef}
           className={classNames(
             'fixed inset-0 z-[60] flex bg-black/60',
-            'px-3 pb-[calc(132px+env(safe-area-inset-bottom))] pt-[calc(22vh+108px)] sm:px-4 sm:py-6',
+            'px-3 pb-[calc(110px+env(safe-area-inset-bottom))] pt-[calc(15vh+82px)] sm:px-4 sm:py-6',
             'items-start justify-center sm:items-center'
           )}
           onClick={handleOverlayClick}
