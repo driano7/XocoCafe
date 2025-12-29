@@ -98,15 +98,21 @@ Xoco Café es un proyecto de café artesanal inspirado en la riqueza del café m
 
 **Sitio Oficial:** https://xococafe.netlify.app
 
-| Tecnología        | Función                             |
-| ----------------- | ----------------------------------- |
-| React.js          | Framework principal del front-end.  |
-| Netlify           | Plataforma de hosting y despliegue. |
-| HTML5 / CSS3      | Estructura y estilos base.          |
-| JavaScript ES6+   | Interactividad del sitio.           |
-| Google Fonts      | Tipografía personalizada.           |
-| Animaciones       | Transiciones visuales suaves.       |
-| Diseño Responsive | Experiencia optimizada en móviles.  |
+| Tecnología        | Función                                                                 |
+| ----------------- | ----------------------------------------------------------------------- |
+| React.js          | Framework principal del front-end.                                      |
+| Netlify           | Plataforma de hosting y despliegue.                                     |
+| Supabase          | Autenticación, sincronización en la nube y funciones programadas.       |
+| SQLite            | Base de datos local de respaldo para operación resiliente sin conexión. |
+| HTML5 / CSS3      | Estructura y estilos base.                                              |
+| JavaScript ES6+   | Interactividad del sitio.                                               |
+| Google Fonts      | Tipografía personalizada.                                               |
+| Animaciones       | Transiciones visuales suaves.                                           |
+| Diseño Responsive | Experiencia optimizada en móviles.                                      |
+
+### 🔁 Automatización operativa
+
+Usamos **Pipedream** como puente serverless para automatizar correos (reset de contraseña, confirmaciones propias) y orquestar integraciones entre la app Xoco Café y Supabase.
 
 ---
 
@@ -218,15 +224,21 @@ Xoco Café is an artisanal Mexican coffee project centered on sustainability, co
 
 **Official Website:** https://xococafe.netlify.app
 
-| Technology        | Purpose                          |
-| ----------------- | -------------------------------- |
-| React.js          | Main front-end framework.        |
-| Netlify           | Deployment and hosting platform. |
-| HTML5 / CSS3      | Structure and base styling.      |
-| JavaScript ES6+   | Website interactivity.           |
-| Google Fonts      | Typography customization.        |
-| Animations        | Smooth visual transitions.       |
-| Responsive Design | Optimized mobile experience.     |
+| Technology        | Purpose                                                                             |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| React.js          | Main front-end framework.                                                           |
+| Netlify           | Deployment and hosting platform.                                                    |
+| Supabase          | Auth, cloud persistence, and scheduled functions for the operational stack.         |
+| SQLite            | Offline-ready local database that syncs back to Supabase when connectivity returns. |
+| HTML5 / CSS3      | Structure and base styling.                                                         |
+| JavaScript ES6+   | Website interactivity.                                                              |
+| Google Fonts      | Typography customization.                                                           |
+| Animations        | Smooth visual transitions.                                                          |
+| Responsive Design | Optimized mobile experience.                                                        |
+
+### 🔁 Automation
+
+We leverage **Pipedream** as a lightweight serverless bridge to automate transactional emails (password resets, branded confirmations) and connect our Xoco Café app with Supabase workflows.
 
 ---
 

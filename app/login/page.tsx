@@ -27,7 +27,8 @@
 
 'use client';
 
-import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import classNames from 'classnames';
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import LoginForm from '@/components/Auth/LoginForm';
@@ -51,12 +52,34 @@ export default function LoginPage() {
   const [snackbar, setSnackbar] = useState<SnackbarState | null>(null);
   const { login, user, logout, isLoading } = useAuth();
   const router = useRouter();
+  const formCardRef = useRef<HTMLDivElement | null>(null);
+  const [formVisible, setFormVisible] = useState(false);
+  const [formHasBeenVisible, setFormHasBeenVisible] = useState(false);
 
   useEffect(() => {
     router.prefetch('/profile');
     router.prefetch('/onboarding/favorites');
     router.prefetch('/dashboard/pedidos');
   }, [router]);
+
+  useEffect(() => {
+    const target = formCardRef.current;
+    if (!target) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry) return;
+        if (entry.isIntersecting) {
+          setFormVisible(true);
+          setFormHasBeenVisible(true);
+        } else {
+          setFormVisible(false);
+        }
+      },
+      { threshold: 0.4 }
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
 
   const triggerSnackbar = useCallback((message: ReactNode, tone: SnackbarTone = 'info') => {
     setSnackbar({ message, tone, id: Date.now() });
@@ -237,7 +260,15 @@ export default function LoginPage() {
             </div>
           )}
 
-          <div className="bg-white dark:bg-gray-800 py-8 px-6 shadow rounded-lg">
+          <div
+            ref={formCardRef}
+            className={classNames(
+              'bg-white dark:bg-gray-800 py-8 px-6 shadow rounded-lg transition-all duration-500',
+              formHasBeenVisible && formVisible
+                ? 'translate-y-0 opacity-100'
+                : 'translate-y-4 opacity-0'
+            )}
+          >
             {showForgotPassword ? (
               <ForgotPasswordForm onBack={handleBackToLogin} />
             ) : isLogin ? (

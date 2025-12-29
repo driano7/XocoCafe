@@ -1446,7 +1446,7 @@ export default function OrdersDashboardPage() {
             className={classNames(
               'flex w-full max-w-md flex-col overflow-hidden border border-white/30 bg-white/90 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-gray-900/80',
               'rounded-t-3xl sm:rounded-3xl',
-              'h-[calc(100vh-120px)] max-h-[calc(100vh-120px)] sm:h-[calc(100vh-96px)] sm:max-h-[calc(100vh-96px)]'
+              'h-[calc(100vh-120px-15vh)] max-h-[calc(100vh-120px-15vh)] sm:h-[calc(100vh-96px)] sm:max-h-[calc(100vh-96px)]'
             )}
           >
             <div
