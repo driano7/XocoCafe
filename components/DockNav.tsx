@@ -10,10 +10,12 @@ import {
   FiFileText,
   FiFolderMinus,
   FiHome,
+  FiMapPin,
   FiMoreHorizontal,
   FiShoppingBag,
 } from 'react-icons/fi';
 import { PiTrayBold } from 'react-icons/pi';
+import { useAuth } from '@/components/Auth/AuthProvider';
 
 type DockLink = {
   href: string;
@@ -22,7 +24,14 @@ type DockLink = {
   startsWith?: string;
 };
 
-const PRIMARY_LINKS: DockLink[] = [
+const LOCATION_LINK: DockLink = {
+  href: '/blog/ubicacion',
+  icon: FiMapPin,
+  label: 'Ubicación',
+  startsWith: '/blog/ubicacion',
+};
+
+const AUTH_LINKS: DockLink[] = [
   { href: '/', icon: FiHome, label: 'Inicio' },
   {
     href: '/dashboard/pedidos',
@@ -34,7 +43,24 @@ const PRIMARY_LINKS: DockLink[] = [
   { href: '/uses', icon: PiTrayBold, label: 'Menú', startsWith: '/uses' },
 ];
 
-const EXTRA_LINKS: DockLink[] = [
+const PUBLIC_LINKS: DockLink[] = [
+  { href: '/', icon: FiHome, label: 'Inicio' },
+  { href: '/uses', icon: PiTrayBold, label: 'Menú', startsWith: '/uses' },
+  LOCATION_LINK,
+];
+
+const EXTRA_LINKS_AUTH: DockLink[] = [
+  {
+    href: '/blog/facturacion',
+    icon: FiFileText,
+    label: 'Facturación',
+    startsWith: '/blog/facturacion',
+  },
+  LOCATION_LINK,
+  { href: '/blog', icon: FiCoffee, label: 'Blog', startsWith: '/blog' },
+];
+
+const EXTRA_LINKS_PUBLIC: DockLink[] = [
   {
     href: '/blog/facturacion',
     icon: FiFileText,
@@ -62,11 +88,12 @@ const isActiveRoute = (pathname: string, link: DockLink) => {
 
 export default function DockNav() {
   const pathname = usePathname();
+  const { user } = useAuth();
   const [showExtras, setShowExtras] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const links = useMemo(() => PRIMARY_LINKS, []);
-  const extraLinks = useMemo(() => EXTRA_LINKS, []);
+  const links = useMemo(() => (user ? AUTH_LINKS : PUBLIC_LINKS), [user]);
+  const extraLinks = useMemo(() => (user ? EXTRA_LINKS_AUTH : EXTRA_LINKS_PUBLIC), [user]);
 
   const scheduleCollapse = useCallback(() => {
     if (collapseTimer.current) {

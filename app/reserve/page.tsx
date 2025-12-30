@@ -332,10 +332,12 @@ export default function ReservePage() {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const reservationTicketRef = useRef<HTMLDivElement | null>(null);
   const reservationFormRef = useRef<HTMLDivElement | null>(null);
+  const reservationBoardRef = useRef<HTMLDivElement | null>(null);
   const [reservationTicketActionError, setReservationTicketActionError] = useState<string | null>(
     null
   );
   const [isProcessingReservationTicket, setIsProcessingReservationTicket] = useState(false);
+  const [recentReservationCode, setRecentReservationCode] = useState<string | null>(null);
   const [reservationDeviceInfo, setReservationDeviceInfo] = useState({
     isMobile: false,
     isAndroid: false,
@@ -585,6 +587,45 @@ export default function ReservePage() {
       behavior: 'smooth',
     });
   }, [isMobileDevice, selectedReservation]);
+
+  useEffect(() => {
+    if (!recentReservationCode) {
+      return;
+    }
+    if (
+      !reservations.some((reservation) => reservation.reservationCode === recentReservationCode)
+    ) {
+      return;
+    }
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const scrollTarget = document.querySelector<HTMLElement>(
+      `[data-reservation-code="${recentReservationCode}"]`
+    );
+    const scrollToBoard = () => {
+      const host = reservationBoardRef.current;
+      if (!host) {
+        return;
+      }
+      const offsetTop = Math.max(host.getBoundingClientRect().top + window.scrollY - 120, 0);
+      window.scrollTo({ top: offsetTop, behavior: 'smooth' });
+    };
+
+    window.requestAnimationFrame(() => {
+      if (scrollTarget) {
+        scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        scrollToBoard();
+      }
+    });
+
+    const timer = window.setTimeout(() => {
+      setRecentReservationCode(null);
+    }, 600);
+
+    return () => window.clearTimeout(timer);
+  }, [recentReservationCode, reservations]);
 
   const {
     pendingReservations,
@@ -1211,6 +1252,7 @@ export default function ReservePage() {
         setSelectedTime(null);
       }
       await loadReservations();
+      setRecentReservationCode(reservationCode);
     } catch (error) {
       console.error(error);
       const message =
@@ -1628,7 +1670,10 @@ export default function ReservePage() {
             )}
           </div>
 
-          <section className="mt-10 space-y-6 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+          <section
+            ref={reservationBoardRef}
+            className="mt-10 space-y-6 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900"
+          >
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.35em] text-primary-500">
@@ -2002,6 +2047,7 @@ const ReservationCard = ({
     <button
       type="button"
       onClick={() => onSelect(reservation)}
+      data-reservation-code={reservation.reservationCode ?? undefined}
       className="w-full rounded-[32px] border border-gray-200 bg-white px-5 py-4 text-left text-gray-900 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-white/10 dark:bg-[#0f1728] dark:text-white dark:hover:bg-[#151f36]"
     >
       <div className="flex items-center justify-between gap-3">
@@ -2150,7 +2196,7 @@ const DetailModal = ({ children, onClose }: { children: ReactNode; onClose: () =
     <div
       className={classNames(
         'fixed inset-0 z-50 flex justify-center',
-        'px-3 pb-[calc(118px+env(safe-area-inset-bottom))] pt-[calc(20vh+96px)] sm:px-5 sm:pt-0 sm:pb-0',
+        'px-3 pb-[calc(100px+env(safe-area-inset-bottom))] pt-[calc(12vh+72px)] sm:px-5 sm:pt-0 sm:pb-0',
         'items-start sm:items-center'
       )}
     >
