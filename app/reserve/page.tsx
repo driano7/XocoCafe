@@ -2196,7 +2196,7 @@ const DetailModal = ({ children, onClose }: { children: ReactNode; onClose: () =
     <div
       className={classNames(
         'fixed inset-0 z-50 flex justify-center',
-        'px-3 pb-[calc(100px+env(safe-area-inset-bottom))] pt-[calc(12vh+72px)] sm:px-5 sm:pt-0 sm:pb-0',
+        'px-3 pb-[calc(84px+env(safe-area-inset-bottom))] pt-[calc(10vh+62px)] sm:px-5 sm:pt-0 sm:pb-0',
         'items-start sm:items-center'
       )}
     >
@@ -2216,7 +2216,7 @@ const DetailModal = ({ children, onClose }: { children: ReactNode; onClose: () =
         className={classNames(
           'relative z-10 w-full max-w-3xl overflow-y-auto border border-[#462b20] bg-[#2a170f] text-white shadow-[0_45px_95px_rgba(0,0,0,0.85)]',
           'rounded-t-[34px] sm:rounded-[34px]',
-          'max-h-[calc(100vh-128px-30vh)] h-[calc(100vh-128px-30vh)] sm:max-h-[90vh] sm:h-auto',
+          'max-h-[calc(100vh-110px-26vh)] h-[calc(100vh-110px-26vh)] sm:max-h-[92vh] sm:h-auto',
           'p-6 sm:p-7'
         )}
       >

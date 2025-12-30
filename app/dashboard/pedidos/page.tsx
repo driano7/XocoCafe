@@ -1490,7 +1490,7 @@ export default function OrdersDashboardPage() {
           ref={overlayRef}
           className={classNames(
             'fixed inset-0 z-[60] flex bg-black/60',
-            'px-3 pb-[calc(96px+env(safe-area-inset-bottom))] pt-[calc(10vh+70px)] sm:px-4 sm:py-6',
+            'px-3 pb-[calc(80px+env(safe-area-inset-bottom))] pt-[calc(8vh+60px)] sm:px-4 sm:py-6',
             'items-start justify-center sm:items-center'
           )}
           onClick={handleOverlayClick}
@@ -1502,7 +1502,7 @@ export default function OrdersDashboardPage() {
             className={classNames(
               'flex w-full max-w-md flex-col overflow-hidden border border-white/30 bg-white/90 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-gray-900/80',
               'rounded-t-3xl sm:rounded-3xl',
-              'h-[calc(100vh-120px-22vh)] max-h-[calc(100vh-120px-22vh)] sm:h-[calc(100vh-96px)] sm:max-h-[calc(100vh-96px)]'
+              'h-[calc(100vh-90px-18vh)] max-h-[calc(100vh-90px-18vh)] sm:h-[calc(100vh-84px)] sm:max-h-[calc(100vh-84px)]'
             )}
           >
             <div
