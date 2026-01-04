@@ -55,6 +55,30 @@ export default function LoginPage() {
   const formCardRef = useRef<HTMLDivElement | null>(null);
   const [formVisible, setFormVisible] = useState(false);
   const [formHasBeenVisible, setFormHasBeenVisible] = useState(false);
+  const pageShellClasses =
+    'relative min-h-screen overflow-hidden bg-gradient-to-br from-primary-50 via-white to-white dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 py-12 px-4 sm:px-6 lg:px-8';
+  const highlightItems = [
+    {
+      title: 'Pedidos inteligentes',
+      description: 'Confirma órdenes, monitorea estados y recibe alertas sin salir del POS.',
+      accent: 'Pedidos',
+    },
+    {
+      title: 'Recompensas siempre visibles',
+      description: 'Consulta metas de lealtad y anima a tus clientes a canjearlas.',
+      accent: 'Rewards',
+    },
+    {
+      title: 'Equipo sincronizado',
+      description: 'Comparte accesos seguros para baristas, gerentes y marketing.',
+      accent: 'Equipo',
+    },
+    {
+      title: 'Analítica integrada',
+      description: 'Activa mediciones y campañas desde un mismo panel.',
+      accent: 'Insights',
+    },
+  ];
 
   useEffect(() => {
     router.prefetch('/profile');
@@ -151,15 +175,15 @@ export default function LoginPage() {
   };
 
   const snackbarToneStyles: Record<SnackbarTone, string> = {
-    info: 'bg-blue-600 text-white',
-    success: 'bg-green-600 text-white',
-    error: 'bg-red-600 text-white',
+    info: 'bg-primary-600 text-white shadow-primary-600/40',
+    success: 'bg-success-600 text-white shadow-success-600/40',
+    error: 'bg-danger-600 text-white shadow-danger-600/40',
   };
 
   const snackbarElement = snackbar ? (
-    <div className="fixed bottom-6 inset-x-0 flex justify-center px-4 z-50">
+    <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
       <div
-        className={`flex items-center space-x-3 rounded-md px-4 py-3 shadow-lg ${
+        className={`flex items-center space-x-3 rounded-2xl px-4 py-3 shadow-xl ${
           snackbarToneStyles[snackbar.tone]
         }`}
       >
@@ -179,8 +203,12 @@ export default function LoginPage() {
     return (
       <>
         {snackbarElement}
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-          <p className="text-gray-600 dark:text-gray-300">Cargando tu sesión...</p>
+        <div className={pageShellClasses}>
+          <div className="relative z-10 flex min-h-[60vh] items-center justify-center">
+            <p className="rounded-full border border-primary-200/60 bg-white/70 px-6 py-3 text-sm font-semibold text-primary-700 shadow-lg shadow-primary-900/5 dark:border-primary-900/40 dark:bg-gray-900/70 dark:text-primary-100">
+              Cargando tu sesión...
+            </p>
+          </div>
         </div>
       </>
     );
@@ -190,41 +218,45 @@ export default function LoginPage() {
     return (
       <>
         {snackbarElement}
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-lg w-full space-y-6 text-center">
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Hola, {greetingName}
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Ya tienes una sesión activa. Puedes visitar tu perfil o cerrar sesión desde aquí.
-            </p>
-            <div className="flex flex-col sm:flex-row sm:justify-center sm:space-x-4 space-y-3 sm:space-y-0">
+        <div className={pageShellClasses}>
+          <div className="relative z-10 mx-auto max-w-3xl">
+            <div className="brand-auth-card space-y-6 text-center">
+              <div>
+                <p className="text-xs uppercase tracking-[0.5em] text-primary-500/80">
+                  Sesión activa
+                </p>
+                <h2 className="mt-2 text-4xl font-black text-primary-900 dark:text-white">
+                  Hola, {greetingName}
+                </h2>
+                <p className="mt-3 text-sm text-primary-800/80 dark:text-primary-100/80">
+                  Ya tienes una sesión activa. Ve directo a tu perfil o cierra sesión para ingresar
+                  con otra cuenta.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => router.push('/profile')}
+                  className="brand-primary-btn"
+                >
+                  Ir a mi perfil
+                </button>
+                <button type="button" onClick={() => void logout()} className="brand-secondary-btn">
+                  Cerrar sesión
+                </button>
+              </div>
               <button
                 type="button"
-                onClick={() => router.push('/profile')}
-                className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                onClick={() => {
+                  setIsLogin(true);
+                  setShowForgotPassword(false);
+                  setSnackbar(null);
+                }}
+                className="brand-tertiary-btn w-full justify-center"
               >
-                Ir a mi perfil
-              </button>
-              <button
-                type="button"
-                onClick={() => void logout()}
-                className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-              >
-                Cerrar sesión
+                ¿Quieres registrar otra cuenta?
               </button>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setIsLogin(true);
-                setShowForgotPassword(false);
-                setSnackbar(null);
-              }}
-              className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400"
-            >
-              ¿Quieres registrar otra cuenta?
-            </button>
           </div>
         </div>
       </>
@@ -243,94 +275,166 @@ export default function LoginPage() {
   return (
     <>
       {snackbarElement}
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8">
-          <div>
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-              {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
-            </h2>
-            <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-              {isLogin ? 'Accede a tu cuenta de Xoco Café' : 'Únete a la comunidad Xoco Café'}
-            </p>
-          </div>
+      <div className={pageShellClasses}>
+        <div className="pointer-events-none absolute inset-y-0 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-primary-500/10 blur-3xl dark:bg-primary-900/30" />
+        <div className="pointer-events-none absolute bottom-0 right-10 h-64 w-64 rounded-full bg-primary-200/40 blur-3xl dark:bg-primary-900/40" />
+        <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-12 lg:flex-row">
+          <section className="flex-1 space-y-8">
+            <button
+              type="button"
+              onClick={() => router.push('/')}
+              className="brand-tertiary-btn w-full justify-center border border-primary-100/70 bg-white/70 py-3 text-xs uppercase tracking-[0.4em] text-primary-700 shadow-sm dark:border-primary-900/30 dark:bg-gray-900/60 dark:text-primary-100"
+            >
+              Volver al inicio
+            </button>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
-              {error}
+            <div className="rounded-3xl border border-primary-100/70 bg-white/90 p-8 shadow-2xl shadow-primary-900/5 backdrop-blur-md dark:border-primary-900/40 dark:bg-gray-900/70">
+              <p className="text-sm uppercase tracking-[0.5em] text-primary-500/70">
+                {isLogin ? 'Tu barra digital' : 'Bienvenido a Xoco Café'}
+              </p>
+              <h1 className="mt-4 text-4xl font-black text-primary-900 dark:text-white">
+                {isLogin
+                  ? 'Inicia sesión y reactiva tu POS'
+                  : 'Registra tu cuenta y personaliza la experiencia POS'}
+              </h1>
+              <p className="mt-3 text-sm text-primary-800/80 dark:text-primary-100/80">
+                Mantén sincronizados pedidos, recompensas, notificaciones y campañas de marketing en
+                un mismo flujo.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                {['Pedidos omnicanal', 'Rewards inteligentes', 'Analítica conectada'].map(
+                  (badge) => (
+                    <span
+                      key={badge}
+                      className="rounded-full border border-primary-200/80 bg-primary-50/80 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-primary-700 dark:border-primary-800/50 dark:bg-primary-900/20 dark:text-primary-100"
+                    >
+                      {badge}
+                    </span>
+                  )
+                )}
+              </div>
             </div>
-          )}
 
-          <div
-            ref={formCardRef}
-            className={classNames(
-              'bg-white dark:bg-gray-800 py-8 px-6 shadow rounded-lg transition-all duration-500',
-              formHasBeenVisible && formVisible
-                ? 'translate-y-0 opacity-100'
-                : 'translate-y-4 opacity-0'
+            <div className="grid gap-4 sm:grid-cols-2">
+              {highlightItems.map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-2xl border border-primary-100/80 bg-white/80 p-4 shadow-lg shadow-primary-900/5 transition hover:-translate-y-1 hover:border-primary-200 hover:shadow-primary-900/10 dark:border-primary-900/40 dark:bg-gray-900/60"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.4em] text-primary-500">
+                    {item.accent}
+                  </p>
+                  <h3 className="mt-2 text-lg font-semibold text-primary-900 dark:text-white">
+                    {item.title}
+                  </h3>
+                  <p className="mt-1 text-sm text-primary-800/80 dark:text-primary-100/80">
+                    {item.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="flex-1 lg:max-w-xl">
+            {error && (
+              <div className="mb-4 rounded-2xl border border-danger-200 bg-danger-50/80 px-4 py-3 text-sm font-semibold text-danger-700 dark:border-danger-500/40 dark:bg-danger-900/20 dark:text-danger-100">
+                {error}
+              </div>
             )}
-          >
-            {showForgotPassword ? (
-              <ForgotPasswordForm onBack={handleBackToLogin} />
-            ) : isLogin ? (
-              <>
-                <LoginForm
-                  onSuccess={handleSuccess}
-                  onError={handleError}
-                  onForgotPassword={handleForgotPassword}
-                />
-                <div className="mt-4 text-center">
+
+            <div
+              ref={formCardRef}
+              className={classNames(
+                'brand-auth-card relative overflow-hidden transition-all duration-500',
+                formHasBeenVisible && formVisible
+                  ? 'translate-y-0 opacity-100'
+                  : 'translate-y-6 opacity-0'
+              )}
+            >
+              <div className="absolute inset-x-0 top-0 h-1 rounded-full bg-gradient-to-r from-primary-400 via-primary-600 to-primary-400" />
+              <div className="space-y-6 pt-2">
+                <div className="text-center">
+                  <p className="text-xs uppercase tracking-[0.5em] text-primary-500/70">
+                    {isLogin ? 'Iniciar sesión' : 'Registrar cuenta'}
+                  </p>
+                  <h2 className="mt-2 text-3xl font-black text-primary-900 dark:text-white">
+                    {isLogin ? 'Bienvenido de vuelta' : 'Crea tu cuenta en minutos'}
+                  </h2>
+                  <p className="mt-2 text-sm text-primary-800/80 dark:text-primary-100/80">
+                    {isLogin
+                      ? 'Accede al panel para continuar con tus pedidos.'
+                      : 'Prepara tus datos básicos para activar tu perfil POS.'}
+                  </p>
+                </div>
+
+                {isLogin ? (
+                  <>
+                    <LoginForm
+                      onSuccess={handleSuccess}
+                      onError={handleError}
+                      onForgotPassword={handleForgotPassword}
+                    />
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        onClick={handleForgotPassword}
+                        className="brand-tertiary-btn w-full justify-center"
+                      >
+                        ¿Olvidaste tu contraseña?
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <RegisterForm
+                    onSuccess={handleSuccess}
+                    onError={handleError}
+                    onExistingAccount={handleExistingAccount}
+                  />
+                )}
+
+                <div className="text-center">
                   <button
-                    type="button"
-                    onClick={handleForgotPassword}
-                    className="text-sm font-semibold text-blue-600 underline decoration-dotted underline-offset-4 hover:text-blue-500 dark:text-blue-400"
+                    onClick={() => {
+                      if (showForgotPassword) {
+                        handleBackToLogin();
+                        return;
+                      }
+                      setIsLogin(!isLogin);
+                      setShowForgotPassword(false);
+                      setError(null);
+                    }}
+                    className="brand-tertiary-btn w-full justify-center"
                   >
-                    ¿Olvidaste tu contraseña?
+                    {showForgotPassword
+                      ? 'Volver a iniciar sesión'
+                      : isLogin
+                      ? '¿No tienes cuenta? Regístrate aquí'
+                      : '¿Ya tienes cuenta? Inicia sesión aquí'}
                   </button>
                 </div>
-              </>
-            ) : (
-              <RegisterForm
-                onSuccess={handleSuccess}
-                onError={handleError}
-                onExistingAccount={handleExistingAccount}
-              />
-            )}
-          </div>
 
-          <div className="text-center">
-            <button
-              onClick={() => {
-                if (showForgotPassword) {
-                  handleBackToLogin();
-                  return;
-                }
-                setIsLogin(!isLogin);
-                setShowForgotPassword(false);
-                setError(null);
-              }}
-              className="text-blue-600 hover:text-blue-500 font-medium"
-            >
-              {showForgotPassword
-                ? 'Volver a iniciar sesión'
-                : isLogin
-                ? '¿No tienes cuenta? Regístrate aquí'
-                : '¿Ya tienes cuenta? Inicia sesión aquí'}
-            </button>
-          </div>
-
-          <div className="text-center text-sm text-gray-500 dark:text-gray-400">
-            <p>
-              Al {isLogin ? 'iniciar sesión' : 'registrarte'}, aceptas nuestros{' '}
-              <a href="/terms" className="text-blue-600 hover:text-blue-500 underline">
-                términos y condiciones
-              </a>{' '}
-              y{' '}
-              <a href="/privacy" className="text-blue-600 hover:text-blue-500 underline">
-                política de privacidad
-              </a>
-              .
-            </p>
-          </div>
+                <div className="text-center text-xs text-primary-800/70 dark:text-primary-100/70">
+                  <p>
+                    Al {isLogin ? 'iniciar sesión' : 'registrarte'}, aceptas nuestros{' '}
+                    <a
+                      href="/terms"
+                      className="font-semibold text-primary-600 underline decoration-dotted underline-offset-4 hover:text-primary-500"
+                    >
+                      términos y condiciones
+                    </a>{' '}
+                    y{' '}
+                    <a
+                      href="/privacy"
+                      className="font-semibold text-primary-600 underline decoration-dotted underline-offset-4 hover:text-primary-500"
+                    >
+                      política de privacidad
+                    </a>
+                    .
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </>

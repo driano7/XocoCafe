@@ -67,6 +67,11 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
   const [isResetting, setIsResetting] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const inputClasses = 'brand-input';
+  const labelClasses =
+    'block text-sm font-semibold tracking-wide text-primary-900 dark:text-primary-100';
+  const pageContainerClasses =
+    'relative min-h-screen bg-gradient-to-br from-primary-50 via-white to-white dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 py-12 px-4 sm:px-6 lg:px-8';
 
   const emailForm = useForm<RequestPasswordResetInput>({
     resolver: zodResolver(requestPasswordResetSchema),
@@ -256,30 +261,23 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
 
   if (step === 'success') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8">
-          <div className="bg-white dark:bg-gray-800 py-8 px-6 shadow rounded-lg text-center">
-            <div className="mb-4">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900">
-                <svg
-                  className="h-6 w-6 text-green-600 dark:text-green-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              </div>
+      <div className={pageContainerClasses}>
+        <div className="mx-auto max-w-lg">
+          <div className="brand-auth-card text-center space-y-6">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-success-100 text-success-800 dark:bg-success-900/40 dark:text-success-100">
+              <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+            <h2 className="text-3xl font-black text-primary-900 dark:text-white">
               Contraseña actualizada
             </h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
+            <p className="text-sm text-primary-800/80 dark:text-primary-100/80">
               Tu contraseña se restableció correctamente. Ahora puedes iniciar sesión con tus nuevas
               credenciales.
             </p>
@@ -288,7 +286,7 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
                 resetFlow();
                 onBack();
               }}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="brand-primary-btn"
             >
               Volver al Login
             </button>
@@ -299,22 +297,22 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className={pageContainerClasses}>
+      <div className="mx-auto w-full max-w-2xl space-y-10">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+          <h2 className="mt-6 text-center text-4xl font-black text-primary-900 dark:text-white">
             Recuperar Contraseña
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-2 text-center text-sm text-primary-800/80 dark:text-primary-100/80">
             {step === 'request' && 'Ingresa tu email para recibir un código de verificación.'}
             {step === 'verify' && 'Ingresa el código que enviamos a tu correo electrónico.'}
             {step === 'reset' && 'Crea una nueva contraseña segura para tu cuenta.'}
           </p>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 py-8 px-6 shadow rounded-lg">
+        <div className="brand-auth-card space-y-6">
           {infoMessage && (
-            <div className="mb-4 rounded-md bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+            <div className="rounded-2xl border border-primary-100/70 bg-primary-50/80 px-4 py-3 text-sm font-medium text-primary-900 dark:border-primary-900/30 dark:bg-primary-900/10 dark:text-primary-100">
               {infoMessage}
             </div>
           )}
@@ -322,17 +320,14 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
           {step === 'request' && (
             <form onSubmit={handleRequestCode} className="space-y-6">
               <div>
-                <label
-                  htmlFor="reset-email"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
+                <label htmlFor="reset-email" className={labelClasses}>
                   Email
                 </label>
                 <input
                   {...emailForm.register('email')}
                   type="email"
                   id="reset-email"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                  className={inputClasses}
                   placeholder="tu@email.com"
                 />
                 {emailForm.formState.errors.email && (
@@ -342,19 +337,11 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
                 )}
               </div>
 
-              <div className="flex space-x-3">
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="flex-1 flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600"
-                >
+              <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:space-x-3">
+                <button type="button" onClick={handleCancel} className="brand-secondary-btn flex-1">
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  disabled={isRequesting}
-                  className="flex-1 flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                <button type="submit" disabled={isRequesting} className="brand-primary-btn flex-1">
                   {isRequesting ? 'Enviando...' : 'Enviar Código'}
                 </button>
               </div>
@@ -364,14 +351,11 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
           {step === 'verify' && (
             <form onSubmit={handleVerifyCode} className="space-y-6">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                <p className="mb-2 text-sm text-primary-800/80 dark:text-primary-100/90">
                   Enviamos un código a <span className="font-medium">{email}</span>.
                   {formattedExpiry && ` El código expira a las ${formattedExpiry}.`}
                 </p>
-                <label
-                  htmlFor="reset-code"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
+                <label htmlFor="reset-code" className={labelClasses}>
                   Código de verificación
                 </label>
                 <input
@@ -381,7 +365,7 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
                   inputMode="text"
                   autoComplete="one-time-code"
                   maxLength={6}
-                  className="mt-1 block w-full uppercase tracking-[0.3em] px-3 py-2 border border-gray-300 rounded-md text-center text-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                  className={`${inputClasses} text-center text-lg font-black uppercase tracking-[0.35em]`}
                   placeholder="AAAA11"
                 />
                 {codeForm.formState.errors.code && (
@@ -397,15 +381,11 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
                   onClick={() => {
                     resetFlow();
                   }}
-                  className="flex-1 flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600"
+                  className="brand-secondary-btn flex-1"
                 >
                   Cambiar email
                 </button>
-                <button
-                  type="submit"
-                  disabled={isVerifying}
-                  className="flex-1 flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                <button type="submit" disabled={isVerifying} className="brand-primary-btn flex-1">
                   {isVerifying ? 'Verificando...' : 'Verificar Código'}
                 </button>
               </div>
@@ -414,7 +394,7 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
                 type="button"
                 onClick={handleResendCode}
                 disabled={isResending}
-                className="w-full text-sm font-medium text-blue-600 hover:text-blue-500 disabled:opacity-50"
+                className="brand-tertiary-btn w-full justify-center disabled:opacity-50"
               >
                 {isResending ? 'Reenviando código...' : 'Reenviar código'}
               </button>
@@ -423,15 +403,12 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
 
           {step === 'reset' && (
             <form onSubmit={handleResetPassword} className="space-y-6">
-              <div className="rounded-md bg-gray-50 px-4 py-3 text-sm text-gray-700 dark:bg-gray-700/50 dark:text-gray-200">
+              <div className="rounded-2xl border border-primary-100/70 bg-primary-50/80 px-4 py-3 text-sm font-semibold text-primary-900 dark:border-primary-900/40 dark:bg-primary-900/20 dark:text-primary-100">
                 Restableciendo contraseña para <span className="font-semibold">{email}</span>
               </div>
 
               <div>
-                <label
-                  htmlFor="reset-password"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
+                <label htmlFor="reset-password" className={labelClasses}>
                   Nueva contraseña
                 </label>
                 <div className="relative">
@@ -439,13 +416,13 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
                     {...resetForm.register('newPassword')}
                     id="reset-password"
                     type={showNewPassword ? 'text' : 'password'}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                    className={inputClasses}
                     placeholder="Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número"
                   />
                   <button
                     type="button"
                     onClick={() => setShowNewPassword((prev) => !prev)}
-                    className="absolute inset-y-0 right-2 flex items-center text-sm text-gray-500"
+                    className="absolute inset-y-0 right-3 flex items-center text-xs font-semibold uppercase tracking-[0.2em] text-primary-600 hover:text-primary-500 dark:text-primary-200"
                   >
                     {showNewPassword ? 'Ocultar' : 'Ver'}
                   </button>
@@ -458,10 +435,7 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
               </div>
 
               <div>
-                <label
-                  htmlFor="reset-confirm-password"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
+                <label htmlFor="reset-confirm-password" className={labelClasses}>
                   Confirmar contraseña
                 </label>
                 <div className="relative">
@@ -469,13 +443,13 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
                     {...resetForm.register('confirmPassword')}
                     id="reset-confirm-password"
                     type={showConfirmPassword ? 'text' : 'password'}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                    className={inputClasses}
                     placeholder="Repite tu nueva contraseña"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword((prev) => !prev)}
-                    className="absolute inset-y-0 right-2 flex items-center text-sm text-gray-500"
+                    className="absolute inset-y-0 right-3 flex items-center text-xs font-semibold uppercase tracking-[0.2em] text-primary-600 hover:text-primary-500 dark:text-primary-200"
                   >
                     {showConfirmPassword ? 'Ocultar' : 'Ver'}
                   </button>
@@ -487,22 +461,18 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
                 )}
               </div>
 
-              <div className="flex space-x-3">
+              <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:space-x-3">
                 <button
                   type="button"
                   onClick={() => {
                     setStep('verify');
                     setInfoMessage('Ingresa el código de 6 caracteres que enviamos a tu correo.');
                   }}
-                  className="flex-1 flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600"
+                  className="brand-secondary-btn flex-1"
                 >
                   Cambiar código
                 </button>
-                <button
-                  type="submit"
-                  disabled={isResetting}
-                  className="flex-1 flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                <button type="submit" disabled={isResetting} className="brand-primary-btn flex-1">
                   {isResetting ? 'Guardando...' : 'Actualizar contraseña'}
                 </button>
               </div>

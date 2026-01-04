@@ -47,6 +47,9 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { trackSignup, trackFormSubmit } = useConversionTracking();
+  const inputClasses = 'brand-input';
+  const labelClasses =
+    'block text-sm font-semibold tracking-wide text-primary-900 dark:text-primary-100';
 
   const {
     register,
@@ -224,17 +227,14 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
       {/* Información básica */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label
-            htmlFor="firstName"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-          >
+          <label htmlFor="firstName" className={labelClasses}>
             Nombre *
           </label>
           <input
             {...register('firstName')}
             type="text"
             id="firstName"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+            className={inputClasses}
             placeholder="Tu nombre"
           />
           {errors.firstName && (
@@ -243,17 +243,14 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
         </div>
 
         <div>
-          <label
-            htmlFor="lastName"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-          >
+          <label htmlFor="lastName" className={labelClasses}>
             Apellido *
           </label>
           <input
             {...register('lastName')}
             type="text"
             id="lastName"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+            className={inputClasses}
             placeholder="Tu apellido"
           />
           {errors.lastName && (
@@ -263,17 +260,14 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
       </div>
 
       <div>
-        <label
-          htmlFor="email"
-          className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-        >
+        <label htmlFor="email" className={labelClasses}>
           Email *
         </label>
         <input
           {...register('email')}
           type="email"
           id="email"
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+          className={inputClasses}
           placeholder="tu@email.com"
         />
         {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
@@ -281,10 +275,7 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-          >
+          <label htmlFor="password" className={labelClasses}>
             Contraseña *
           </label>
           <div className="relative">
@@ -292,13 +283,13 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
               {...register('password')}
               type={showPassword ? 'text' : 'password'}
               id="password"
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+              className={inputClasses}
               placeholder="Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-2 flex items-center text-sm text-gray-500"
+              className="absolute inset-y-0 right-3 flex items-center text-xs font-semibold uppercase tracking-[0.2em] text-primary-600 hover:text-primary-500 dark:text-primary-200"
               aria-label="Mostrar u ocultar contraseña"
             >
               {showPassword ? 'Ocultar' : 'Ver'}
@@ -374,10 +365,7 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
         </div>
 
         <div>
-          <label
-            htmlFor="confirmPassword"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-          >
+          <label htmlFor="confirmPassword" className={labelClasses}>
             Confirmar Contraseña *
           </label>
           <div className="relative">
@@ -385,13 +373,13 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
               {...register('confirmPassword')}
               type={showConfirmPassword ? 'text' : 'password'}
               id="confirmPassword"
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+              className={inputClasses}
               placeholder="Repite tu contraseña"
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute inset-y-0 right-2 flex items-center text-sm text-gray-500"
+              className="absolute inset-y-0 right-3 flex items-center text-xs font-semibold uppercase tracking-[0.2em] text-primary-600 hover:text-primary-500 dark:text-primary-200"
               aria-label="Mostrar u ocultar confirmación de contraseña"
             >
               {showConfirmPassword ? 'Ocultar' : 'Ver'}
@@ -421,33 +409,27 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
       {/* Información opcional */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label
-            htmlFor="phone"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-          >
+          <label htmlFor="phone" className={labelClasses}>
             Teléfono (opcional)
           </label>
           <input
             {...register('phone')}
             type="tel"
             id="phone"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+            className={inputClasses}
             placeholder="+1 234 567 8900"
           />
         </div>
 
         <div>
-          <label
-            htmlFor="walletAddress"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-          >
+          <label htmlFor="walletAddress" className={labelClasses}>
             Wallet EVM (opcional)
           </label>
           <input
             {...register('walletAddress')}
             type="text"
             id="walletAddress"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+            className={inputClasses}
             placeholder="0x..."
           />
         </div>
@@ -455,26 +437,20 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label
-            htmlFor="city"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-          >
+          <label htmlFor="city" className={labelClasses}>
             Ciudad (opcional)
           </label>
           <input
             {...register('city')}
             type="text"
             id="city"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+            className={inputClasses}
             placeholder="Tu ciudad"
           />
         </div>
 
         <div>
-          <label
-            htmlFor="country"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-          >
+          <label htmlFor="country" className={labelClasses}>
             País (opcional)
           </label>
           <CountryDropdown
@@ -488,7 +464,7 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
 
       {/* Consentimientos GDPR */}
       <div className="space-y-4 border-t pt-6">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+        <h3 className="text-lg font-bold text-primary-900 dark:text-primary-100">
           Términos y Condiciones
         </h3>
 
@@ -498,18 +474,24 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
               {...register('termsAndPrivacyAccepted')}
               type="checkbox"
               id="termsAndPrivacyAccepted"
-              className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              className="mt-1 h-4 w-4 rounded border-primary-200 text-primary-600 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-950"
             />
             <label
               htmlFor="termsAndPrivacyAccepted"
-              className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
+              className="ml-3 text-sm text-primary-900 dark:text-primary-100"
             >
               Acepto los{' '}
-              <a href="/terms" className="text-blue-600 hover:text-blue-500 underline">
+              <a
+                href="/terms"
+                className="text-primary-600 underline decoration-dotted underline-offset-4 hover:text-primary-500"
+              >
                 términos y condiciones
               </a>{' '}
               y la{' '}
-              <a href="/privacy" className="text-blue-600 hover:text-blue-500 underline">
+              <a
+                href="/privacy"
+                className="text-primary-600 underline decoration-dotted underline-offset-4 hover:text-primary-500"
+              >
                 política de privacidad
               </a>{' '}
               *
@@ -521,7 +503,7 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
         </div>
 
         <div className="space-y-3">
-          <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+          <h4 className="text-sm font-semibold text-primary-900 dark:text-primary-100">
             Preferencias de Marketing (opcional)
           </h4>
 
@@ -530,11 +512,11 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
               {...register('marketingEmail')}
               type="checkbox"
               id="marketingEmail"
-              className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              className="mt-1 h-4 w-4 rounded border-primary-200 text-primary-600 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-950"
             />
             <label
               htmlFor="marketingEmail"
-              className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
+              className="ml-3 text-sm text-primary-900 dark:text-primary-100"
             >
               Recibir ofertas por email
             </label>
@@ -545,11 +527,11 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
               {...register('marketingPush')}
               type="checkbox"
               id="marketingPush"
-              className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              className="mt-1 h-4 w-4 rounded border-primary-200 text-primary-600 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-950"
             />
             <label
               htmlFor="marketingPush"
-              className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
+              className="ml-3 text-sm text-primary-900 dark:text-primary-100"
             >
               Recibir notificaciones push
             </label>
@@ -557,11 +539,7 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
         </div>
       </div>
 
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
+      <button type="submit" disabled={isLoading} className="brand-primary-btn">
         {isLoading ? 'Creando cuenta...' : 'Crear Cuenta'}
       </button>
     </form>

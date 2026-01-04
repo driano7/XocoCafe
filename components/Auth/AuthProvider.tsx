@@ -28,6 +28,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import type { AuthUser } from '@/lib/validations/auth';
 import { useAnalyticsContext } from '@/components/Analytics/AnalyticsProvider';
 import { detectDeviceInfo, ensurePushPermission, type DeviceInfo } from '@/lib/pushNotifications';
@@ -62,6 +63,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo>(() => detectDeviceInfo());
+  const router = useRouter();
 
   // Obtener contexto de analítica de forma segura
   const analyticsContext = useAnalyticsContext();
@@ -181,10 +183,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(null);
       localStorage.removeItem('authToken');
       if (typeof window !== 'undefined') {
-        window.location.replace('/login');
+        router.push('/');
       }
     }
-  }, [analyticsContext, token, user]);
+  }, [analyticsContext, router, token, user]);
 
   useEffect(() => {
     const handleBeforeUnload = () => {

@@ -45,6 +45,7 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword }: Logi
   const [showPassword, setShowPassword] = useState(false);
   const { trackLogin, trackFormSubmit } = useConversionTracking();
   void onForgotPassword;
+  const inputClasses = 'brand-input';
 
   const {
     register,
@@ -93,7 +94,7 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword }: Logi
       <div>
         <label
           htmlFor="email"
-          className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+          className="block text-sm font-semibold tracking-wide text-primary-900 dark:text-primary-100"
         >
           Email
         </label>
@@ -101,7 +102,7 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword }: Logi
           {...register('email')}
           type="email"
           id="email"
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+          className={inputClasses}
           placeholder="tu@email.com"
         />
         {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
@@ -110,7 +111,7 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword }: Logi
       <div>
         <label
           htmlFor="password"
-          className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+          className="block text-sm font-semibold tracking-wide text-primary-900 dark:text-primary-100"
         >
           Contraseña
         </label>
@@ -119,13 +120,13 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword }: Logi
             {...register('password')}
             type={showPassword ? 'text' : 'password'}
             id="password"
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            className={inputClasses}
             placeholder="Tu contraseña"
           />
           <button
             type="button"
             onClick={() => setShowPassword((value) => !value)}
-            className="absolute inset-y-0 right-2 flex items-center text-sm text-gray-500"
+            className="absolute inset-y-0 right-3 flex items-center text-xs font-semibold uppercase tracking-[0.2em] text-primary-600 hover:text-primary-500 dark:text-primary-200"
             aria-label="Mostrar u ocultar contraseña"
           >
             {showPassword ? 'Ocultar' : 'Ver'}
@@ -134,11 +135,7 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword }: Logi
         {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
       </div>
 
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-      >
+      <button type="submit" disabled={isLoading} className="brand-primary-btn">
         {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
       </button>
     </form>

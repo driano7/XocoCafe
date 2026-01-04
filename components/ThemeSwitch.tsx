@@ -29,15 +29,38 @@
 
 import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BsMoonFill, BsSunFill } from 'react-icons/bs';
 
 const ThemeSwitch = () => {
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
+  const transitionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // When mounted on client, now we can show the UI
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimeout.current) {
+        clearTimeout(transitionTimeout.current);
+      }
+      document.documentElement.classList.remove('theme-transition');
+    };
+  }, []);
+
+  const handleToggle = () => {
+    const root = document.documentElement;
+    root.classList.add('theme-transition');
+    if (transitionTimeout.current) {
+      clearTimeout(transitionTimeout.current);
+    }
+    transitionTimeout.current = setTimeout(() => {
+      root.classList.remove('theme-transition');
+    }, 750);
+
+    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
+  };
 
   return (
     <motion.button
@@ -51,7 +74,7 @@ const ThemeSwitch = () => {
         transition: { duration: 0.2 },
       }}
       whileHover={{ scale: 1.2 }}
-      onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+      onClick={handleToggle}
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
