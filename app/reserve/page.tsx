@@ -847,43 +847,6 @@ export default function ReservePage() {
     [buildQrPayload, setAlert]
   );
 
-  const runReservationShareGuard = useCallback(async (action: () => Promise<void>) => {
-    if (typeof document === 'undefined') {
-      await action();
-      return;
-    }
-    let wasHidden = false;
-    let settled = false;
-    let rejectAbort: ((reason?: unknown) => void) | null = null;
-    const abortPromise = new Promise<never>((_, reject) => {
-      rejectAbort = reject;
-    });
-    const handleVisibility = () => {
-      if (document.visibilityState === 'hidden') {
-        wasHidden = true;
-        return;
-      }
-      if (document.visibilityState === 'visible' && wasHidden && !settled && rejectAbort) {
-        rejectAbort(new Error('share_aborted_visibility'));
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-    const cleanup = () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      rejectAbort = null;
-    };
-    try {
-      await Promise.race([
-        action().finally(() => {
-          settled = true;
-        }),
-        abortPromise,
-      ]);
-    } finally {
-      cleanup();
-    }
-  }, []);
-
   const waitForReservationAssets = useCallback(async () => {
     if (!reservationTicketRef.current) return;
     const images = Array.from(reservationTicketRef.current.querySelectorAll('img'));
@@ -982,27 +945,25 @@ export default function ReservePage() {
         throw new Error('reservation_gallery_unsupported');
       }
       try {
-        await runReservationShareGuard(() =>
-          navigator.share({
-            files: [file],
-            title: 'Reserva Xoco Café',
-            text: 'Guardaremos tu confirmación en tu galería.',
-          })
-        );
+        await navigator.share({
+          files: [file],
+          title: 'Reserva Xoco Café',
+          text: 'Guardaremos tu confirmación en tu galería.',
+        });
       } catch (error) {
         if (
           error instanceof DOMException &&
           (error.name === 'AbortError' || error.name === 'NotAllowedError')
         ) {
+          if (error.name === 'AbortError') {
+            throw error;
+          }
           throw new Error('reservation_gallery_permission');
-        }
-        if (error instanceof Error && error.message === 'share_aborted_visibility') {
-          throw error;
         }
         throw new Error('reservation_gallery_failed');
       }
     },
-    [canShareReservation, reservationDeviceInfo.isAndroid, runReservationShareGuard]
+    [canShareReservation, reservationDeviceInfo.isAndroid]
   );
 
   const handleDownloadReservationTicket = useCallback(
@@ -1020,10 +981,7 @@ export default function ReservePage() {
             await saveReservationToGallery(blob, filename);
             return;
           } catch (mobileError) {
-            if (
-              mobileError instanceof Error &&
-              mobileError.message === 'share_aborted_visibility'
-            ) {
+            if (mobileError instanceof DOMException && mobileError.name === 'AbortError') {
               setReservationTicketActionError('Cancelaste la acción antes de guardar la reserva.');
               return;
             }
@@ -1099,16 +1057,14 @@ export default function ReservePage() {
         if (!supportsFiles && !reservationDeviceInfo.isAndroid) {
           throw new Error('reservation_share_unsupported');
         }
-        await runReservationShareGuard(() =>
-          navigator.share({
-            files: [file],
-            title: 'Reserva Xoco Café',
-            text: `${buildReservationShareText(reservation)}\nTe espero en Xoco Café.`,
-          })
-        );
+        await navigator.share({
+          files: [file],
+          title: 'Reserva Xoco Café',
+          text: `${buildReservationShareText(reservation)}\nTe espero en Xoco Café.`,
+        });
       } catch (error) {
         console.error('Error compartiendo reserva:', error);
-        if (error instanceof Error && error.message === 'share_aborted_visibility') {
+        if (error instanceof DOMException && error.name === 'AbortError') {
           setReservationTicketActionError('Cancelaste la acción de compartir.');
         } else if (error instanceof Error && error.message === 'reservation_capture_failed') {
           setReservationTicketActionError('No pudimos generar la imagen de la reserva.');
@@ -1127,7 +1083,6 @@ export default function ReservePage() {
       canShareReservation,
       captureReservationTicket,
       reservationDeviceInfo.isAndroid,
-      runReservationShareGuard,
     ]
   );
 

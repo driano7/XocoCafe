@@ -875,42 +875,6 @@ export default function OrdersDashboardPage() {
 
   const [isProcessingTicket, setIsProcessingTicket] = useState(false);
   const [ticketActionError, setTicketActionError] = useState<string | null>(null);
-  const runWithShareGuard = useCallback(async (action: () => Promise<void>) => {
-    if (typeof document === 'undefined') {
-      await action();
-      return;
-    }
-    let wasHidden = false;
-    let settled = false;
-    let rejectAbort: ((reason?: unknown) => void) | null = null;
-    const abortPromise = new Promise<never>((_, reject) => {
-      rejectAbort = reject;
-    });
-    const handleVisibility = () => {
-      if (document.visibilityState === 'hidden') {
-        wasHidden = true;
-        return;
-      }
-      if (document.visibilityState === 'visible' && wasHidden && !settled && rejectAbort) {
-        rejectAbort(new Error('share_aborted_visibility'));
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-    const cleanup = () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      rejectAbort = null;
-    };
-    try {
-      await Promise.race([
-        action().finally(() => {
-          settled = true;
-        }),
-        abortPromise,
-      ]);
-    } finally {
-      cleanup();
-    }
-  }, []);
 
   const detectDevice = useCallback(() => {
     if (typeof navigator === 'undefined' || typeof window === 'undefined') {
@@ -1096,28 +1060,26 @@ export default function OrdersDashboardPage() {
         throw new Error('gallery_not_supported');
       }
       try {
-        await runWithShareGuard(() =>
-          navigator.share({
-            files: [file],
-            title: 'Ticket digital Xoco Café',
-            text: 'Guardaremos tu ticket en tu galería.',
-          })
-        );
+        await navigator.share({
+          files: [file],
+          title: 'Ticket digital Xoco Café',
+          text: 'Guardaremos tu ticket en tu galería.',
+        });
       } catch (error) {
         console.error('Error guardando ticket en galería:', error);
         if (
           error instanceof DOMException &&
           (error.name === 'AbortError' || error.name === 'NotAllowedError')
         ) {
+          if (error.name === 'AbortError') {
+            throw error;
+          }
           throw new Error('gallery_permission_denied');
-        }
-        if (error instanceof Error && error.message === 'share_aborted_visibility') {
-          throw error;
         }
         throw new Error('gallery_share_failed');
       }
     },
-    [deviceInfo.isAndroid, isShareCapableDevice, runWithShareGuard]
+    [deviceInfo.isAndroid, isShareCapableDevice]
   );
 
   const handleDownloadTicket = useCallback(async () => {
@@ -1151,7 +1113,7 @@ export default function OrdersDashboardPage() {
       triggerDownload(blob, filename);
     } catch (error) {
       console.error('Error descargando ticket:', error);
-      if (error instanceof Error && error.message === 'share_aborted_visibility') {
+      if (error instanceof DOMException && error.name === 'AbortError') {
         setTicketActionError('Cancelaste la acción antes de guardar el ticket.');
       } else if (error instanceof Error && error.message === 'gallery_permission_denied') {
         setTicketActionError(
@@ -1221,10 +1183,10 @@ export default function OrdersDashboardPage() {
                 text: 'Comparte este enlace para descargar tu ticket.',
               };
             })();
-      await runWithShareGuard(() => navigator.share(sharePayload));
+      await navigator.share(sharePayload);
     } catch (error) {
       console.error('Error compartiendo ticket:', error);
-      if (error instanceof Error && error.message === 'share_aborted_visibility') {
+      if (error instanceof DOMException && error.name === 'AbortError') {
         setTicketActionError('Cancelaste la acción de compartir.');
       } else if (error instanceof Error && error.message === 'ticket_unavailable') {
         setTicketActionError('No pudimos preparar el ticket para compartir. Intenta descargarlo.');
@@ -1239,7 +1201,6 @@ export default function OrdersDashboardPage() {
     deviceInfo.isAndroid,
     isShareCapableDevice,
     refreshTicketShareBlob,
-    runWithShareGuard,
     selectedOrder,
     ticketShareBlob,
   ]);

@@ -263,6 +263,8 @@ input:-webkit-autofill:focus {
 
 @media (max-width: 640px) {
   .menu-simple-prose table {
+    --mobile-beverage-col-width: 21%;
+    --mobile-size-col-width: calc(var(--mobile-beverage-col-width) * 0.65);
     min-width: 680px;
   }
 
@@ -274,8 +276,17 @@ input:-webkit-autofill:focus {
 
   .menu-simple-prose th:first-child,
   .menu-simple-prose td:first-child {
-    width: 21%;
+    width: var(--mobile-beverage-col-width);
     min-width: 100px;
     max-width: 120px;
+  }
+
+  /* Reduce medium/grande columns 35% vs. beverage column on mobile */
+  .menu-simple-prose th:nth-child(2),
+  .menu-simple-prose td:nth-child(2),
+  .menu-simple-prose th:nth-child(3),
+  .menu-simple-prose td:nth-child(3) {
+    width: var(--mobile-size-col-width);
+    max-width: calc(120px * 0.65);
   }
 }
