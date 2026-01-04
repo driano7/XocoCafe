@@ -298,7 +298,7 @@ export default function LoginPage() {
               </p>
               <h1 className="mt-4 text-4xl font-black text-primary-900 dark:text-white">
                 {isLogin
-                  ? 'Inicia sesión y reactiva tu POS'
+                  ? 'Inicia sesión y mantén tu POS en marcha'
                   : 'Registra tu cuenta y personaliza la experiencia POS'}
               </h1>
               <p className="mt-3 text-sm text-primary-800/80 dark:text-primary-100/80">
