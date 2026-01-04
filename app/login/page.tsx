@@ -115,7 +115,10 @@ export default function LoginPage() {
     if (typeof window !== 'undefined' && context.source === 'login' && context.showFeedbackPrompt) {
       sessionStorage.setItem('xoco:feedbackPrompt', 'true');
     }
-    setPostAuthRedirect(context.source === 'register' ? '/onboarding/favorites' : '/profile');
+    const targetPath = context.source === 'register' ? '/onboarding/favorites' : '/profile';
+    setPostAuthRedirect(targetPath);
+    router.prefetch(targetPath);
+    router.replace(targetPath);
   };
 
   const handleError = (message: string | ReactNode) => {
@@ -326,7 +329,6 @@ export default function LoginPage() {
               ))}
             </div>
           </section>
-
           <section className="flex-1 lg:max-w-xl">
             {error && (
               <div className="mb-4 rounded-2xl border border-danger-200 bg-danger-50/80 px-4 py-3 text-sm font-semibold text-danger-700 dark:border-danger-500/40 dark:bg-danger-900/20 dark:text-danger-100">
@@ -449,17 +451,6 @@ export default function LoginPage() {
                 </motion.div>
               </div>
             </motion.div>
-
-            <div className="mt-8 flex flex-wrap gap-3 lg:hidden">
-              {['Tu barra digital', 'Pedidos', 'Rewards'].map((badge) => (
-                <span
-                  key={badge}
-                  className="rounded-full border border-primary-200/80 bg-primary-50/80 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-primary-700 dark:border-primary-800/50 dark:bg-primary-900/20 dark:text-primary-100"
-                >
-                  {badge}
-                </span>
-              ))}
-            </div>
           </section>
         </div>
       </div>

@@ -1090,7 +1090,9 @@ export default function OrdersDashboardPage() {
         throw new Error('gallery_not_supported');
       }
       const file = new File([blob], `${filename}.png`, { type: 'image/png' });
-      if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+      const supportsFiles =
+        typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] });
+      if (!supportsFiles && !deviceInfo.isAndroid) {
         throw new Error('gallery_not_supported');
       }
       try {
@@ -1115,7 +1117,7 @@ export default function OrdersDashboardPage() {
         throw new Error('gallery_share_failed');
       }
     },
-    [isShareCapableDevice, runWithShareGuard]
+    [deviceInfo.isAndroid, isShareCapableDevice, runWithShareGuard]
   );
 
   const handleDownloadTicket = useCallback(async () => {
@@ -1200,8 +1202,11 @@ export default function OrdersDashboardPage() {
       const file = new File([blob], `${buildTicketFileName()}.png`, {
         type: 'image/png',
       });
+      const supportsFiles =
+        typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] });
+      const forceFileShare = deviceInfo.isAndroid;
       const sharePayload =
-        navigator.canShare && navigator.canShare({ files: [file] })
+        supportsFiles || forceFileShare
           ? {
               files: [file],
               title: 'Ticket digital Xoco Café',
@@ -1231,6 +1236,7 @@ export default function OrdersDashboardPage() {
     }
   }, [
     buildTicketFileName,
+    deviceInfo.isAndroid,
     isShareCapableDevice,
     refreshTicketShareBlob,
     runWithShareGuard,

@@ -37,6 +37,7 @@ import LinkButton from './LinkButton';
 import Pre from './Pre';
 import TOCInline from './TOCInline';
 import WhatsAppCTA from './WhatsAppCTA';
+import LocationMap from './Location/LocationMap';
 
 interface MDXLayout {
   content: Blog | Authors;
@@ -50,6 +51,7 @@ export const components: MDXComponents = {
   pre: Pre,
   LinkButton,
   WhatsAppCTA,
+  LocationMap,
 };
 
 export const MDXLayoutRenderer = ({ content, ...rest }: MDXLayout) => {

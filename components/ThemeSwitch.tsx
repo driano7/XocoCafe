@@ -37,9 +37,15 @@ const ThemeSwitch = () => {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const transitionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pulses, setPulses] = useState<number[]>([]);
+  const [isAndroid, setIsAndroid] = useState(false);
 
   // When mounted on client, now we can show the UI
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setMounted(true);
+    if (typeof navigator !== 'undefined') {
+      setIsAndroid(/android/i.test(navigator.userAgent));
+    }
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -51,6 +57,11 @@ const ThemeSwitch = () => {
   }, []);
 
   const isDarkMode = theme === 'dark' || resolvedTheme === 'dark';
+  const themeTransitionDuration = isAndroid ? 450 : 750;
+  const pulseFadeDuration = isAndroid ? 380 : 550;
+  const pulseMotionDuration = isAndroid ? 0.3 : 0.45;
+  const iconTransitionDuration = isAndroid ? 0.25 : 0.35;
+  const iconEase = isAndroid ? [0.33, 1, 0.68, 1] : [0.17, 0.55, 0.55, 1];
 
   const handleToggle = () => {
     const root = document.documentElement;
@@ -60,13 +71,13 @@ const ThemeSwitch = () => {
     }
     transitionTimeout.current = setTimeout(() => {
       root.classList.remove('theme-transition');
-    }, 750);
+    }, themeTransitionDuration);
 
     const pulseId = Date.now();
     setPulses((prev) => [...prev, pulseId]);
     setTimeout(() => {
       setPulses((prev) => prev.filter((id) => id !== pulseId));
-    }, 550);
+    }, pulseFadeDuration);
 
     setTheme(isDarkMode ? 'light' : 'dark');
   };
@@ -98,7 +109,7 @@ const ThemeSwitch = () => {
             initial={{ opacity: 0.7, scale: 0.2 }}
             animate={{ opacity: 0, scale: 1.6 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: pulseMotionDuration, ease: [0.16, 1, 0.3, 1] }}
             aria-hidden="true"
           />
         ))}
@@ -111,7 +122,7 @@ const ThemeSwitch = () => {
             initial={{ opacity: 0, rotate: -90, scale: 0.6 }}
             animate={{ opacity: 1, rotate: 0, scale: 1 }}
             exit={{ opacity: 0, rotate: 90, scale: 0.6 }}
-            transition={{ duration: 0.35, ease: [0.17, 0.55, 0.55, 1] }}
+            transition={{ duration: iconTransitionDuration, ease: iconEase }}
           >
             {isDarkMode ? <BsSunFill size={16} /> : <BsMoonFill size={18} />}
           </motion.span>

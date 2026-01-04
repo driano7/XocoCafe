@@ -976,7 +976,9 @@ export default function ReservePage() {
         throw new Error('reservation_gallery_unsupported');
       }
       const file = new File([blob], `${filename}.png`, { type: 'image/png' });
-      if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+      const supportsFiles =
+        typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] });
+      if (!supportsFiles && !reservationDeviceInfo.isAndroid) {
         throw new Error('reservation_gallery_unsupported');
       }
       try {
@@ -1000,7 +1002,7 @@ export default function ReservePage() {
         throw new Error('reservation_gallery_failed');
       }
     },
-    [canShareReservation, runReservationShareGuard]
+    [canShareReservation, reservationDeviceInfo.isAndroid, runReservationShareGuard]
   );
 
   const handleDownloadReservationTicket = useCallback(
@@ -1092,7 +1094,9 @@ export default function ReservePage() {
         const file = new File([blob], `${buildReservationTicketFileName(reservation)}.png`, {
           type: 'image/png',
         });
-        if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+        const supportsFiles =
+          typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] });
+        if (!supportsFiles && !reservationDeviceInfo.isAndroid) {
           throw new Error('reservation_share_unsupported');
         }
         await runReservationShareGuard(() =>
@@ -1122,6 +1126,7 @@ export default function ReservePage() {
       buildReservationTicketFileName,
       canShareReservation,
       captureReservationTicket,
+      reservationDeviceInfo.isAndroid,
       runReservationShareGuard,
     ]
   );

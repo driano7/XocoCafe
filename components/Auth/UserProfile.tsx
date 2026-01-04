@@ -350,14 +350,25 @@ export default function UserProfile() {
         typeof navigator.share === 'function'
       ) {
         const shareFile = new File([blob], `${filename}.png`, { type: 'image/png' });
-        if (navigator.canShare && !navigator.canShare({ files: [shareFile] })) {
-          throw new Error('share_not_supported');
-        }
+        const canShareFiles =
+          typeof navigator.canShare !== 'function' || navigator.canShare({ files: [shareFile] });
         try {
+          const sharePayload =
+            canShareFiles || deviceInfo.isAndroid
+              ? {
+                  files: [shareFile],
+                  title: 'Programa de lealtad Xoco Café',
+                  text: 'Comparte tu avance del programa de lealtad y tus favoritos.',
+                }
+              : {
+                  title: 'Programa de lealtad Xoco Café',
+                  text: 'Comparte tu avance del programa de lealtad y tus favoritos.',
+                };
+          if (!canShareFiles && !deviceInfo.isAndroid) {
+            throw new Error('share_not_supported');
+          }
           await navigator.share({
-            files: [shareFile],
-            title: 'Programa de lealtad Xoco Café',
-            text: 'Comparte tu avance del programa de lealtad y tus favoritos.',
+            ...sharePayload,
           });
           setIsExportingLoyaltyPanel(false);
           return;
@@ -396,7 +407,7 @@ export default function UserProfile() {
     } finally {
       setIsExportingLoyaltyPanel(false);
     }
-  }, [captureLoyaltyPanelBlob, downloadLoyaltyPanel, shouldShareLoyaltyPanel]);
+  }, [captureLoyaltyPanelBlob, downloadLoyaltyPanel, shouldShareLoyaltyPanel, deviceInfo]);
 
   const updateConsentPreferences = useCallback(
     async (overrides: Partial<UpdateConsentInput>) => {
