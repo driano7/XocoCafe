@@ -42,7 +42,7 @@ export default function AuthNav() {
         </span>
         <Link
           href="/profile"
-          className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400"
+          className="text-sm font-semibold text-primary-700 transition-colors hover:text-primary-600 dark:text-primary-200 dark:hover:text-primary-100"
         >
           Mi Perfil
         </Link>
@@ -61,7 +61,7 @@ export default function AuthNav() {
     <div className="flex items-center space-x-4">
       <Link
         href="/login"
-        className="group relative inline-flex overflow-hidden rounded-full border border-current px-4 py-1.5 text-sm font-semibold text-current transition-colors duration-300 dark:text-white"
+        className="group relative inline-flex overflow-hidden rounded-full border border-primary-700 px-4 py-1.5 text-sm font-semibold text-primary-700 transition-colors duration-300 hover:text-primary-600 dark:border-primary-200 dark:text-primary-100"
       >
         <span className="absolute inset-0 scale-0 rounded-full bg-current opacity-10 transition-transform duration-300 group-hover:scale-100" />
         <span className="relative">Iniciar Sesión</span>

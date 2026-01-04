@@ -292,14 +292,6 @@ export default function LoginPage() {
         <div className="pointer-events-none absolute bottom-0 right-10 h-64 w-64 rounded-full bg-primary-200/40 blur-3xl dark:bg-primary-900/40" />
         <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col-reverse gap-12 lg:flex-row">
           <section className="flex-1 space-y-8">
-            <button
-              type="button"
-              onClick={() => router.push('/')}
-              className="brand-tertiary-btn w-full justify-center border border-primary-100/70 bg-white/70 py-3 text-xs uppercase tracking-[0.4em] text-primary-700 shadow-sm dark:border-primary-900/30 dark:bg-gray-900/60 dark:text-primary-100"
-            >
-              Volver al inicio
-            </button>
-
             <div className="rounded-3xl border border-primary-100/70 bg-white/90 p-8 shadow-2xl shadow-primary-900/5 backdrop-blur-md dark:border-primary-900/40 dark:bg-gray-900/70">
               <p className="text-sm uppercase tracking-[0.5em] text-primary-500/70">
                 {isLogin ? 'Tu barra digital' : 'Bienvenido a Xoco Café'}
