@@ -33,8 +33,10 @@ export interface AuthSuccessContext {
   showFeedbackPrompt?: boolean;
 }
 
+import type { AuthUser } from '@/lib/validations/auth';
+
 export type AuthSuccessHandler = (
   token: string,
-  user: Record<string, unknown>,
+  user: AuthUser,
   context: AuthSuccessContext
 ) => void;

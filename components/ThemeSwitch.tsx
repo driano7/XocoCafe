@@ -27,7 +27,7 @@
 
 'use client';
 
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { useEffect, useRef, useState } from 'react';
 import { BsMoonFill, BsSunFill } from 'react-icons/bs';
@@ -36,6 +36,7 @@ const ThemeSwitch = () => {
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
   const transitionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pulses, setPulses] = useState<number[]>([]);
 
   // When mounted on client, now we can show the UI
   useEffect(() => setMounted(true), []);
@@ -49,6 +50,8 @@ const ThemeSwitch = () => {
     };
   }, []);
 
+  const isDarkMode = theme === 'dark' || resolvedTheme === 'dark';
+
   const handleToggle = () => {
     const root = document.documentElement;
     root.classList.add('theme-transition');
@@ -59,7 +62,13 @@ const ThemeSwitch = () => {
       root.classList.remove('theme-transition');
     }, 750);
 
-    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
+    const pulseId = Date.now();
+    setPulses((prev) => [...prev, pulseId]);
+    setTimeout(() => {
+      setPulses((prev) => prev.filter((id) => id !== pulseId));
+    }, 550);
+
+    setTheme(isDarkMode ? 'light' : 'dark');
   };
 
   return (
@@ -67,7 +76,7 @@ const ThemeSwitch = () => {
       id="theme-btn"
       aria-label="Toggle Dark Mode"
       type="button"
-      className="ml-1 mr-1 h-8 w-8 rounded p-1"
+      className="relative ml-1 mr-1 flex h-8 w-8 items-center justify-center overflow-hidden rounded p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50"
       whileTap={{
         scale: 0.7,
         rotate: 360,
@@ -76,18 +85,42 @@ const ThemeSwitch = () => {
       whileHover={{ scale: 1.2 }}
       onClick={handleToggle}
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        className="text-gray-900 dark:text-gray-100"
-      >
-        {mounted && (theme === 'dark' || resolvedTheme === 'dark') ? (
-          <BsSunFill size={16} />
+      <AnimatePresence>
+        {pulses.map((pulse) => (
+          <motion.span
+            key={pulse}
+            className="pointer-events-none absolute inset-0 rounded-full"
+            style={{
+              background: isDarkMode
+                ? 'radial-gradient(circle, rgba(255,255,255,0.35) 0%, transparent 70%)'
+                : 'radial-gradient(circle, rgba(20,20,20,0.25) 0%, transparent 70%)',
+            }}
+            initial={{ opacity: 0.7, scale: 0.2 }}
+            animate={{ opacity: 0, scale: 1.6 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            aria-hidden="true"
+          />
+        ))}
+      </AnimatePresence>
+      <AnimatePresence mode="wait" initial={false}>
+        {mounted ? (
+          <motion.span
+            key={isDarkMode ? 'sun' : 'moon'}
+            className="text-gray-900 dark:text-gray-100"
+            initial={{ opacity: 0, rotate: -90, scale: 0.6 }}
+            animate={{ opacity: 1, rotate: 0, scale: 1 }}
+            exit={{ opacity: 0, rotate: 90, scale: 0.6 }}
+            transition={{ duration: 0.35, ease: [0.17, 0.55, 0.55, 1] }}
+          >
+            {isDarkMode ? <BsSunFill size={16} /> : <BsMoonFill size={18} />}
+          </motion.span>
         ) : (
-          <BsMoonFill size={18} />
+          <span className="text-gray-900 dark:text-gray-100">
+            <BsMoonFill size={18} />
+          </span>
         )}
-      </svg>
+      </AnimatePresence>
     </motion.button>
   );
 };

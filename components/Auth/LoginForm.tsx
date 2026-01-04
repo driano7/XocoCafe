@@ -27,25 +27,52 @@
 
 'use client';
 
-import { ReactNode, useState } from 'react';
+import { ReactNode, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, type LoginInput } from '@/lib/validations/auth';
 import { useConversionTracking } from '@/components/Analytics/AnalyticsProvider';
 import type { AuthSuccessHandler } from '@/components/Auth/types';
+import { motion, type Variants } from 'framer-motion';
 
 interface LoginFormProps {
   onSuccess: AuthSuccessHandler;
   onError: (message: string | ReactNode) => void;
   onForgotPassword?: () => void;
+  shouldAnimateFields?: boolean;
+  animationDelay?: number;
 }
 
-export default function LoginForm({ onSuccess, onError, onForgotPassword }: LoginFormProps) {
+export default function LoginForm({
+  onSuccess,
+  onError,
+  onForgotPassword,
+  shouldAnimateFields = false,
+  animationDelay = 0,
+}: LoginFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { trackLogin, trackFormSubmit } = useConversionTracking();
   void onForgotPassword;
   const inputClasses = 'brand-input';
+
+  const fieldVariants = useMemo<Variants>(() => {
+    return {
+      hidden: { opacity: 0, y: 18 },
+      visible: (custom: number) => ({
+        opacity: 1,
+        y: 0,
+        transition: {
+          delay: animationDelay + custom * 0.1,
+          duration: 0.45,
+          ease: [0.17, 0.55, 0.55, 1],
+        },
+      }),
+      instant: { opacity: 1, y: 0, transition: { duration: 0 } },
+    };
+  }, [animationDelay]);
+
+  const animationState = shouldAnimateFields ? 'visible' : 'instant';
 
   const {
     register,
@@ -90,8 +117,8 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword }: Logi
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div>
+    <motion.form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <motion.div variants={fieldVariants} initial="hidden" animate={animationState} custom={0}>
         <label
           htmlFor="email"
           className="block text-sm font-semibold tracking-wide text-primary-900 dark:text-primary-100"
@@ -106,9 +133,9 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword }: Logi
           placeholder="tu@email.com"
         />
         {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
-      </div>
+      </motion.div>
 
-      <div>
+      <motion.div variants={fieldVariants} initial="hidden" animate={animationState} custom={1}>
         <label
           htmlFor="password"
           className="block text-sm font-semibold tracking-wide text-primary-900 dark:text-primary-100"
@@ -133,11 +160,19 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword }: Logi
           </button>
         </div>
         {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
-      </div>
+      </motion.div>
 
-      <button type="submit" disabled={isLoading} className="brand-primary-btn">
+      <motion.button
+        type="submit"
+        disabled={isLoading}
+        className="brand-primary-btn"
+        variants={fieldVariants}
+        initial="hidden"
+        animate={animationState}
+        custom={2}
+      >
         {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
-      </button>
-    </form>
+      </motion.button>
+    </motion.form>
   );
 }

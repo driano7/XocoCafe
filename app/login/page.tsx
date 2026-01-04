@@ -28,6 +28,7 @@
 'use client';
 
 import classNames from 'classnames';
+import { motion, type Variants } from 'framer-motion';
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/Auth/AuthProvider';
@@ -35,6 +36,7 @@ import LoginForm from '@/components/Auth/LoginForm';
 import RegisterForm from '@/components/Auth/RegisterForm';
 import ForgotPasswordForm from '@/components/Auth/ForgotPasswordForm';
 import type { AuthSuccessContext } from '@/components/Auth/types';
+import type { AuthUser } from '@/lib/validations/auth';
 
 type SnackbarTone = 'info' | 'success' | 'error';
 
@@ -55,6 +57,7 @@ export default function LoginPage() {
   const formCardRef = useRef<HTMLDivElement | null>(null);
   const [formVisible, setFormVisible] = useState(false);
   const [formHasBeenVisible, setFormHasBeenVisible] = useState(false);
+  const [animationSeed] = useState(() => Math.random());
   const pageShellClasses =
     'relative min-h-screen overflow-hidden bg-gradient-to-br from-primary-50 via-white to-white dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 py-12 px-4 sm:px-6 lg:px-8';
   const highlightItems = [
@@ -117,7 +120,7 @@ export default function LoginPage() {
     };
   }, [snackbar]);
 
-  const handleSuccess = (token: string, authUser: any, context: AuthSuccessContext) => {
+  const handleSuccess = (token: string, authUser: AuthUser, context: AuthSuccessContext) => {
     login(token, authUser);
     if (typeof window !== 'undefined' && context.source === 'login' && context.showFeedbackPrompt) {
       sessionStorage.setItem('xoco:feedbackPrompt', 'true');
@@ -179,6 +182,25 @@ export default function LoginPage() {
     success: 'bg-success-600 text-white shadow-success-600/40',
     error: 'bg-danger-600 text-white shadow-danger-600/40',
   };
+
+  const interactiveVariants = useMemo<Variants>(() => {
+    const baseDelay = 0.15 + (animationSeed % 0.15);
+    return {
+      hidden: { opacity: 0, y: 16 },
+      visible: (index: number) => ({
+        opacity: 1,
+        y: 0,
+        transition: {
+          delay: baseDelay + index * 0.08,
+          duration: 0.4,
+          ease: [0.17, 0.55, 0.55, 1],
+        },
+      }),
+      instant: { opacity: 1, y: 0, transition: { duration: 0 } },
+    };
+  }, [animationSeed]);
+
+  const shouldAnimateLoginStack = formHasBeenVisible && formVisible;
 
   const snackbarElement = snackbar ? (
     <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
@@ -342,7 +364,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            <div
+            <motion.div
               ref={formCardRef}
               className={classNames(
                 'brand-auth-card relative overflow-hidden transition-all duration-500',
@@ -350,6 +372,9 @@ export default function LoginPage() {
                   ? 'translate-y-0 opacity-100'
                   : 'translate-y-6 opacity-0'
               )}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
             >
               <div className="absolute inset-x-0 top-0 h-1 rounded-full bg-gradient-to-r from-primary-400 via-primary-600 to-primary-400" />
               <div className="space-y-6 pt-2">
@@ -373,8 +398,16 @@ export default function LoginPage() {
                       onSuccess={handleSuccess}
                       onError={handleError}
                       onForgotPassword={handleForgotPassword}
+                      shouldAnimateFields={shouldAnimateLoginStack}
+                      animationDelay={0.1}
                     />
-                    <div className="text-center">
+                    <motion.div
+                      className="text-center"
+                      variants={interactiveVariants}
+                      initial="hidden"
+                      animate={shouldAnimateLoginStack ? 'visible' : 'instant'}
+                      custom={3}
+                    >
                       <button
                         type="button"
                         onClick={handleForgotPassword}
@@ -382,7 +415,7 @@ export default function LoginPage() {
                       >
                         ¿Olvidaste tu contraseña?
                       </button>
-                    </div>
+                    </motion.div>
                   </>
                 ) : (
                   <RegisterForm
@@ -392,7 +425,13 @@ export default function LoginPage() {
                   />
                 )}
 
-                <div className="text-center">
+                <motion.div
+                  className="text-center"
+                  variants={interactiveVariants}
+                  initial="hidden"
+                  animate={shouldAnimateLoginStack ? 'visible' : 'instant'}
+                  custom={4}
+                >
                   <button
                     onClick={() => {
                       if (showForgotPassword) {
@@ -411,9 +450,15 @@ export default function LoginPage() {
                       ? '¿No tienes cuenta? Regístrate aquí'
                       : '¿Ya tienes cuenta? Inicia sesión aquí'}
                   </button>
-                </div>
+                </motion.div>
 
-                <div className="text-center text-xs text-primary-800/70 dark:text-primary-100/70">
+                <motion.div
+                  className="text-center text-xs text-primary-800/70 dark:text-primary-100/70"
+                  variants={interactiveVariants}
+                  initial="hidden"
+                  animate={shouldAnimateLoginStack ? 'visible' : 'instant'}
+                  custom={5}
+                >
                   <p>
                     Al {isLogin ? 'iniciar sesión' : 'registrarte'}, aceptas nuestros{' '}
                     <a
@@ -431,9 +476,9 @@ export default function LoginPage() {
                     </a>
                     .
                   </p>
-                </div>
+                </motion.div>
               </div>
-            </div>
+            </motion.div>
           </section>
         </div>
       </div>
