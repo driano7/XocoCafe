@@ -29,7 +29,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-export type SnackbarTone = 'info' | 'success' | 'warning' | 'error';
+export type SnackbarTone =
+  | 'info'
+  | 'success'
+  | 'warning'
+  | 'error'
+  | 'ticket'
+  | 'profile'
+  | 'whatsapp';
 
 export type SnackbarState = {
   id: number;

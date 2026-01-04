@@ -38,7 +38,7 @@ import ForgotPasswordForm from '@/components/Auth/ForgotPasswordForm';
 import type { AuthSuccessContext } from '@/components/Auth/types';
 import type { AuthUser } from '@/lib/validations/auth';
 
-type SnackbarTone = 'info' | 'success' | 'error';
+type SnackbarTone = 'info' | 'success' | 'error' | 'warning' | 'ticket' | 'profile' | 'whatsapp';
 
 interface SnackbarState {
   message: ReactNode;
@@ -173,7 +173,11 @@ export default function LoginPage() {
   const snackbarToneStyles: Record<SnackbarTone, string> = {
     info: 'bg-primary-600 text-white shadow-primary-600/40',
     success: 'bg-success-600 text-white shadow-success-600/40',
+    warning: 'bg-amber-500 text-primary-900 shadow-amber-500/40',
     error: 'bg-danger-600 text-white shadow-danger-600/40',
+    ticket: 'bg-cyan-600 text-white shadow-cyan-600/40',
+    profile: 'bg-violet-500 text-white shadow-violet-500/40',
+    whatsapp: 'bg-[#0b1221] text-white shadow-[#0b1221]/40',
   };
 
   const interactiveVariants = useMemo<Variants>(() => {

@@ -28,17 +28,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { calculateEligiblePunches, type LoyaltyOrderSnapshot } from '@/lib/loyaltyPunches';
 const MAX_STAMPS = 7;
-const LOYALTY_ELIGIBLE_PRODUCTS = ['beverage-cafe-mexicano'];
-
-type OrderItemRow = {
-  productId?: string | null;
-  quantity?: number | string | null;
-};
-
-type WeeklyOrderRow = {
-  items?: OrderItemRow[] | null;
-};
 
 const getStartOfWeek = () => {
   const now = new Date();
@@ -92,7 +83,7 @@ export async function GET(request: NextRequest) {
           .maybeSingle(),
         supabase
           .from('orders')
-          .select('id,createdAt,items:order_items(productId,quantity)')
+          .select('id,createdAt,updatedAt,status,items:order_items(productId,quantity)')
           .eq('userId', auth.decoded.userId)
           .gte('createdAt', startOfWeekIso),
       ]);
@@ -105,23 +96,11 @@ export async function GET(request: NextRequest) {
       throw new Error(ordersError.message);
     }
 
-    const eligibleCoffeeCount = (weeklyOrders ?? []).reduce((orderAcc, order) => {
-      const typedOrder = order as WeeklyOrderRow;
-      const items = Array.isArray(typedOrder.items) ? typedOrder.items : [];
-      const orderTotal = items.reduce((itemAcc, item) => {
-        if (!item?.productId) return itemAcc;
-        if (!LOYALTY_ELIGIBLE_PRODUCTS.includes(item.productId)) {
-          return itemAcc;
-        }
-        const quantity =
-          typeof item.quantity === 'number'
-            ? item.quantity
-            : Number.parseInt(String(item.quantity ?? 0), 10) || 0;
-        return itemAcc + Math.max(0, quantity);
-      }, 0);
-      return orderAcc + orderTotal;
-    }, 0);
-    const normalizedCoffeeCount = Math.min(eligibleCoffeeCount, MAX_STAMPS);
+    const eligibleCoffeeCount = Math.min(
+      calculateEligiblePunches((weeklyOrders as LoyaltyOrderSnapshot[]) ?? []),
+      MAX_STAMPS
+    );
+    const normalizedCoffeeCount = eligibleCoffeeCount;
 
     if (user && (user.weeklyCoffeeCount ?? 0) !== normalizedCoffeeCount) {
       await supabase

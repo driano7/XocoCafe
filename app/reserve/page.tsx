@@ -454,6 +454,9 @@ export default function ReservePage() {
     enrolled: user?.loyaltyEnrolled ?? false,
     token,
   });
+  const handleWhatsappSnackbar = useCallback(() => {
+    showSnackbar('Abriendo chat de WhatsApp con Xoco Café…', 'whatsapp');
+  }, [showSnackbar]);
 
   const handleActivateLoyaltyReminder = useCallback(async () => {
     const result = await loyaltyReminder.activate();
@@ -1637,6 +1640,7 @@ export default function ReservePage() {
             rel="noreferrer"
             className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white shadow transition-colors hover:bg-white/30 dark:bg-[#0f1728]"
             aria-label="WhatsApp"
+            onClick={handleWhatsappSnackbar}
           >
             <FaWhatsapp />
           </a>

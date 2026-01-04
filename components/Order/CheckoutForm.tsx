@@ -33,6 +33,7 @@ import clsx from 'clsx';
 import { useCartStore } from '@/hooks/useCartStore';
 import type { AddressInput, AuthUser } from '@/lib/validations/auth';
 import { MAX_SAVED_ADDRESSES } from '@/lib/address-constants';
+import { enqueuePendingSnackbar } from '@/lib/pendingSnackbar';
 
 interface CheckoutFormProps {
   token: string | null;
@@ -498,6 +499,12 @@ export default function CheckoutForm({ token, user, onAddressesUpdate }: Checkou
         throw new Error(payload.message || 'No pudimos confirmar tu pedido');
       }
 
+      const ticketCode =
+        payload?.data?.orderNumber ?? payload?.data?.ticketCode ?? payload?.data?.id ?? '---';
+      enqueuePendingSnackbar({
+        message: `Pedido ${ticketCode} creado correctamente.`,
+        tone: 'ticket',
+      });
       clearCart();
       router.push('/dashboard/pedidos');
     } catch (error: any) {

@@ -186,7 +186,7 @@ export default function UserProfile() {
       const hasNotified = window.sessionStorage.getItem(FREE_COFFEE_NOTICE_KEY);
       if (!hasNotified) {
         window.sessionStorage.setItem(FREE_COFFEE_NOTICE_KEY, 'yes');
-        showSnackbar('Tu próximo café americano es cortesía. Mantente al pendiente.', 'success', {
+        showSnackbar('Tu próximo café americano es cortesía. Mantente al pendiente.', 'profile', {
           deviceNotification: {
             title: 'Tu siguiente café es gratis ☕️',
             body: 'Acumula un sello más para canjearlo en barra.',

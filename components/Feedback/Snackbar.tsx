@@ -35,6 +35,9 @@ const toneClasses: Record<SnackbarTone, string> = {
   success: 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-gray-900',
   warning: 'bg-amber-500 text-gray-900 dark:bg-amber-400 dark:text-slate-900',
   error: 'bg-red-600 text-white dark:bg-red-500 dark:text-white',
+  ticket: 'snackbar-ticket',
+  profile: 'snackbar-profile',
+  whatsapp: 'snackbar-whatsapp',
 };
 
 interface SnackbarProps {

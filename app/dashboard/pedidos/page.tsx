@@ -47,6 +47,7 @@ import { useTicketDetails } from '@/hooks/useTicketDetails';
 import { useClientFavorites } from '@/hooks/useClientFavorites';
 import { detectDeviceInfo, ensurePushPermission } from '@/lib/pushNotifications';
 import { decryptField } from '@/lib/secure-fields';
+import { consumePendingSnackbar } from '@/lib/pendingSnackbar';
 
 type Order = OrderRecord & {
   status: OrderStatus;
@@ -140,7 +141,7 @@ const useOrderStatusTracker = (
           if (!createdTs || createdTs >= sessionStartRef.current - 60_000) {
             sessionOrdersRef.current.add(orderId);
             notices.push({
-              tone: 'success',
+              tone: 'ticket',
               message: `Pedido ${displayCode} registrado correctamente.`,
               title: 'Nuevo pedido creado',
               body: `Ticket ${displayCode} está en cola.`,
@@ -639,11 +640,12 @@ export default function OrdersDashboardPage() {
   const orderModalVars = useMemo(() => {
     const safeHeaderHeight = Number.isFinite(headerHeight) ? headerHeight : 96;
     const mobileTopOffset = Math.round(Math.max(safeHeaderHeight * 0.45, 48));
-    const desktopTopOffset = Math.round(Math.max(safeHeaderHeight * 1.2, safeHeaderHeight + 24));
+    const desktopTopOffset = Math.round(Math.max(safeHeaderHeight * 1.4, safeHeaderHeight + 72));
     const mobileHeight = `calc(100vh - ${mobileTopOffset + 60}px)`;
-    const desktopHeight = `min(calc((100vh - ${desktopTopOffset}px) * 1.35), calc(100vh - ${Math.round(
+    const desktopHeightBase = `min(calc((100vh - ${desktopTopOffset}px) * 1.35), calc(100vh - ${Math.round(
       safeHeaderHeight * 0.25
     )}px))`;
+    const desktopHeight = `calc(${desktopHeightBase} * 0.85)`;
     return {
       '--order-modal-mobile-top': `${mobileTopOffset}px`,
       '--order-modal-desktop-top': `${desktopTopOffset}px`,
@@ -660,6 +662,9 @@ export default function OrdersDashboardPage() {
     shouldDisplayPermissionPrompt,
     notificationSupported,
   } = useSnackbarNotifications();
+  const handleWhatsappSnackbar = useCallback(() => {
+    showSnackbar('Abriendo chat de WhatsApp con Xoco Café…', 'whatsapp');
+  }, [showSnackbar]);
   const [pushPermissionInfo, setPushPermissionInfo] = useState<string | null>(null);
   const trackOrderStatuses = useOrderStatusTracker(showSnackbar);
   const { orders, isLoading, error, refresh } = useOrders<Order>({
@@ -712,6 +717,13 @@ export default function OrdersDashboardPage() {
       scrollModalIntoView();
     }
   }, [showHistoricalModal, scrollModalIntoView]);
+
+  useEffect(() => {
+    const pending = consumePendingSnackbar();
+    if (pending?.message) {
+      showSnackbar(pending.message, pending.tone ?? 'ticket');
+    }
+  }, [showSnackbar]);
 
   useEffect(() => {
     const staffEmail = user?.email?.trim();
@@ -1415,6 +1427,7 @@ export default function OrdersDashboardPage() {
             rel="noreferrer"
             className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white shadow-sm transition-colors hover:bg-white/30 dark:bg-[#222c44] dark:text-primary-200 dark:hover:bg-[#2b3650]"
             aria-label="WhatsApp"
+            onClick={handleWhatsappSnackbar}
           >
             <FaWhatsapp />
           </a>
