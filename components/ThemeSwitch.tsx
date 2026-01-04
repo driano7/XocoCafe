@@ -33,19 +33,38 @@ import { useEffect, useRef, useState } from 'react';
 import { BsMoonFill, BsSunFill } from 'react-icons/bs';
 
 const ThemeSwitch = () => {
+  type DeviceProfile = 'ios' | 'android' | 'default';
+
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
   const transitionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pulses, setPulses] = useState<number[]>([]);
-  const [isAndroid, setIsAndroid] = useState(false);
+  const [deviceProfile, setDeviceProfile] = useState<DeviceProfile>('default');
 
   // When mounted on client, now we can show the UI
   useEffect(() => {
     setMounted(true);
     if (typeof navigator !== 'undefined') {
-      setIsAndroid(/android/i.test(navigator.userAgent));
+      const ua = navigator.userAgent || navigator.vendor || (window as any).opera || '';
+      if (/android/i.test(ua)) {
+        setDeviceProfile('android');
+        return;
+      }
+      if (/iphone|ipad|ipod/i.test(ua)) {
+        setDeviceProfile('ios');
+        return;
+      }
     }
   }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const duration = deviceProfile === 'ios' ? 0.28 : deviceProfile === 'android' ? 0.36 : 0.45;
+    root.style.setProperty('--theme-transition-duration', `${duration}s`);
+    return () => {
+      root.style.removeProperty('--theme-transition-duration');
+    };
+  }, [deviceProfile]);
 
   useEffect(() => {
     return () => {
@@ -57,11 +76,17 @@ const ThemeSwitch = () => {
   }, []);
 
   const isDarkMode = theme === 'dark' || resolvedTheme === 'dark';
-  const themeTransitionDuration = isAndroid ? 450 : 750;
-  const pulseFadeDuration = isAndroid ? 380 : 550;
-  const pulseMotionDuration = isAndroid ? 0.3 : 0.45;
-  const iconTransitionDuration = isAndroid ? 0.25 : 0.35;
-  const iconEase = isAndroid ? [0.33, 1, 0.68, 1] : [0.17, 0.55, 0.55, 1];
+  const isAndroid = deviceProfile === 'android';
+  const isIOS = deviceProfile === 'ios';
+  const themeTransitionDuration = isIOS ? 280 : isAndroid ? 360 : 750;
+  const pulseFadeDuration = isIOS ? 220 : isAndroid ? 380 : 550;
+  const pulseMotionDuration = isIOS ? 0.24 : isAndroid ? 0.3 : 0.45;
+  const iconTransitionDuration = isIOS ? 0.18 : isAndroid ? 0.25 : 0.35;
+  const iconEase = isIOS
+    ? ([0.4, 0, 0.2, 1] as [number, number, number, number])
+    : isAndroid
+    ? ([0.33, 1, 0.68, 1] as [number, number, number, number])
+    : ([0.17, 0.55, 0.55, 1] as [number, number, number, number]);
 
   const handleToggle = () => {
     const root = document.documentElement;

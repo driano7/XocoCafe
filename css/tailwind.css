@@ -35,6 +35,10 @@ body {
   overflow-x: hidden;
 }
 
+:root {
+  --theme-transition-duration: 0.45s;
+}
+
 .task-list-item::before {
   @apply hidden;
 }
@@ -50,10 +54,10 @@ html::-webkit-scrollbar {
 .theme-transition body,
 .theme-transition body * {
   transition:
-    background-color 0.45s ease,
-    color 0.45s ease,
-    border-color 0.45s ease,
-    box-shadow 0.45s ease;
+    background-color var(--theme-transition-duration) ease,
+    color var(--theme-transition-duration) ease,
+    border-color var(--theme-transition-duration) ease,
+    box-shadow var(--theme-transition-duration) ease;
 }
 
 .scrollable {
