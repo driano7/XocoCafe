@@ -63,23 +63,13 @@ export default function LoginPage() {
   const highlightItems = [
     {
       title: 'Pedidos inteligentes',
-      description: 'Confirma órdenes, monitorea estados y recibe alertas sin salir del POS.',
+      description: 'Confirma órdenes, monitorea estados y recibe alertas al instante.',
       accent: 'Pedidos',
     },
     {
       title: 'Recompensas siempre visibles',
       description: 'Consulta metas de lealtad y anima a tus clientes a canjearlas.',
       accent: 'Rewards',
-    },
-    {
-      title: 'Equipo sincronizado',
-      description: 'Comparte accesos seguros para baristas, gerentes y marketing.',
-      accent: 'Equipo',
-    },
-    {
-      title: 'Analítica integrada',
-      description: 'Activa mediciones y campañas desde un mismo panel.',
-      accent: 'Insights',
     },
   ];
 
@@ -300,7 +290,7 @@ export default function LoginPage() {
       <div className={pageShellClasses}>
         <div className="pointer-events-none absolute inset-y-0 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-primary-500/10 blur-3xl dark:bg-primary-900/30" />
         <div className="pointer-events-none absolute bottom-0 right-10 h-64 w-64 rounded-full bg-primary-200/40 blur-3xl dark:bg-primary-900/40" />
-        <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-12 lg:flex-row">
+        <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col-reverse gap-12 lg:flex-row">
           <section className="flex-1 space-y-8">
             <button
               type="button"
@@ -323,18 +313,6 @@ export default function LoginPage() {
                 Mantén sincronizados pedidos, recompensas, notificaciones y campañas de marketing en
                 un mismo flujo.
               </p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                {['Pedidos omnicanal', 'Rewards inteligentes', 'Analítica conectada'].map(
-                  (badge) => (
-                    <span
-                      key={badge}
-                      className="rounded-full border border-primary-200/80 bg-primary-50/80 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-primary-700 dark:border-primary-800/50 dark:bg-primary-900/20 dark:text-primary-100"
-                    >
-                      {badge}
-                    </span>
-                  )
-                )}
-              </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -479,6 +457,17 @@ export default function LoginPage() {
                 </motion.div>
               </div>
             </motion.div>
+
+            <div className="mt-8 flex flex-wrap gap-3 lg:hidden">
+              {['Tu barra digital', 'Pedidos', 'Rewards'].map((badge) => (
+                <span
+                  key={badge}
+                  className="rounded-full border border-primary-200/80 bg-primary-50/80 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-primary-700 dark:border-primary-800/50 dark:bg-primary-900/20 dark:text-primary-100"
+                >
+                  {badge}
+                </span>
+              ))}
+            </div>
           </section>
         </div>
       </div>
