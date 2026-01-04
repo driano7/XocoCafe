@@ -1,3 +1,5 @@
+'use client';
+
 /*
  * --------------------------------------------------------------------
  *  Xoco Café — Software Property
@@ -25,34 +27,39 @@
  * --------------------------------------------------------------------
  */
 
-'use client';
+import classNames from 'classnames';
+import { useEffect, type ReactNode } from 'react';
 
-import siteMetadata from 'content/siteMetadata';
-import Link from 'next/link';
-import { FaWhatsapp } from 'react-icons/fa';
-
-interface WhatsAppCTAProps {
-  prefix?: string;
-  suffix?: string;
+interface CoffeeBackgroundProps {
+  children: ReactNode;
+  className?: string;
+  contentClassName?: string;
 }
 
-export default function WhatsAppCTA({
-  prefix = 'Si necesitas ayuda, mándanos un',
-  suffix = 'y con gusto te atendemos.',
-}: WhatsAppCTAProps) {
+const BODY_GRADIENT_CLASS = 'coffee-page-bg--body';
+
+export default function CoffeeBackground({
+  children,
+  className,
+  contentClassName,
+}: CoffeeBackgroundProps) {
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return undefined;
+    }
+    const target = document.body;
+    if (!target) {
+      return undefined;
+    }
+    target.classList.add(BODY_GRADIENT_CLASS);
+    return () => {
+      target.classList.remove(BODY_GRADIENT_CLASS);
+    };
+  }, []);
+
   return (
-    <div className="my-8 flex flex-wrap items-center justify-center gap-2 rounded-3xl bg-primary-600 px-4 py-3 text-sm text-white shadow-lg dark:border dark:border-primary-700/50 dark:bg-[#050e1b] dark:text-primary-50">
-      <span>{prefix}</span>
-      <Link
-        href={siteMetadata.whats}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white shadow transition-colors hover:bg-white/30 dark:bg-[#0f1728]"
-        aria-label="WhatsApp"
-      >
-        <FaWhatsapp />
-      </Link>
-      <span>{suffix}</span>
+    <div className={classNames('coffee-page-bg', className)}>
+      <div className={classNames('coffee-page-bg__content', contentClassName)}>{children}</div>
     </div>
   );
 }

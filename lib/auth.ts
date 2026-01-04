@@ -50,6 +50,12 @@ const ADDRESS_SELECT_VARIANTS = [
   ADDRESS_ENCRYPTED_FIELDS_SNAKE,
   ADDRESS_LEGACY_FIELDS,
 ];
+const isMissingDataRetentionLogsTableError = (error: { message?: string; code?: string } | null) =>
+  Boolean(
+    error?.message?.toLowerCase().includes('data_retention_logs') ||
+      error?.code === 'PGRST204' ||
+      error?.code === 'PGRST210'
+  );
 
 const fetchAddressRows = async (userId: string): Promise<AddressRow[]> => {
   let lastError: { message?: string } | null = null;
@@ -283,6 +289,10 @@ export async function logDataRetentionAction(
     createdAt: nowIso(),
   });
   if (error) {
+    if (isMissingDataRetentionLogsTableError(error)) {
+      console.warn('Tabla data_retention_logs no disponible. Omitiendo registro de retención.');
+      return;
+    }
     throw new Error(`Error al registrar acción de retención: ${error.message}`);
   }
 }

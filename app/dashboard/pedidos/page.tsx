@@ -29,7 +29,7 @@
 
 import classNames from 'classnames';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { FaWhatsapp } from 'react-icons/fa';
 import siteMetadata from 'content/siteMetadata';
 import Snackbar from '@/components/Feedback/Snackbar';
@@ -38,6 +38,8 @@ import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
 import { OrderDetailPanel } from '@/components/Orders/OrderDetailPanel';
 import { usePagination } from '@/hooks/use-pagination';
 import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
+import CoffeeBackground from '@/components/CoffeeBackground';
+import { useHeaderHeight } from '@/hooks/useHeaderHeight';
 import VirtualTicket from '@/components/Orders/VirtualTicket';
 import { useSnackbarNotifications, type SnackbarTone } from '@/hooks/useSnackbarNotifications';
 import { useOrders, type OrderRecord, type OrderStatus } from '@/hooks/useOrders';
@@ -428,6 +430,22 @@ const HistoricalModal = ({
   onClose: () => void;
   orders: Order[];
 }) => {
+  const headerHeight = useHeaderHeight();
+  const modalVars = useMemo(() => {
+    const safeHeaderHeight = Number.isFinite(headerHeight) ? headerHeight : 96;
+    const mobileTopOffset = Math.round(Math.max(safeHeaderHeight * 0.65, 56));
+    const desktopTopOffset = Math.round(Math.max(safeHeaderHeight * 1.2, safeHeaderHeight + 32));
+    const mobileHeight = `calc(100vh - ${mobileTopOffset + 48}px)`;
+    const desktopHeight = `min(calc((100vh - ${desktopTopOffset}px) * 1.35), calc(100vh - ${Math.round(
+      safeHeaderHeight * 0.3
+    )}px))`;
+    return {
+      '--historical-modal-mobile-top': `${mobileTopOffset}px`,
+      '--historical-modal-desktop-top': `${desktopTopOffset}px`,
+      '--historical-modal-mobile-height': mobileHeight,
+      '--historical-modal-desktop-height': desktopHeight,
+    } as CSSProperties;
+  }, [headerHeight]);
   const listRef = useRef<HTMLDivElement | null>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
 
@@ -470,22 +488,23 @@ const HistoricalModal = ({
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center px-3 py-6 sm:px-6"
+      className="fixed inset-0 z-40 flex items-start justify-center px-3 pb-6 pt-[var(--historical-modal-mobile-top)] sm:px-6 sm:pt-[var(--historical-modal-desktop-top)]"
       role="presentation"
+      style={modalVars}
     >
-      <div className="relative flex h-full w-full items-center justify-center">
+      <div className="relative flex h-full w-full items-start justify-center">
         <button
           type="button"
           className="absolute inset-0 h-full w-full bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
           aria-label="Cerrar registros históricos"
           onClick={onClose}
         />
-        <div className="relative z-10 mx-auto flex h-full min-h-full max-w-4xl items-center justify-center">
+        <div className="relative z-10 mx-auto flex h-full min-h-full max-w-4xl items-start justify-center">
           <div
-            className="flex h-full min-h-0 w-full max-w-md flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white text-gray-900 shadow-2xl dark:border-white/10 dark:bg-[#070d1a] dark:text-white"
-            style={{ maxHeight: 'calc(100vh - 96px)', height: 'calc(100vh - 96px)' }}
+            className="flex min-h-0 w-full max-w-md flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white text-gray-900 shadow-2xl dark:border-white/10 dark:bg-[#070d1a] dark:text-white h-[var(--historical-modal-mobile-height)] max-h-[var(--historical-modal-mobile-height)] sm:h-[var(--historical-modal-desktop-height)] sm:max-h-[var(--historical-modal-desktop-height)]"
             role="dialog"
             aria-modal="true"
+            data-historical-modal
           >
             <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-5 pb-3 pt-5 dark:border-white/10">
               <div>
@@ -607,6 +626,31 @@ export default function OrdersDashboardPage() {
   const ticketRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const isAuthenticated = Boolean(user && token);
+  const scrollModalIntoView = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (!window.matchMedia('(min-width: 1024px)').matches) {
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+  const headerHeight = useHeaderHeight();
+  const orderModalVars = useMemo(() => {
+    const safeHeaderHeight = Number.isFinite(headerHeight) ? headerHeight : 96;
+    const mobileTopOffset = Math.round(Math.max(safeHeaderHeight * 0.45, 48));
+    const desktopTopOffset = Math.round(Math.max(safeHeaderHeight * 1.2, safeHeaderHeight + 24));
+    const mobileHeight = `calc(100vh - ${mobileTopOffset + 60}px)`;
+    const desktopHeight = `min(calc((100vh - ${desktopTopOffset}px) * 1.35), calc(100vh - ${Math.round(
+      safeHeaderHeight * 0.25
+    )}px))`;
+    return {
+      '--order-modal-mobile-top': `${mobileTopOffset}px`,
+      '--order-modal-desktop-top': `${desktopTopOffset}px`,
+      '--order-modal-mobile-height': mobileHeight,
+      '--order-modal-desktop-height': desktopHeight,
+    } as CSSProperties;
+  }, [headerHeight]);
   const {
     snackbar,
     showSnackbar,
@@ -656,6 +700,18 @@ export default function OrdersDashboardPage() {
   useEffect(() => {
     trackOrderStatuses(orders);
   }, [orders, trackOrderStatuses]);
+
+  useEffect(() => {
+    if (selectedOrder) {
+      scrollModalIntoView();
+    }
+  }, [selectedOrder, scrollModalIntoView]);
+
+  useEffect(() => {
+    if (showHistoricalModal) {
+      scrollModalIntoView();
+    }
+  }, [showHistoricalModal, scrollModalIntoView]);
 
   useEffect(() => {
     const staffEmail = user?.email?.trim();
@@ -1253,383 +1309,394 @@ export default function OrdersDashboardPage() {
 
   if (isAuthLoading) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-12 text-center text-gray-600 dark:text-gray-300">
-        Cargando información de tu cuenta...
-      </div>
+      <CoffeeBackground className="py-10">
+        <div className="mx-auto max-w-4xl rounded-[32px] bg-white/90 px-4 py-12 text-center text-gray-600 shadow-2xl shadow-black/20 dark:bg-gray-900/80 dark:text-gray-200">
+          Cargando información de tu cuenta...
+        </div>
+      </CoffeeBackground>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-12 text-center">
-        <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Mis pedidos</h1>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Inicia sesión para revisar el historial de pedidos y crear nuevos.
-        </p>
-        <Link
-          href="/login"
-          className="mt-6 inline-flex min-w-[220px] items-center justify-center rounded-full bg-primary-600 px-8 py-4 text-xl font-bold uppercase tracking-[0.25em] text-white shadow-xl transition hover:bg-primary-700"
-        >
-          Iniciar sesión
-        </Link>
-      </div>
+      <CoffeeBackground className="py-10">
+        <div className="mx-auto max-w-4xl rounded-[32px] bg-white/95 px-4 py-12 text-center shadow-2xl shadow-black/20 dark:bg-gray-950/80">
+          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Mis pedidos</h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            Inicia sesión para revisar el historial de pedidos y crear nuevos.
+          </p>
+          <Link
+            href="/login"
+            className="mt-6 inline-flex min-w-[220px] items-center justify-center rounded-full bg-primary-600 px-8 py-4 text-xl font-bold uppercase tracking-[0.25em] text-white shadow-xl transition hover:bg-primary-700"
+          >
+            Iniciar sesión
+          </Link>
+        </div>
+      </CoffeeBackground>
     );
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 lg:px-0">
-      <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.35em] text-primary-500">Panel</p>
-          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Mis pedidos</h1>
-          <p className="text-sm text-gray-500">
-            Visualiza el estado de tus pedidos o los que realicemos por ti en tiempo real.
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          {hasReachedOrderLimit ? (
-            <button
-              type="button"
-              disabled
-              className="inline-flex items-center justify-center rounded-full border border-gray-300 px-6 py-3 text-base font-semibold text-gray-400 cursor-not-allowed dark:border-gray-600 dark:text-gray-500"
-            >
-              Crear nuevo pedido
-            </button>
-          ) : (
-            <Link
-              href="/order"
-              className="inline-flex items-center justify-center rounded-full bg-primary-600 px-6 py-3 text-base font-semibold text-white shadow hover:bg-primary-700"
-            >
-              Crear nuevo pedido
-            </Link>
-          )}
-        </div>
-      </header>
-      {showMobileNotificationPrompt && (
-        <div className="mb-6 rounded-3xl border border-primary-200 bg-white/70 p-4 text-sm text-gray-800 shadow dark:border-primary-500/30 dark:bg-primary-900/20 dark:text-primary-50">
-          <p className="mb-3 font-semibold">
-            Activa las notificaciones push para enterarte cuando cambiemos el estado de tus pedidos.
-          </p>
-          <button
-            type="button"
-            onClick={handleRequestPushPermission}
-            className="w-full rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-          >
-            Permitir notificaciones
-          </button>
-          <p className="mt-2 text-xs text-gray-500 dark:text-primary-100/70">
-            iOS requiere que aceptes manualmente para poder enviarte avisos.
-          </p>
-          {pushPermissionInfo && (
-            <p className="mt-1 text-xs font-semibold text-primary-600 dark:text-primary-200">
-              {pushPermissionInfo}
+    <CoffeeBackground className="py-10">
+      <div className="mx-auto max-w-5xl px-4 py-8 lg:px-0">
+        <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-[0.35em] text-primary-500">Panel</p>
+            <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Mis pedidos</h1>
+            <p className="text-sm text-gray-500">
+              Visualiza el estado de tus pedidos o los que realicemos por ti en tiempo real.
             </p>
-          )}
-        </div>
-      )}
-      {isAuthenticated && loyaltyNotice && (
-        <div
-          className={`mb-4 rounded-full px-4 py-2 text-sm font-semibold ${
-            loyaltyNotice.type === 'success'
-              ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
-              : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-100'
-          }`}
-        >
-          {loyaltyNotice.message}
-        </div>
-      )}
-      {isAuthenticated && showLoyaltyReminder && (
-        <LoyaltyReminderCard
-          onActivate={handleLoyaltyActivation}
-          isLoading={isActivatingLoyalty}
-          className="mb-6"
-        />
-      )}
-      <div className="mb-6 flex flex-wrap items-center justify-center gap-2 rounded-3xl bg-primary-600 px-4 py-3 text-sm text-white shadow-lg dark:bg-primary-900/20 dark:text-primary-200">
-        <span>Si necesitas ayuda, mándanos un</span>
-        <a
-          href={siteMetadata.whats}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white shadow-sm transition-colors hover:bg-white/30 dark:bg-[#222c44] dark:text-primary-200 dark:hover:bg-[#2b3650]"
-          aria-label="WhatsApp"
-        >
-          <FaWhatsapp />
-        </a>
-        <span>y con todo gusto te ayudamos.</span>
-      </div>
-      {hasReachedOrderLimit && (
-        <div className="mb-6 rounded-xl bg-amber-100 px-4 py-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">
-          Solo puedes tener 3 pedidos pendientes creados desde la app. Finaliza o cancela un ticket
-          que empiece con C- para generar otro.
-        </div>
-      )}
-      <div className="mb-6 rounded-xl bg-orange-50 px-4 py-3 text-sm text-orange-900 dark:bg-orange-900/30 dark:text-orange-100">
-        Si no acudiste antes del corte (23:59), movemos el ticket a seguimiento en color naranja,
-        eliminamos su QR y conservamos el registro únicamente durante 48 horas para referencias
-        internas.
-      </div>
-      <div className="mb-6 flex justify-end">
-        <button
-          type="button"
-          onClick={handleRefreshOrders}
-          disabled={isLoading}
-          className="inline-flex items-center justify-center rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-white/5"
-        >
-          {isLoading ? 'Actualizando...' : 'Actualizar lista'}
-        </button>
-      </div>
-
-      {error && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-900/30 dark:text-red-100">
-          {error}
-        </div>
-      )}
-
-      <section aria-live="polite" className="space-y-4">
-        {isLoading ? (
-          <div className="grid gap-4 md:grid-cols-3">
-            {[1, 2, 3].map((skeleton) => (
-              <div
-                key={skeleton}
-                className="rounded-3xl border border-gray-200 bg-white p-5 text-gray-500 shadow-sm dark:border-white/10 dark:bg-[#070d1a] dark:text-white/80"
-              >
-                <div className="mb-4 h-5 w-32 animate-pulse rounded-full bg-gray-200 dark:bg-white/10" />
-                <div className="space-y-3">
-                  {[1, 2, 3].map((card) => (
-                    <div
-                      // eslint-disable-next-line react/no-array-index-key
-                      key={card}
-                      className="h-24 rounded-2xl border border-dashed border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#070d1a]"
-                    >
-                      <span className="sr-only">Cargando tarjeta</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
           </div>
-        ) : (
-          <>
-            <div
-              className="grid gap-6 lg:grid-cols-3"
-              aria-live="polite"
-              aria-label="Tablero de pedidos"
-            >
-              <OrdersBoardColumn
-                title="Pendientes"
-                description="Pedidos que aún no entran a barra"
-                orders={pendingOrders}
-                emptyLabel="No hay pedidos en pendientes."
-                onSelect={(value) => setSelectedOrder(value)}
-              />
-              <OrdersBoardColumn
-                title="En producción"
-                description="Baristas trabajando en el pedido"
-                orders={prepOrders}
-                emptyLabel="No hay pedidos en producción."
-                onSelect={(value) => setSelectedOrder(value)}
-              />
-              <OrdersBoardColumn
-                title="Completados"
-                description="Listos para entregar o ya recolectados"
-                orders={completedOrdersList}
-                emptyLabel="No hay pedidos completados recientes."
-                onSelect={(value) => setSelectedOrder(value)}
-              />
-            </div>
-            <div className="flex justify-end">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {hasReachedOrderLimit ? (
               <button
                 type="button"
-                onClick={() => setShowHistoricalModal(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-5 py-2 text-sm font-semibold text-white shadow transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                disabled
+                className="inline-flex items-center justify-center rounded-full border border-gray-300 px-6 py-3 text-base font-semibold text-gray-400 cursor-not-allowed dark:border-gray-600 dark:text-gray-500"
               >
-                Histórico ({boardColumns.pastBucket.length})
-                <span className="text-xs text-white/80 dark:text-white/70">Abrir registros</span>
+                Crear nuevo pedido
               </button>
-            </div>
-          </>
-        )}
-      </section>
-
-      {selectedOrder && (
-        <div
-          ref={overlayRef}
-          className={classNames(
-            'fixed inset-0 z-[60] flex bg-black/60',
-            'px-3 pb-[calc(80px+env(safe-area-inset-bottom))] pt-[calc(5vh+48px)] sm:px-6 sm:pb-10 sm:pt-[calc(84px+20vh)]',
-            'items-start justify-center sm:items-start'
-          )}
-          onClick={handleOverlayClick}
-          onKeyDown={handleOverlayKeyDown}
-          role="presentation"
-          tabIndex={-1}
-        >
-          <div
-            className={classNames(
-              'flex w-full max-w-md flex-col overflow-hidden border border-white/30 bg-white/90 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-gray-900/80',
-              'rounded-t-3xl sm:rounded-3xl',
-              'h-[calc(100vh-90px-14vh)] max-h-[calc(100vh-90px-14vh)] sm:h-[calc(100vh-84px-20vh)] sm:max-h-[calc(100vh-84px-20vh)]'
+            ) : (
+              <Link
+                href="/order"
+                className="inline-flex items-center justify-center rounded-full bg-primary-600 px-6 py-3 text-base font-semibold text-white shadow hover:bg-primary-700"
+              >
+                Crear nuevo pedido
+              </Link>
             )}
-          >
-            <div
-              className="scrollable flex-1 overscroll-contain px-4 pb-24 pt-5 sm:px-5 sm:pb-6"
-              aria-labelledby="order-detail-title"
-              style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
-              onWheelCapture={(event) => event.stopPropagation()}
-              onTouchMoveCapture={(event) => event.stopPropagation()}
+          </div>
+        </header>
+        {showMobileNotificationPrompt && (
+          <div className="mb-6 rounded-3xl border border-primary-200 bg-white/70 p-4 text-sm text-gray-800 shadow dark:border-primary-500/30 dark:bg-primary-900/20 dark:text-primary-50">
+            <p className="mb-3 font-semibold">
+              Activa las notificaciones push para enterarte cuando cambiemos el estado de tus
+              pedidos.
+            </p>
+            <button
+              type="button"
+              onClick={handleRequestPushPermission}
+              className="w-full rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             >
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.35em] text-primary-500">Pedido</p>
-                  <h3
-                    id="order-detail-title"
-                    className="text-xl font-semibold text-gray-900 dark:text-white"
-                  >
-                    Ticket {selectedOrder.ticketId ?? selectedOrder.orderNumber ?? selectedOrder.id}
-                  </h3>
+              Permitir notificaciones
+            </button>
+            <p className="mt-2 text-xs text-gray-500 dark:text-primary-100/70">
+              iOS requiere que aceptes manualmente para poder enviarte avisos.
+            </p>
+            {pushPermissionInfo && (
+              <p className="mt-1 text-xs font-semibold text-primary-600 dark:text-primary-200">
+                {pushPermissionInfo}
+              </p>
+            )}
+          </div>
+        )}
+        {isAuthenticated && loyaltyNotice && (
+          <div
+            className={`mb-4 rounded-full px-4 py-2 text-sm font-semibold ${
+              loyaltyNotice.type === 'success'
+                ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
+                : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-100'
+            }`}
+          >
+            {loyaltyNotice.message}
+          </div>
+        )}
+        {isAuthenticated && showLoyaltyReminder && (
+          <LoyaltyReminderCard
+            onActivate={handleLoyaltyActivation}
+            isLoading={isActivatingLoyalty}
+            className="mb-6"
+          />
+        )}
+        <div className="mb-6 flex flex-wrap items-center justify-center gap-2 rounded-3xl bg-primary-600 px-4 py-3 text-sm text-white shadow-lg dark:bg-primary-900/20 dark:text-primary-200">
+          <span>Si necesitas ayuda, mándanos un</span>
+          <a
+            href={siteMetadata.whats}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white shadow-sm transition-colors hover:bg-white/30 dark:bg-[#222c44] dark:text-primary-200 dark:hover:bg-[#2b3650]"
+            aria-label="WhatsApp"
+          >
+            <FaWhatsapp />
+          </a>
+          <span>y con todo gusto te ayudamos.</span>
+        </div>
+        {hasReachedOrderLimit && (
+          <div className="mb-6 rounded-xl bg-amber-100 px-4 py-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">
+            Solo puedes tener 3 pedidos pendientes creados desde la app. Finaliza o cancela un
+            ticket que empiece con C- para generar otro.
+          </div>
+        )}
+        <div className="mb-6 rounded-xl bg-orange-50 px-4 py-3 text-sm text-orange-900 dark:bg-orange-900/30 dark:text-orange-100">
+          Si no acudiste antes del corte (23:59), movemos el ticket a seguimiento en color naranja,
+          eliminamos su QR y conservamos el registro únicamente durante 48 horas para referencias
+          internas.
+        </div>
+        <div className="mb-6 flex justify-end">
+          <button
+            type="button"
+            onClick={handleRefreshOrders}
+            disabled={isLoading}
+            className="inline-flex items-center justify-center rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-white/5"
+          >
+            {isLoading ? 'Actualizando...' : 'Actualizar lista'}
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-900/30 dark:text-red-100">
+            {error}
+          </div>
+        )}
+
+        <section aria-live="polite" className="space-y-4">
+          {isLoading ? (
+            <div className="grid gap-4 md:grid-cols-3">
+              {[1, 2, 3].map((skeleton) => (
+                <div
+                  key={skeleton}
+                  className="rounded-3xl border border-gray-200 bg-white p-5 text-gray-500 shadow-sm dark:border-white/10 dark:bg-[#070d1a] dark:text-white/80"
+                >
+                  <div className="mb-4 h-5 w-32 animate-pulse rounded-full bg-gray-200 dark:bg-white/10" />
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((card) => (
+                      <div
+                        // eslint-disable-next-line react/no-array-index-key
+                        key={card}
+                        className="h-24 rounded-2xl border border-dashed border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#070d1a]"
+                      >
+                        <span className="sr-only">Cargando tarjeta</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              <div
+                className="grid gap-6 lg:grid-cols-3"
+                aria-live="polite"
+                aria-label="Tablero de pedidos"
+              >
+                <OrdersBoardColumn
+                  title="Pendientes"
+                  description="Pedidos que aún no entran a barra"
+                  orders={pendingOrders}
+                  emptyLabel="No hay pedidos en pendientes."
+                  onSelect={(value) => setSelectedOrder(value)}
+                />
+                <OrdersBoardColumn
+                  title="En producción"
+                  description="Baristas trabajando en el pedido"
+                  orders={prepOrders}
+                  emptyLabel="No hay pedidos en producción."
+                  onSelect={(value) => setSelectedOrder(value)}
+                />
+                <OrdersBoardColumn
+                  title="Completados"
+                  description="Listos para entregar o ya recolectados"
+                  orders={completedOrdersList}
+                  emptyLabel="No hay pedidos completados recientes."
+                  onSelect={(value) => setSelectedOrder(value)}
+                />
+              </div>
+              <div className="flex justify-end">
                 <button
                   type="button"
-                  onClick={() => setSelectedOrder(null)}
-                  className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200"
-                  aria-label="Cerrar modal"
+                  onClick={() => setShowHistoricalModal(true)}
+                  className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-5 py-2 text-sm font-semibold text-white shadow transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 >
-                  ×
+                  Histórico ({boardColumns.pastBucket.length})
+                  <span className="text-xs text-white/80 dark:text-white/70">Abrir registros</span>
                 </button>
               </div>
+            </>
+          )}
+        </section>
 
-              <OrderDetailPanel
-                order={selectedOrder}
-                ticketDetails={ticketDetails}
-                decryptedCustomer={{
-                  firstName: decryptedSnapshots.customerFirstName,
-                  lastName: decryptedSnapshots.customerLastName,
-                  phone: decryptedSnapshots.customerPhone,
-                }}
-                decryptedHandlerName={decryptedSnapshots.handlerName}
-                isLoading={isTicketLoading && Boolean(ticketIdentifier)}
-              />
-              <div className="space-y-2 text-xs">
-                {ticketDetailsError && (
-                  <p className="text-red-600 dark:text-red-400">{ticketDetailsError}</p>
-                )}
-                {clientFavoritesError && (
-                  <p className="text-red-600 dark:text-red-400">{clientFavoritesError}</p>
-                )}
-              </div>
-
-              {expiredSelectedOrder ? (
-                <div className="mt-6 rounded-2xl border border-dashed border-orange-200 bg-orange-50 p-4 text-sm text-orange-900 dark:border-orange-900/50 dark:bg-orange-900/20 dark:text-orange-100">
-                  El ticket ya no está disponible porque no se completó antes del corte del día.
-                  Solo conservamos su descripción para referencia.
-                </div>
-              ) : (
-                <div className="mt-6 flex justify-center">
-                  <VirtualTicket
-                    order={selectedOrder}
-                    ref={ticketRef}
-                    showQr={shouldShowQr}
-                    orderStatus={selectedOrderEffectiveStatus ?? selectedOrder.status}
-                  />
-                </div>
+        {selectedOrder && (
+          <div
+            ref={overlayRef}
+            className={classNames(
+              'fixed inset-0 z-[60] flex bg-black/60',
+              'px-3 pb-[calc(80px+env(safe-area-inset-bottom))] pt-[var(--order-modal-mobile-top)]',
+              'sm:px-6 sm:pb-10 sm:pt-[var(--order-modal-desktop-top)]',
+              'items-start justify-center sm:items-start'
+            )}
+            style={orderModalVars}
+            onClick={handleOverlayClick}
+            onKeyDown={handleOverlayKeyDown}
+            role="presentation"
+            tabIndex={-1}
+          >
+            <div
+              className={classNames(
+                'flex w-full max-w-md flex-col overflow-hidden border border-white/30 bg-white/90 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-gray-900/80',
+                'rounded-t-3xl sm:rounded-3xl',
+                'h-[var(--order-modal-mobile-height)] max-h-[var(--order-modal-mobile-height)]',
+                'sm:h-[var(--order-modal-desktop-height)] sm:max-h-[var(--order-modal-desktop-height)]'
               )}
+            >
+              <div
+                className="scrollable flex-1 overscroll-contain px-4 pb-24 pt-5 sm:px-5 sm:pb-6"
+                aria-labelledby="order-detail-title"
+                style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
+                onWheelCapture={(event) => event.stopPropagation()}
+                onTouchMoveCapture={(event) => event.stopPropagation()}
+              >
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.35em] text-primary-500">Pedido</p>
+                    <h3
+                      id="order-detail-title"
+                      className="text-xl font-semibold text-gray-900 dark:text-white"
+                    >
+                      Ticket{' '}
+                      {selectedOrder.ticketId ?? selectedOrder.orderNumber ?? selectedOrder.id}
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOrder(null)}
+                    className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200"
+                    aria-label="Cerrar modal"
+                  >
+                    ×
+                  </button>
+                </div>
 
-              {(() => {
-                const address = selectedOrder.shipping?.address;
-                const contactPhone = selectedOrder.shipping?.contactPhone?.trim();
-                const hasAddressDetails =
-                  !!address &&
-                  [
-                    address.street,
-                    address.city,
-                    address.state,
-                    address.postalCode,
-                    address.reference,
-                  ]
-                    .filter((value) => typeof value === 'string')
-                    .some((value) => Boolean((value as string).trim().length));
-                if (!hasAddressDetails) {
-                  return null;
-                }
-                return (
-                  <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
-                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-300">
-                      Detalles de entrega
-                    </h4>
-                    <p>
-                      {address?.street}
-                      {address?.city ? `, ${address.city}` : ''}
-                      {address?.state ? `, ${address.state}` : ''}
-                      {address?.postalCode ? ` · CP ${address.postalCode}` : ''}
-                    </p>
-                    {address?.reference && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Referencia: {address.reference}
+                <OrderDetailPanel
+                  order={selectedOrder}
+                  ticketDetails={ticketDetails}
+                  decryptedCustomer={{
+                    firstName: decryptedSnapshots.customerFirstName,
+                    lastName: decryptedSnapshots.customerLastName,
+                    phone: decryptedSnapshots.customerPhone,
+                  }}
+                  decryptedHandlerName={decryptedSnapshots.handlerName}
+                  isLoading={isTicketLoading && Boolean(ticketIdentifier)}
+                />
+                <div className="space-y-2 text-xs">
+                  {ticketDetailsError && (
+                    <p className="text-red-600 dark:text-red-400">{ticketDetailsError}</p>
+                  )}
+                  {clientFavoritesError && (
+                    <p className="text-red-600 dark:text-red-400">{clientFavoritesError}</p>
+                  )}
+                </div>
+
+                {expiredSelectedOrder ? (
+                  <div className="mt-6 rounded-2xl border border-dashed border-orange-200 bg-orange-50 p-4 text-sm text-orange-900 dark:border-orange-900/50 dark:bg-orange-900/20 dark:text-orange-100">
+                    El ticket ya no está disponible porque no se completó antes del corte del día.
+                    Solo conservamos su descripción para referencia.
+                  </div>
+                ) : (
+                  <div className="mt-6 flex justify-center">
+                    <VirtualTicket
+                      order={selectedOrder}
+                      ref={ticketRef}
+                      showQr={shouldShowQr}
+                      orderStatus={selectedOrderEffectiveStatus ?? selectedOrder.status}
+                    />
+                  </div>
+                )}
+
+                {(() => {
+                  const address = selectedOrder.shipping?.address;
+                  const contactPhone = selectedOrder.shipping?.contactPhone?.trim();
+                  const hasAddressDetails =
+                    !!address &&
+                    [
+                      address.street,
+                      address.city,
+                      address.state,
+                      address.postalCode,
+                      address.reference,
+                    ]
+                      .filter((value) => typeof value === 'string')
+                      .some((value) => Boolean((value as string).trim().length));
+                  if (!hasAddressDetails) {
+                    return null;
+                  }
+                  return (
+                    <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
+                      <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-300">
+                        Detalles de entrega
+                      </h4>
+                      <p>
+                        {address?.street}
+                        {address?.city ? `, ${address.city}` : ''}
+                        {address?.state ? `, ${address.state}` : ''}
+                        {address?.postalCode ? ` · CP ${address.postalCode}` : ''}
+                      </p>
+                      {address?.reference && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Referencia: {address.reference}
+                        </p>
+                      )}
+                      {contactPhone && (
+                        <p className="mt-2 text-sm font-medium">
+                          Contacto: {contactPhone}{' '}
+                          {selectedOrder.shipping?.isWhatsapp ? '(WhatsApp)' : ''}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {!expiredSelectedOrder && (
+                  <div className="border-t border-gray-100 pb-2 pt-3 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleDownloadTicket()}
+                      disabled={isProcessingTicket}
+                      className="w-full rounded-full bg-primary-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {isProcessingTicket ? 'Generando ticket…' : 'Descargar Ticket'}
+                    </button>
+                    {shouldShowShareButton && (
+                      <button
+                        type="button"
+                        onClick={() => void handleShareTicket()}
+                        disabled={isProcessingTicket || !isShareCapableDevice}
+                        className="w-full rounded-full border border-primary-200 px-4 py-3 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-primary-500/60 dark:text-primary-200 dark:hover:bg-primary-500/10"
+                      >
+                        {isProcessingTicket
+                          ? 'Compartiendo ticket…'
+                          : isShareCapableDevice
+                          ? isTicketShareReady
+                            ? 'Compartir ticket'
+                            : 'Preparando ticket…'
+                          : 'Compartir no disponible'}
+                      </button>
+                    )}
+                    {shouldShowShareButton && (!isShareCapableDevice || !isTicketShareReady) && (
+                      <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+                        {isShareCapableDevice
+                          ? isPreparingShareBlob
+                            ? 'Generando una vista previa del ticket para compartir…'
+                            : 'No pudimos preparar el ticket para compartir. Usa la descarga para guardarlo.'
+                          : 'Tu navegador no soporta compartir archivos. Usa la descarga para guardar tu ticket.'}
                       </p>
                     )}
-                    {contactPhone && (
-                      <p className="mt-2 text-sm font-medium">
-                        Contacto: {contactPhone}{' '}
-                        {selectedOrder.shipping?.isWhatsapp ? '(WhatsApp)' : ''}
+                    {ticketActionError && (
+                      <p className="text-center text-xs text-red-600 dark:text-red-400">
+                        {ticketActionError}
                       </p>
                     )}
                   </div>
-                );
-              })()}
-
-              {!expiredSelectedOrder && (
-                <div className="border-t border-gray-100 pb-2 pt-3 space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => void handleDownloadTicket()}
-                    disabled={isProcessingTicket}
-                    className="w-full rounded-full bg-primary-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {isProcessingTicket ? 'Generando ticket…' : 'Descargar Ticket'}
-                  </button>
-                  {shouldShowShareButton && (
-                    <button
-                      type="button"
-                      onClick={() => void handleShareTicket()}
-                      disabled={isProcessingTicket || !isShareCapableDevice}
-                      className="w-full rounded-full border border-primary-200 px-4 py-3 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-primary-500/60 dark:text-primary-200 dark:hover:bg-primary-500/10"
-                    >
-                      {isProcessingTicket
-                        ? 'Compartiendo ticket…'
-                        : isShareCapableDevice
-                        ? isTicketShareReady
-                          ? 'Compartir ticket'
-                          : 'Preparando ticket…'
-                        : 'Compartir no disponible'}
-                    </button>
-                  )}
-                  {shouldShowShareButton && (!isShareCapableDevice || !isTicketShareReady) && (
-                    <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                      {isShareCapableDevice
-                        ? isPreparingShareBlob
-                          ? 'Generando una vista previa del ticket para compartir…'
-                          : 'No pudimos preparar el ticket para compartir. Usa la descarga para guardarlo.'
-                        : 'Tu navegador no soporta compartir archivos. Usa la descarga para guardar tu ticket.'}
-                    </p>
-                  )}
-                  {ticketActionError && (
-                    <p className="text-center text-xs text-red-600 dark:text-red-400">
-                      {ticketActionError}
-                    </p>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      <HistoricalModal
-        open={showHistoricalModal}
-        onClose={() => setShowHistoricalModal(false)}
-        orders={boardColumns.pastBucket}
-      />
-      <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
-    </div>
+        )}
+        <HistoricalModal
+          open={showHistoricalModal}
+          onClose={() => setShowHistoricalModal(false)}
+          orders={boardColumns.pastBucket}
+        />
+        <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
+      </div>
+    </CoffeeBackground>
   );
 }

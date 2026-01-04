@@ -33,6 +33,8 @@
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
+  --rdp-cell-size: 34px;
+  margin: 0;
 }
 
 .rdp .rdp-day {
@@ -53,4 +55,16 @@
 
 .rdp-caption_label {
   font-weight: 600;
+}
+
+.rdp-table {
+  max-width: none;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.rdp-head_cell,
+.rdp-cell {
+  width: calc(100% / 7);
+  text-align: center;
 }

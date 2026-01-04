@@ -93,6 +93,7 @@ export default function Header() {
   return (
     <div className="pointer-events-none fixed inset-x-0 top-4 z-40 flex justify-center px-4 sm:px-6 lg:px-8">
       <header
+        data-app-header
         className={classNames(
           'pointer-events-auto flex w-[min(1100px,100%)] items-center gap-4 rounded-3xl border px-5 py-3 text-sm font-semibold shadow-2xl transition-all duration-500 backdrop-blur-md',
           'text-gray-900 dark:text-white',

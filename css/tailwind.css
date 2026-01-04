@@ -50,10 +50,10 @@ html::-webkit-scrollbar {
 .theme-transition body,
 .theme-transition body * {
   transition:
-    background-color 0.7s ease,
-    color 0.7s ease,
-    border-color 0.7s ease,
-    box-shadow 0.7s ease;
+    background-color 0.45s ease,
+    color 0.45s ease,
+    border-color 0.45s ease,
+    box-shadow 0.45s ease;
 }
 
 .scrollable {
@@ -171,7 +171,8 @@ input:-webkit-autofill:focus {
 
 @layer components {
   .brand-input {
-    @apply mt-1 block w-full rounded-2xl border border-primary-200/70 bg-white/90 px-4 py-3 text-sm font-medium text-gray-900 shadow-sm placeholder:text-gray-400 transition-all duration-300 ease-out focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/70 dark:border-primary-800/60 dark:bg-primary-900/40 dark:text-white dark:placeholder:text-primary-200 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400 dark:disabled:border-primary-900 dark:disabled:bg-primary-900/40 dark:disabled:text-primary-200;
+    @apply mt-1 block w-full rounded-2xl border border-primary-200/70 bg-white/95 px-4 py-3 text-sm font-medium text-gray-900 shadow-sm placeholder:text-gray-400 transition-all duration-300 ease-out focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/70 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400 dark:border-primary-800/60 dark:bg-gray-950/50 dark:text-white dark:placeholder:text-primary-200 dark:disabled:border-primary-900 dark:disabled:bg-primary-900/40 dark:disabled:text-primary-200;
+    background-image: radial-gradient(circle at 5% 10%, rgba(232, 135, 87, 0.18), transparent 50%);
   }
 
   .brand-primary-btn {
@@ -219,6 +220,87 @@ input:-webkit-autofill:focus {
   100% {
     opacity: 0;
   }
+}
+
+.coffee-page-bg {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  min-height: 100vh;
+  overflow: hidden;
+  background-color: #050812;
+  background-image: radial-gradient(circle at 20% 15%, rgba(232, 138, 95, 0.18), transparent 45%),
+    radial-gradient(circle at 80% 0%, rgba(250, 188, 115, 0.12), transparent 50%),
+    radial-gradient(circle at 50% 80%, rgba(118, 74, 204, 0.18), transparent 60%),
+    linear-gradient(145deg, #050912 0%, #0b1221 55%, #141f33 100%);
+}
+
+.coffee-page-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.08), transparent 45%),
+    radial-gradient(circle at 85% 15%, rgba(255, 188, 115, 0.08), transparent 55%);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.coffee-page-bg__content {
+  position: relative;
+  z-index: 1;
+}
+
+.light .coffee-page-bg {
+  background-color: #f8f6f2;
+  background-image: radial-gradient(circle at 20% 15%, rgba(255, 199, 144, 0.45), transparent 45%),
+    radial-gradient(circle at 80% 0%, rgba(234, 166, 120, 0.35), transparent 50%),
+    radial-gradient(circle at 30% 80%, rgba(140, 165, 228, 0.2), transparent 55%),
+    linear-gradient(145deg, #faf5ef 0%, #f0ebe3 40%, #e7dfd6 100%);
+}
+
+.light .coffee-page-bg::before {
+  background: radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.7), transparent 40%),
+    radial-gradient(circle at 85% 25%, rgba(255, 255, 255, 0.5), transparent 55%);
+  opacity: 1;
+}
+
+.coffee-page-bg--body [data-app-header],
+.coffee-page-bg--body footer[data-app-footer] {
+  background-color: #050812 !important;
+  background-image: radial-gradient(circle at 20% 15%, rgba(232, 138, 95, 0.18), transparent 45%),
+    radial-gradient(circle at 80% 0%, rgba(250, 188, 115, 0.12), transparent 50%),
+    radial-gradient(circle at 50% 80%, rgba(118, 74, 204, 0.18), transparent 60%),
+    linear-gradient(145deg, #050912 0%, #0b1221 55%, #141f33 100%) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 35px 55px rgba(2, 4, 9, 0.45);
+}
+
+.light .coffee-page-bg--body [data-app-header],
+.light .coffee-page-bg--body footer[data-app-footer] {
+  background-color: #f8f6f2 !important;
+  background-image: radial-gradient(circle at 20% 15%, rgba(255, 199, 144, 0.45), transparent 45%),
+    radial-gradient(circle at 80% 0%, rgba(234, 166, 120, 0.35), transparent 50%),
+    radial-gradient(circle at 30% 80%, rgba(140, 165, 228, 0.2), transparent 55%),
+    linear-gradient(145deg, #faf5ef 0%, #f0ebe3 40%, #e7dfd6 100%) !important;
+  border-color: rgba(141, 118, 106, 0.25) !important;
+  box-shadow: 0 35px 65px rgba(197, 172, 149, 0.35);
+}
+
+body.coffee-page-bg--body {
+  background-color: #050812 !important;
+  background-image: radial-gradient(circle at 20% 15%, rgba(232, 138, 95, 0.18), transparent 45%),
+    radial-gradient(circle at 80% 0%, rgba(250, 188, 115, 0.12), transparent 50%),
+    radial-gradient(circle at 50% 80%, rgba(118, 74, 204, 0.18), transparent 60%),
+    linear-gradient(145deg, #050912 0%, #0b1221 55%, #141f33 100%) !important;
+  background-attachment: fixed;
+}
+
+.light body.coffee-page-bg--body {
+  background-color: #f8f6f2 !important;
+  background-image: radial-gradient(circle at 20% 15%, rgba(255, 199, 144, 0.45), transparent 45%),
+    radial-gradient(circle at 80% 0%, rgba(234, 166, 120, 0.35), transparent 50%),
+    radial-gradient(circle at 30% 80%, rgba(140, 165, 228, 0.2), transparent 55%),
+    linear-gradient(145deg, #faf5ef 0%, #f0ebe3 40%, #e7dfd6 100%) !important;
 }
 
 .menu-simple-prose table {

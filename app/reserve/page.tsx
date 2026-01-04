@@ -37,11 +37,12 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type CSSProperties,
   type MutableRefObject,
   type ReactNode,
 } from 'react';
 import Link from 'next/link';
-import { DayPicker } from 'react-day-picker';
+import { DayPicker, type Formatters } from 'react-day-picker';
 import { FaWhatsapp } from 'react-icons/fa';
 import '@/css/react-day-picker.css';
 import { useAuth } from '@/components/Auth/AuthProvider';
@@ -55,6 +56,9 @@ import { cancelReservation } from '@/lib/reservations-client';
 import { useLoyaltyReminder } from '@/hooks/useLoyaltyReminder';
 import { useSnackbarNotifications, type SnackbarTone } from '@/hooks/useSnackbarNotifications';
 import { createBrowserSupabaseClient } from '@/lib/supabase-browser';
+import { useHeaderHeight } from '@/hooks/useHeaderHeight';
+import CoffeeBackground from '@/components/CoffeeBackground';
+import { es as esLocale } from 'date-fns/locale';
 
 const MAX_PEOPLE = 15;
 const BRANCH_ID = DEFAULT_BRANCH_ID;
@@ -116,6 +120,18 @@ const RESERVATION_VISUALS: Record<
     dotClass: 'bg-primary-500',
     textClass: 'text-primary-700 dark:text-primary-200',
   },
+};
+const DAY_PICKER_WEEKDAYS: Record<number, string> = {
+  0: 'Do',
+  1: 'Lu',
+  2: 'Ma',
+  3: 'Mi',
+  4: 'Ju',
+  5: 'Vi',
+  6: 'Sá',
+};
+const dayPickerFormatters: Partial<Formatters> = {
+  formatWeekdayName: (day) => DAY_PICKER_WEEKDAYS[day.getDay()] ?? '',
 };
 
 const getStatusVisuals = (status: string, fallback?: string) =>
@@ -324,6 +340,15 @@ export default function ReservePage() {
   const [selectedReservation, setSelectedReservation] = useState<ReservationRecord | null>(null);
   const [showReservationHistory, setShowReservationHistory] = useState(false);
   const [showReservationCompletedHistory, setShowReservationCompletedHistory] = useState(false);
+  const scrollReservationModalIntoView = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (!window.matchMedia('(min-width: 1024px)').matches) {
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
   const [reservationActionState, setReservationActionState] = useState<DetailActionState>({
     isLoading: false,
     message: null,
@@ -405,6 +430,24 @@ export default function ReservePage() {
     setReservationTicketActionError(null);
     setIsProcessingReservationTicket(false);
   }, [selectedReservation]);
+
+  useEffect(() => {
+    if (selectedReservation) {
+      scrollReservationModalIntoView();
+    }
+  }, [selectedReservation, scrollReservationModalIntoView]);
+
+  useEffect(() => {
+    if (showReservationHistory) {
+      scrollReservationModalIntoView();
+    }
+  }, [showReservationHistory, scrollReservationModalIntoView]);
+
+  useEffect(() => {
+    if (showReservationCompletedHistory) {
+      scrollReservationModalIntoView();
+    }
+  }, [showReservationCompletedHistory, scrollReservationModalIntoView]);
 
   const loyaltyReminder = useLoyaltyReminder({
     userId: user?.id,
@@ -1252,13 +1295,13 @@ export default function ReservePage() {
     <form
       id="reservation-form"
       onSubmit={handleSubmit}
-      className="grid gap-8 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900 lg:grid-cols-[1.1fr,0.9fr]"
+      className="grid gap-8 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900"
     >
       <div className="space-y-6">
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6">
           <div>
             <p className="mb-3 text-sm font-medium text-gray-800 dark:text-gray-200">Fecha</p>
-            <div className="space-y-3 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
               {isMobileDevice ? (
                 <div className="space-y-2">
                   <input
@@ -1319,6 +1362,7 @@ export default function ReservePage() {
                     </button>
                   </div>
                   <DayPicker
+                    className="w-full"
                     mode="single"
                     month={displayMonth}
                     selected={selectedDate}
@@ -1343,12 +1387,18 @@ export default function ReservePage() {
                     toMonth={maxMonth}
                     disableNavigation
                     showOutsideDays={false}
+                    locale={esLocale}
+                    formatters={dayPickerFormatters}
                     modifiersClassNames={{
                       selected: 'bg-primary-600 text-white',
                       today: 'text-primary-600 font-semibold',
                     }}
                     styles={{
                       caption: { color: '#1f2937' },
+                      root: { width: '100%', minWidth: 280 },
+                      table: { width: '100%' },
+                      head_cell: { width: '14.285%', textTransform: 'uppercase' },
+                      cell: { width: '14.285%' },
                     }}
                   />
                 </>
@@ -1527,352 +1577,359 @@ export default function ReservePage() {
   );
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 lg:px-0">
-      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="text-center md:text-left">
-          <p className="text-xs uppercase tracking-[0.35em] text-primary-500">Reservaciones</p>
-          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">
-            Reserva tu mesa en Xoco Café
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Selecciona fecha, hora y asistentes; te daremos un código QR único para tu llegada.
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          {isAuthenticated ? (
-            <>
-              <button
-                type="button"
-                onClick={handleOpenReservationForm}
-                className="rounded-full bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-primary-700"
-                aria-expanded={showReservationForm}
-              >
-                {showReservationForm ? 'Ocultar formulario' : 'Nueva reservación'}
-              </button>
-              <button
-                type="button"
-                onClick={handleRefreshReservations}
-                className="rounded-full border border-primary-600 px-5 py-2.5 text-sm font-semibold text-primary-600 hover:bg-primary-50 dark:border-primary-400 dark:text-primary-200"
-              >
-                Actualizar lista
-              </button>
-            </>
-          ) : (
-            <Link
-              href="/login"
-              className="rounded-full bg-primary-600 px-5 py-2 text-center text-xs font-semibold tracking-[0.25em] uppercase text-white shadow hover:bg-primary-700"
-            >
-              Iniciar sesión
-            </Link>
-          )}
-        </div>
-      </div>
-
-      {isAuthenticated && loyaltyReminder.showReminder && (
-        <LoyaltyReminderCard
-          onActivate={handleActivateLoyaltyReminder}
-          isLoading={loyaltyReminder.isActivating}
-          className="mb-6"
-        />
-      )}
-      <div className="mb-8 rounded-3xl border border-primary-100 bg-white p-5 text-sm text-gray-700 shadow-sm dark:border-primary-900/40 dark:bg-gray-900 dark:text-gray-200">
-        Recibirás un código único para presentarlo a los anfitriones al llegar.
-      </div>
-      <div className="mb-8 flex flex-wrap items-center justify-center gap-2 rounded-3xl bg-primary-600 px-4 py-3 text-sm text-white shadow-lg dark:bg-primary-900/30 dark:text-primary-100">
-        <span>Si necesitas ayuda, mándanos un</span>
-        <a
-          href={siteMetadata.whats}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white shadow transition-colors hover:bg-white/30 dark:bg-[#0f1728]"
-          aria-label="WhatsApp"
-        >
-          <FaWhatsapp />
-        </a>
-        <span>y con todo gusto te ayudamos.</span>
-      </div>
-      {isAuthenticated ? (
-        <>
-          <div
-            ref={reservationFormRef}
-            className={`transition-all duration-500 ${
-              showReservationForm
-                ? 'max-h-[5000px] scale-100 opacity-100'
-                : 'pointer-events-none max-h-0 scale-[0.98] opacity-0'
-            }`}
-            aria-hidden={!showReservationForm}
-          >
-            {showReservationForm && (
-              <div className="mb-8 rounded-3xl border border-primary-100 bg-white p-6 shadow-2xl dark:border-primary-900/40 dark:bg-gray-950">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.35em] text-primary-500">
-                      Crear reservación
-                    </p>
-                    <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-900">
-                      Completa los datos de tu visita
-                    </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Selecciona fecha, hora, asistentes, agrega mensaje y revisa el resumen antes
-                      de confirmar.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleOpenReservationForm}
-                    className="rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                  >
-                    Cerrar formulario
-                  </button>
-                </div>
-                <ReservationFormContent />
-              </div>
-            )}
+    <CoffeeBackground className="py-10">
+      <div className="mx-auto max-w-4xl px-4 py-10 lg:px-0">
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="text-center md:text-left">
+            <p className="text-xs uppercase tracking-[0.35em] text-primary-500">Reservaciones</p>
+            <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">
+              Reserva tu mesa en Xoco Café
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Selecciona fecha, hora y asistentes; te daremos un código QR único para tu llegada.
+            </p>
           </div>
-
-          <section
-            ref={reservationBoardRef}
-            className="mt-10 space-y-6 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900"
-          >
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.35em] text-primary-500">
-                  Reservas compartidas
-                </p>
-                <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Panel</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Organiza tus reservaciones en columnas pendientes/completadas, accede al historial
-                  y cancela desde el mismo panel.
-                </p>
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {isAuthenticated ? (
+              <>
                 <button
                   type="button"
                   onClick={handleOpenReservationForm}
-                  disabled={hasReachedReservationLimit}
-                  className={`rounded-full border px-4 py-2 text-sm font-semibold ${
-                    hasReachedReservationLimit
-                      ? 'border-gray-300 text-gray-400'
-                      : 'border-primary-600 text-primary-600 hover:bg-primary-50 dark:border-primary-400 dark:text-primary-200'
-                  }`}
+                  className="rounded-full bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-primary-700"
                   aria-expanded={showReservationForm}
                 >
-                  {showReservationForm ? 'Ocultar formulario' : 'Crear nueva reserva'}
+                  {showReservationForm ? 'Ocultar formulario' : 'Nueva reservación'}
                 </button>
                 <button
                   type="button"
                   onClick={handleRefreshReservations}
-                  disabled={isLoadingReservations}
-                  className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-full border border-primary-600 px-5 py-2.5 text-sm font-semibold text-primary-600 hover:bg-primary-50 dark:border-primary-400 dark:text-primary-200"
                 >
-                  {isLoadingReservations ? 'Actualizando...' : 'Actualizar lista'}
+                  Actualizar lista
                 </button>
-              </div>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                className="rounded-full bg-primary-600 px-5 py-2 text-center text-xs font-semibold tracking-[0.25em] uppercase text-white shadow hover:bg-primary-700"
+              >
+                Iniciar sesión
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {isAuthenticated && loyaltyReminder.showReminder && (
+          <LoyaltyReminderCard
+            onActivate={handleActivateLoyaltyReminder}
+            isLoading={loyaltyReminder.isActivating}
+            className="mb-6"
+          />
+        )}
+        <div className="mb-8 rounded-3xl border border-primary-100 bg-white p-5 text-sm text-gray-700 shadow-sm dark:border-primary-900/40 dark:bg-gray-900 dark:text-gray-200">
+          Recibirás un código único para presentarlo a los anfitriones al llegar.
+        </div>
+        <div className="mb-8 flex flex-wrap items-center justify-center gap-2 rounded-3xl bg-primary-600 px-4 py-3 text-sm text-white shadow-lg dark:bg-primary-900/30 dark:text-primary-100">
+          <span>Si necesitas ayuda, mándanos un</span>
+          <a
+            href={siteMetadata.whats}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white shadow transition-colors hover:bg-white/30 dark:bg-[#0f1728]"
+            aria-label="WhatsApp"
+          >
+            <FaWhatsapp />
+          </a>
+          <span>y con todo gusto te ayudamos.</span>
+        </div>
+        {isAuthenticated ? (
+          <>
+            <div
+              ref={reservationFormRef}
+              className={`transition-all duration-500 ${
+                showReservationForm
+                  ? 'max-h-[5000px] scale-100 opacity-100'
+                  : 'pointer-events-none max-h-0 scale-[0.98] opacity-0'
+              }`}
+              aria-hidden={!showReservationForm}
+            >
+              {showReservationForm && (
+                <div className="mb-8 rounded-3xl border border-primary-100 bg-white p-6 shadow-2xl dark:border-primary-900/40 dark:bg-gray-950">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.35em] text-primary-500">
+                        Crear reservación
+                      </p>
+                      <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                        Completa los datos de tu visita
+                      </h2>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Selecciona fecha, hora, asistentes, agrega mensaje y revisa el resumen antes
+                        de confirmar.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleOpenReservationForm}
+                      className="rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    >
+                      Cerrar formulario
+                    </button>
+                  </div>
+                  <ReservationFormContent />
+                </div>
+              )}
             </div>
 
-            {hasReachedReservationLimit && (
-              <div className="rounded-xl bg-amber-100 px-4 py-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">
-                Tienes 3 reservas activas. Debes esperar a que alguna finalice para crear otra.
+            <section
+              ref={reservationBoardRef}
+              className="mt-10 space-y-6 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900"
+            >
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.35em] text-primary-500">
+                    Reservas compartidas
+                  </p>
+                  <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Panel</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Organiza tus reservaciones en columnas pendientes/completadas, accede al
+                    historial y cancela desde el mismo panel.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={handleOpenReservationForm}
+                    disabled={hasReachedReservationLimit}
+                    className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+                      hasReachedReservationLimit
+                        ? 'border-gray-300 text-gray-400'
+                        : 'border-primary-600 text-primary-600 hover:bg-primary-50 dark:border-primary-400 dark:text-primary-200'
+                    }`}
+                    aria-expanded={showReservationForm}
+                  >
+                    {showReservationForm ? 'Ocultar formulario' : 'Crear nueva reserva'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRefreshReservations}
+                    disabled={isLoadingReservations}
+                    className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isLoadingReservations ? 'Actualizando...' : 'Actualizar lista'}
+                  </button>
+                </div>
               </div>
-            )}
 
-            {reservationsError && (
-              <div className="rounded-xl bg-red-100 px-4 py-3 text-sm text-red-800 dark:bg-red-900/30 dark:text-red-100">
-                {reservationsError}
-              </div>
-            )}
+              {hasReachedReservationLimit && (
+                <div className="rounded-xl bg-amber-100 px-4 py-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">
+                  Tienes 3 reservas activas. Debes esperar a que alguna finalice para crear otra.
+                </div>
+              )}
 
-            <ReservationsSearchBar
-              onSearch={setReservationFilter}
-              isLoading={isLoadingReservations}
-              onRefresh={handleRefreshReservations}
-              onShowPast={() => setShowReservationHistory(true)}
-              onShowCompleted={
-                showCompletedHistoryButton
-                  ? () => setShowReservationCompletedHistory(true)
-                  : undefined
-              }
-              showCompletedButton={showCompletedHistoryButton}
-              disablePastButton={!hasPastReservations}
-            />
+              {reservationsError && (
+                <div className="rounded-xl bg-red-100 px-4 py-3 text-sm text-red-800 dark:bg-red-900/30 dark:text-red-100">
+                  {reservationsError}
+                </div>
+              )}
 
-            {isLoadingReservations ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {[1, 2].map((index) => (
-                  <div
-                    key={index}
-                    className="h-60 rounded-3xl border border-dashed border-gray-200 bg-gray-50 animate-pulse dark:border-gray-700 dark:bg-gray-900"
-                  />
-                ))}
-              </div>
-            ) : (
-              <div
-                className="grid gap-6 lg:grid-cols-2"
-                aria-live="polite"
-                aria-label="Tablero de reservas"
-              >
-                <ReservationColumn
-                  title="Pendientes"
-                  reservations={pendingReservations}
-                  emptyLabel="No tienes reservas pendientes. Agenda una para asegurar tu lugar."
-                  onSelect={(reservation) => setSelectedReservation(reservation)}
-                />
-                <ReservationColumn
-                  title="Completadas"
-                  reservations={completedReservations}
-                  emptyLabel="Aún no completas reservaciones recientes."
-                  onSelect={(reservation) => setSelectedReservation(reservation)}
-                />
-              </div>
-            )}
-          </section>
+              <ReservationsSearchBar
+                onSearch={setReservationFilter}
+                isLoading={isLoadingReservations}
+                onRefresh={handleRefreshReservations}
+                onShowPast={() => setShowReservationHistory(true)}
+                onShowCompleted={
+                  showCompletedHistoryButton
+                    ? () => setShowReservationCompletedHistory(true)
+                    : undefined
+                }
+                showCompletedButton={showCompletedHistoryButton}
+                disablePastButton={!hasPastReservations}
+              />
 
-          {token && (
-            <section className="mt-6 space-y-6 rounded-3xl border border-gray-200 bg-white p-6 text-gray-900 shadow-lg dark:border-white/10 dark:bg-[#070d1a] dark:text-white">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Reservas no completadas
-                </h2>
-                <p className="text-sm text-gray-700 dark:text-white">
-                  Si no acudiste antes del corte (23:59), movemos la reserva aquí en color naranja y
-                  eliminamos su QR. El registro se conserva por 7 días.
-                </p>
-              </div>
-              {failedReservations.length === 0 ? (
-                <p className="text-sm text-gray-600 dark:text-white">
-                  No tienes reservas pendientes de seguimiento. ¡Todo al corriente!
-                </p>
+              {isLoadingReservations ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {[1, 2].map((index) => (
+                    <div
+                      key={index}
+                      className="h-60 rounded-3xl border border-dashed border-gray-200 bg-gray-50 animate-pulse dark:border-gray-700 dark:bg-gray-900"
+                    />
+                  ))}
+                </div>
               ) : (
-                <ul className="space-y-4">
-                  {failedReservations.map((reservation) => {
-                    const branchLabel =
-                      reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
-                    const statusVisuals = getStatusVisuals('failed', 'failed');
-                    const cleanupDate = new Date(reservation.cleanupAt).toLocaleDateString(
-                      'es-MX',
-                      {
-                        weekday: 'long',
-                        day: 'numeric',
-                        month: 'long',
-                      }
-                    );
-                    const formattedDate = formatReservationDate(
-                      reservation.reservationDate,
-                      'es-MX',
-                      {
-                        weekday: 'long',
-                        day: 'numeric',
-                        month: 'long',
-                      }
-                    );
-                    return (
-                      <li
-                        key={reservation.id}
-                        className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900"
-                      >
-                        <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                          <span
-                            className={`h-2.5 w-2.5 rounded-full ${statusVisuals.dotClass}`}
-                            aria-hidden="true"
-                          />
-                          <span>Código</span>
-                          <span className="rounded-full bg-gray-200 px-2 py-0.5 font-semibold text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-                            {reservation.reservationCode}
-                          </span>
-                        </div>
-                        <div className="mt-3 space-y-1 text-sm text-gray-700 dark:text-gray-200">
-                          <p className="text-base font-semibold text-gray-900 dark:text-white">
-                            {formattedDate} · {reservation.reservationTime} hrs
-                          </p>
-                          <p>
-                            {reservation.peopleCount}{' '}
-                            {reservation.peopleCount === 1 ? 'persona' : 'personas'} · {branchLabel}
-                            {reservation.branchNumber ? ` (#${reservation.branchNumber})` : ''}
-                          </p>
-                          {reservation.message && <p>Mensaje: {reservation.message}</p>}
-                          {reservation.preOrderItems && (
-                            <p className="text-primary-700 dark:text-primary-200">
-                              Pre-orden: {reservation.preOrderItems}
-                            </p>
-                          )}
-                          <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusVisuals.badgeClass}`}
-                          >
-                            {statusVisuals.label}
-                          </span>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Registro disponible hasta {cleanupDate}.
-                          </p>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <div
+                  className="grid gap-6 lg:grid-cols-2"
+                  aria-live="polite"
+                  aria-label="Tablero de reservas"
+                >
+                  <ReservationColumn
+                    title="Pendientes"
+                    reservations={pendingReservations}
+                    emptyLabel="No tienes reservas pendientes. Agenda una para asegurar tu lugar."
+                    onSelect={(reservation) => setSelectedReservation(reservation)}
+                  />
+                  <ReservationColumn
+                    title="Completadas"
+                    reservations={completedReservations}
+                    emptyLabel="Aún no completas reservaciones recientes."
+                    onSelect={(reservation) => setSelectedReservation(reservation)}
+                  />
+                </div>
               )}
             </section>
-          )}
-          {selectedReservation && (
-            <DetailModal onClose={() => setSelectedReservation(null)}>
-              <ReservationDetailContent
-                reservation={selectedReservation}
-                onCancelReservation={handleCancelReservation}
-                onDownloadQr={(reservation) => void handleDownloadQr(reservation)}
-                actionState={reservationActionState}
-                currentUserName={userDisplayName}
-                onDownloadTicket={(reservation) =>
-                  void handleDownloadReservationTicket(reservation)
-                }
-                onShareReservation={(reservation) => void handleShareReservationTicket(reservation)}
-                ticketRef={reservationTicketRef}
-                shareState={{
-                  error: reservationTicketActionError,
-                  isProcessing: isProcessingReservationTicket,
-                }}
-              />
-            </DetailModal>
-          )}
-          {showReservationHistory && (
-            <DetailModal onClose={() => setShowReservationHistory(false)}>
-              <ReservationHistoryContent
-                title="Reservas pasadas"
-                reservations={basePastReservations}
-                onClose={() => setShowReservationHistory(false)}
-                hasFilter={Boolean(reservationFilter.trim())}
-                onSelect={(reservation) => {
-                  setSelectedReservation(reservation);
-                  setShowReservationHistory(false);
-                }}
-              />
-            </DetailModal>
-          )}
-          {showReservationCompletedHistory && (
-            <DetailModal onClose={() => setShowReservationCompletedHistory(false)}>
-              <ReservationHistoryContent
-                title="Reservas completadas"
-                reservations={completedReservationsLastWeek}
-                onClose={() => setShowReservationCompletedHistory(false)}
-                hasFilter={Boolean(reservationFilter.trim())}
-                onSelect={(reservation) => {
-                  setSelectedReservation(reservation);
-                  setShowReservationCompletedHistory(false);
-                }}
-              />
-            </DetailModal>
-          )}
-        </>
-      ) : (
-        <div className="rounded-3xl border border-dashed border-gray-300 bg-white px-6 py-10 text-center text-sm text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-          <p className="mb-4">Necesitas iniciar sesión para crear o consultar tus reservaciones.</p>
-          <Link
-            href="/login"
-            className="inline-flex items-center justify-center rounded-full bg-primary-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-primary-700"
-          >
-            Ir a iniciar sesión
-          </Link>
-        </div>
-      )}
-      <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
-    </div>
+
+            {token && (
+              <section className="mt-6 space-y-6 rounded-3xl border border-gray-200 bg-white p-6 text-gray-900 shadow-lg dark:border-white/10 dark:bg-[#070d1a] dark:text-white">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    Reservas no completadas
+                  </h2>
+                  <p className="text-sm text-gray-700 dark:text-white">
+                    Si no acudiste antes del corte (23:59), movemos la reserva aquí en color naranja
+                    y eliminamos su QR. El registro se conserva por 7 días.
+                  </p>
+                </div>
+                {failedReservations.length === 0 ? (
+                  <p className="text-sm text-gray-600 dark:text-white">
+                    No tienes reservas pendientes de seguimiento. ¡Todo al corriente!
+                  </p>
+                ) : (
+                  <ul className="space-y-4">
+                    {failedReservations.map((reservation) => {
+                      const branchLabel =
+                        reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
+                      const statusVisuals = getStatusVisuals('failed', 'failed');
+                      const cleanupDate = new Date(reservation.cleanupAt).toLocaleDateString(
+                        'es-MX',
+                        {
+                          weekday: 'long',
+                          day: 'numeric',
+                          month: 'long',
+                        }
+                      );
+                      const formattedDate = formatReservationDate(
+                        reservation.reservationDate,
+                        'es-MX',
+                        {
+                          weekday: 'long',
+                          day: 'numeric',
+                          month: 'long',
+                        }
+                      );
+                      return (
+                        <li
+                          key={reservation.id}
+                          className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900"
+                        >
+                          <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                            <span
+                              className={`h-2.5 w-2.5 rounded-full ${statusVisuals.dotClass}`}
+                              aria-hidden="true"
+                            />
+                            <span>Código</span>
+                            <span className="rounded-full bg-gray-200 px-2 py-0.5 font-semibold text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                              {reservation.reservationCode}
+                            </span>
+                          </div>
+                          <div className="mt-3 space-y-1 text-sm text-gray-700 dark:text-gray-200">
+                            <p className="text-base font-semibold text-gray-900 dark:text-white">
+                              {formattedDate} · {reservation.reservationTime} hrs
+                            </p>
+                            <p>
+                              {reservation.peopleCount}{' '}
+                              {reservation.peopleCount === 1 ? 'persona' : 'personas'} ·{' '}
+                              {branchLabel}
+                              {reservation.branchNumber ? ` (#${reservation.branchNumber})` : ''}
+                            </p>
+                            {reservation.message && <p>Mensaje: {reservation.message}</p>}
+                            {reservation.preOrderItems && (
+                              <p className="text-primary-700 dark:text-primary-200">
+                                Pre-orden: {reservation.preOrderItems}
+                              </p>
+                            )}
+                            <span
+                              className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusVisuals.badgeClass}`}
+                            >
+                              {statusVisuals.label}
+                            </span>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Registro disponible hasta {cleanupDate}.
+                            </p>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            )}
+            {selectedReservation && (
+              <DetailModal onClose={() => setSelectedReservation(null)}>
+                <ReservationDetailContent
+                  reservation={selectedReservation}
+                  onCancelReservation={handleCancelReservation}
+                  onDownloadQr={(reservation) => void handleDownloadQr(reservation)}
+                  actionState={reservationActionState}
+                  currentUserName={userDisplayName}
+                  onDownloadTicket={(reservation) =>
+                    void handleDownloadReservationTicket(reservation)
+                  }
+                  onShareReservation={(reservation) =>
+                    void handleShareReservationTicket(reservation)
+                  }
+                  ticketRef={reservationTicketRef}
+                  shareState={{
+                    error: reservationTicketActionError,
+                    isProcessing: isProcessingReservationTicket,
+                  }}
+                />
+              </DetailModal>
+            )}
+            {showReservationHistory && (
+              <DetailModal onClose={() => setShowReservationHistory(false)}>
+                <ReservationHistoryContent
+                  title="Reservas pasadas"
+                  reservations={basePastReservations}
+                  onClose={() => setShowReservationHistory(false)}
+                  hasFilter={Boolean(reservationFilter.trim())}
+                  onSelect={(reservation) => {
+                    setSelectedReservation(reservation);
+                    setShowReservationHistory(false);
+                  }}
+                />
+              </DetailModal>
+            )}
+            {showReservationCompletedHistory && (
+              <DetailModal onClose={() => setShowReservationCompletedHistory(false)}>
+                <ReservationHistoryContent
+                  title="Reservas completadas"
+                  reservations={completedReservationsLastWeek}
+                  onClose={() => setShowReservationCompletedHistory(false)}
+                  hasFilter={Boolean(reservationFilter.trim())}
+                  onSelect={(reservation) => {
+                    setSelectedReservation(reservation);
+                    setShowReservationCompletedHistory(false);
+                  }}
+                />
+              </DetailModal>
+            )}
+          </>
+        ) : (
+          <div className="rounded-3xl border border-dashed border-gray-300 bg-white px-6 py-10 text-center text-sm text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+            <p className="mb-4">
+              Necesitas iniciar sesión para crear o consultar tus reservaciones.
+            </p>
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center rounded-full bg-primary-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-primary-700"
+            >
+              Ir a iniciar sesión
+            </Link>
+          </div>
+        )}
+        <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
+      </div>
+    </CoffeeBackground>
   );
 }
 
@@ -2142,6 +2199,23 @@ const ReservationsSearchBar = ({
 };
 
 const DetailModal = ({ children, onClose }: { children: ReactNode; onClose: () => void }) => {
+  const headerHeight = useHeaderHeight();
+  const modalVars = useMemo(() => {
+    const safeHeaderHeight = Number.isFinite(headerHeight) ? headerHeight : 96;
+    const mobileTopOffset = Math.round(Math.max(safeHeaderHeight * 0.45, 48));
+    const desktopTopOffset = Math.round(Math.max(safeHeaderHeight * 1.2, safeHeaderHeight + 32));
+    const mobileHeight = `calc(100vh - ${mobileTopOffset + 48}px)`;
+    const desktopHeight = `min(calc((100vh - ${desktopTopOffset}px) * 1.35), calc(100vh - ${Math.round(
+      safeHeaderHeight * 0.25
+    )}px))`;
+    return {
+      '--detail-modal-mobile-top': `${mobileTopOffset}px`,
+      '--detail-modal-desktop-top': `${desktopTopOffset}px`,
+      '--detail-modal-mobile-height': mobileHeight,
+      '--detail-modal-desktop-height': desktopHeight,
+    } as CSSProperties;
+  }, [headerHeight]);
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -2155,10 +2229,11 @@ const DetailModal = ({ children, onClose }: { children: ReactNode; onClose: () =
   return (
     <div
       className={classNames(
-        'fixed inset-0 z-50 flex justify-center',
-        'px-3 pb-[calc(72px+env(safe-area-inset-bottom))] pt-[calc(6vh+54px)] sm:px-6 sm:pb-10 sm:pt-[calc(84px+20vh)]',
-        'items-start sm:items-start'
+        'fixed inset-0 z-50 flex items-start justify-center',
+        'px-3 pb-[calc(72px+env(safe-area-inset-bottom))] pt-[var(--detail-modal-mobile-top)]',
+        'sm:px-6 sm:pb-10 sm:pt-[var(--detail-modal-desktop-top)]'
       )}
+      style={modalVars}
     >
       <div
         className="absolute inset-0 bg-black/70"
@@ -2176,7 +2251,7 @@ const DetailModal = ({ children, onClose }: { children: ReactNode; onClose: () =
         className={classNames(
           'relative z-10 w-full max-w-3xl overflow-y-auto border border-[#462b20] bg-[#2a170f] text-white shadow-[0_45px_95px_rgba(0,0,0,0.85)]',
           'rounded-t-[34px] sm:rounded-[34px]',
-          'max-h-[calc(100vh-100px-22vh)] h-[calc(100vh-100px-22vh)] sm:max-h-[calc(100vh-84px-20vh)] sm:h-auto',
+          'h-[var(--detail-modal-mobile-height)] max-h-[var(--detail-modal-mobile-height)] sm:h-[var(--detail-modal-desktop-height)] sm:max-h-[var(--detail-modal-desktop-height)]',
           'p-6 sm:p-7'
         )}
       >

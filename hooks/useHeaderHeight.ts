@@ -27,32 +27,43 @@
 
 'use client';
 
-import siteMetadata from 'content/siteMetadata';
-import Link from 'next/link';
-import { FaWhatsapp } from 'react-icons/fa';
+import { useEffect, useState } from 'react';
 
-interface WhatsAppCTAProps {
-  prefix?: string;
-  suffix?: string;
-}
+const DEFAULT_HEADER_HEIGHT = 96;
 
-export default function WhatsAppCTA({
-  prefix = 'Si necesitas ayuda, mándanos un',
-  suffix = 'y con gusto te atendemos.',
-}: WhatsAppCTAProps) {
-  return (
-    <div className="my-8 flex flex-wrap items-center justify-center gap-2 rounded-3xl bg-primary-600 px-4 py-3 text-sm text-white shadow-lg dark:border dark:border-primary-700/50 dark:bg-[#050e1b] dark:text-primary-50">
-      <span>{prefix}</span>
-      <Link
-        href={siteMetadata.whats}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white shadow transition-colors hover:bg-white/30 dark:bg-[#0f1728]"
-        aria-label="WhatsApp"
-      >
-        <FaWhatsapp />
-      </Link>
-      <span>{suffix}</span>
-    </div>
-  );
-}
+export const useHeaderHeight = () => {
+  const [headerHeight, setHeaderHeight] = useState(DEFAULT_HEADER_HEIGHT);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const updateHeight = () => {
+      const header = document.querySelector<HTMLElement>('[data-app-header]');
+      if (!header) {
+        return;
+      }
+      setHeaderHeight(Math.round(header.getBoundingClientRect().height));
+    };
+
+    updateHeight();
+
+    const headerElement = document.querySelector<HTMLElement>('[data-app-header]');
+    if (!headerElement || typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateHeight);
+      return () => window.removeEventListener('resize', updateHeight);
+    }
+
+    const observer = new ResizeObserver(() => updateHeight());
+    observer.observe(headerElement);
+    window.addEventListener('resize', updateHeight);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateHeight);
+    };
+  }, []);
+
+  return headerHeight;
+};

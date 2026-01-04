@@ -108,8 +108,13 @@ const generateReservationCode = async (): Promise<string> => {
         .eq('reservationCode', code)
         .maybeSingle();
 
-      if (archivedError && archivedError.code !== 'PGRST116') {
-        throw new HttpError(500, 'No pudimos validar el código de reserva.');
+      if (archivedError) {
+        if (isMissingReservationFailuresTableError(archivedError)) {
+          return code;
+        }
+        if (archivedError.code !== 'PGRST116') {
+          throw new HttpError(500, 'No pudimos validar el código de reserva.');
+        }
       }
 
       if (!archived) {
