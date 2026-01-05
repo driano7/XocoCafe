@@ -71,7 +71,7 @@ interface RootLayoutProps {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" sizes="76x76" href="/static/favicons/CafeIcon.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/static/favicons/CafeIcon.png" />
