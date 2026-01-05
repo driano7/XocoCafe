@@ -25,6 +25,31 @@
  * --------------------------------------------------------------------
  */
 
+import siteMetadata from 'content/siteMetadata';
+import { FaWhatsapp } from 'react-icons/fa';
+
+const WhatsAppContact = ({ description }: { description: string }) => (
+  <div className="flex items-center gap-3 rounded-2xl border border-emerald-200/60 bg-emerald-50/80 p-4 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-900/30 dark:text-emerald-100">
+    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg dark:bg-emerald-400 dark:text-emerald-950">
+      <FaWhatsapp aria-hidden />
+    </span>
+    <div>
+      <p className="text-sm font-semibold">{description}</p>
+      <p className="text-xs font-medium">
+        Escríbenos por WhatsApp y te atendemos de inmediato.{' '}
+        <a
+          href={siteMetadata.whats}
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-4 hover:text-emerald-600 dark:hover:text-emerald-50"
+        >
+          Ir al chat
+        </a>
+      </p>
+    </div>
+  </div>
+);
+
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
@@ -214,20 +239,13 @@ export default function TermsPage() {
                 12. Contacto
               </h2>
               <div className="text-gray-600 dark:text-gray-300 space-y-4">
-                <p>Si tienes preguntas sobre estos términos y condiciones, contáctanos:</p>
-                <ul className="list-disc pl-6 space-y-2">
-                  <li>
-                    Email:{' '}
-                    <a
-                      href="mailto:legal@xococafe.com"
-                      className="text-blue-600 hover:text-blue-500 underline"
-                    >
-                      legal@xococafe.com
-                    </a>
-                  </li>
-                  <li>Dirección: [Tu dirección física]</li>
-                  <li>Teléfono: [Tu número de teléfono]</li>
-                </ul>
+                <p>
+                  Si tienes preguntas sobre estos términos o deseas reportar una incidencia,
+                  utilicemos nuestro canal de WhatsApp para cualquier duda o queja.
+                </p>
+                <div className="pt-2">
+                  <WhatsAppContact description="Soporte legal y reclamaciones" />
+                </div>
               </div>
             </section>
           </div>

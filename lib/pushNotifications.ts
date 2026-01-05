@@ -19,14 +19,30 @@ export type PushPermissionResult = {
   tone: 'success' | 'info' | 'warning' | 'error';
 };
 
+const canAttemptIOSSettingsRedirect = () => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const navigatorAny = window.navigator as Navigator & { standalone?: boolean };
+  const isStandalone =
+    typeof navigatorAny.standalone === 'boolean'
+      ? navigatorAny.standalone
+      : window.matchMedia?.('(display-mode: standalone)').matches;
+  return Boolean(isStandalone);
+};
+
 const openIOSSettings = () => {
+  if (!canAttemptIOSSettingsRedirect()) {
+    return false;
+  }
   try {
     window.location.assign('App-Prefs:NOTIFICATIONS_ID');
     window.setTimeout(() => {
       window.location.assign('app-settings:');
     }, 200);
+    return true;
   } catch {
-    // ignore
+    return false;
   }
 };
 
@@ -82,12 +98,13 @@ export const ensurePushPermission = async (
 
   if (!notificationSupported) {
     if (deviceInfo.isIOS) {
-      openIOSSettings();
+      const redirected = openIOSSettings();
       return {
         granted: false,
         status: 'unsupported',
-        message:
-          'iOS requiere activarlas desde Configuración → Safari → Notificaciones. Abre Ajustes y habilítalas para Xoco Café.',
+        message: redirected
+          ? 'iOS requiere activarlas desde Configuración → Safari → Notificaciones. Abre Ajustes y habilítalas para Xoco Café.'
+          : 'Abre Configuración → Safari → Notificaciones y habilítalas manualmente para Xoco Café.',
         tone: 'info',
       };
     }
@@ -130,12 +147,13 @@ export const ensurePushPermission = async (
   }
 
   if (deviceInfo.isIOS) {
-    openIOSSettings();
+    const redirected = openIOSSettings();
     return {
       granted: false,
       status: result,
-      message:
-        'Apple no mostró la alerta. Abre Configuración → Safari → Notificaciones y habilítalas para Xoco Café.',
+      message: redirected
+        ? 'Apple no mostró la alerta. Abre Configuración → Safari → Notificaciones y habilítalas para Xoco Café.'
+        : 'Apple no mostró la alerta. Abre Configuración → Safari → Notificaciones y habilítalas manualmente para Xoco Café.',
       tone: 'info',
     };
   }

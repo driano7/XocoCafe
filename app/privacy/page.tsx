@@ -25,6 +25,28 @@
  * --------------------------------------------------------------------
  */
 
+import siteMetadata from 'content/siteMetadata';
+import { FaWhatsapp } from 'react-icons/fa';
+
+const WhatsAppContact = ({ description }: { description: string }) => (
+  <div className="flex items-center gap-3 rounded-2xl border border-emerald-200/60 bg-emerald-50/80 p-4 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-900/30 dark:text-emerald-100">
+    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg dark:bg-emerald-400 dark:text-emerald-950">
+      <FaWhatsapp aria-hidden />
+    </span>
+    <div>
+      <p className="text-sm font-semibold">{description}</p>
+      <a
+        href={siteMetadata.whats}
+        target="_blank"
+        rel="noreferrer"
+        className="text-xs font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-600 dark:text-emerald-100 dark:hover:text-emerald-50"
+      >
+        Escríbenos por WhatsApp y te atendemos de inmediato.
+      </a>
+    </div>
+  </div>
+);
+
 export default function PrivacyPolicyPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
@@ -158,14 +180,12 @@ export default function PrivacyPolicyPage() {
                   </li>
                 </ul>
                 <p>
-                  Para ejercer estos derechos, contacta con nosotros en{' '}
-                  <a
-                    href="mailto:privacy@xococafe.com"
-                    className="text-blue-600 hover:text-blue-500 underline"
-                  >
-                    privacy@xococafe.com
-                  </a>
+                  Para ejercer estos derechos o presentar una queja formal, comunícate por nuestro
+                  canal oficial y recibirás acompañamiento del equipo legal.
                 </p>
+                <div className="pt-2">
+                  <WhatsAppContact description="Derechos ARCO / GDPR" />
+                </div>
               </div>
             </section>
 
@@ -253,22 +273,12 @@ export default function PrivacyPolicyPage() {
               </h2>
               <div className="text-gray-600 dark:text-gray-300 space-y-4">
                 <p>
-                  Si tienes preguntas sobre esta política de privacidad o sobre cómo manejamos tus
-                  datos personales, contáctanos:
+                  Si tienes preguntas sobre esta política de privacidad o necesitas asistencia,
+                  canaliza cualquier duda o queja mediante WhatsApp:
                 </p>
-                <ul className="list-disc pl-6 space-y-2">
-                  <li>
-                    Email:{' '}
-                    <a
-                      href="mailto:privacy@xococafe.com"
-                      className="text-blue-600 hover:text-blue-500 underline"
-                    >
-                      privacy@xococafe.com
-                    </a>
-                  </li>
-                  <li>Dirección: [Tu dirección física]</li>
-                  <li>Teléfono: [Tu número de teléfono]</li>
-                </ul>
+                <div className="pt-2">
+                  <WhatsAppContact description="Atención de dudas y quejas" />
+                </div>
               </div>
             </section>
           </div>

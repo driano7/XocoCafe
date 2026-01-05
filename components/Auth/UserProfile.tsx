@@ -491,8 +491,8 @@ export default function UserProfile() {
         updateUser(result.user);
         prefillProfileForm(result.user);
         setIsEditing(false);
-        setMessage('Perfil actualizado exitosamente');
-        setTimeout(() => setMessage(''), 3000);
+        setMessage('');
+        showSnackbar('Perfil actualizado correctamente.', 'profile');
       } else {
         setMessage(result.message);
       }
@@ -598,8 +598,8 @@ export default function UserProfile() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        setMessage('Datos exportados exitosamente');
-        setTimeout(() => setMessage(''), 3000);
+        setMessage('');
+        showSnackbar('Descargamos una copia de tus datos personales.', 'profile');
       } else {
         setMessage(result.message);
       }
@@ -1048,6 +1048,9 @@ export default function UserProfile() {
                 initialFavorites={clientFavorites}
                 initialFavoritesLoading={isClientFavoritesLoading}
                 onUpdate={() => void refreshClientFavorites()}
+                onNotify={({ success, message }) => {
+                  showSnackbar(message, success ? 'profile' : 'error');
+                }}
                 variant="default"
               />
             </div>

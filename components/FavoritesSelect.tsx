@@ -27,7 +27,7 @@
 
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import SearchableDropdown from '@/components/SearchableDropdown';
 import { beverageOptions, foodOptions, getMenuItemById } from '@/lib/menuData';
 import { useClientFavorites, type ClientFavoritesPayload } from '@/hooks/useClientFavorites';
@@ -35,6 +35,7 @@ import { useAuth } from './Auth/AuthProvider';
 
 interface FavoritesSelectProps {
   onUpdate?: () => void;
+  onNotify?: (payload: { success: boolean; message: string }) => void;
   initialBeverageId?: string | null;
   initialFoodId?: string | null;
   initialFavorites?: ClientFavoritesPayload | null;
@@ -112,6 +113,7 @@ function resolveMenuId(value: string | null | undefined, category: 'beverage' | 
 
 export default function FavoritesSelect({
   onUpdate,
+  onNotify,
   initialBeverageId,
   initialFoodId,
   initialFavorites,
@@ -133,6 +135,10 @@ export default function FavoritesSelect({
   const favoritesError = shouldHydrateFromHook ? fetchedFavoritesError : null;
   const [isUpdating, setIsUpdating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const showLocalMessage = useCallback((text: string) => {
+    setMessage(text);
+    window.setTimeout(() => setMessage(null), 3500);
+  }, []);
   const remoteBeverageId = useMemo(() => {
     if (!resolvedFavorites) return initialBeverageId ?? null;
     const primary = resolvedFavorites.favorites.primaryBeverage;
@@ -211,7 +217,6 @@ export default function FavoritesSelect({
   const handleUpdate = async () => {
     if (!token) return;
     setIsUpdating(true);
-    setMessage(null);
     try {
       const response = await fetch('/api/user/favorites', {
         method: 'PUT',
@@ -232,16 +237,30 @@ export default function FavoritesSelect({
           await refreshFetchedFavorites().catch(() => null);
         }
         onUpdate?.();
-        setMessage('Favoritos actualizados exitosamente');
+        const successMessage = 'Favoritos actualizados exitosamente';
+        if (onNotify) {
+          onNotify({ success: true, message: successMessage });
+        } else {
+          showLocalMessage(successMessage);
+        }
       } else {
-        setMessage(result.message || 'No se pudo actualizar los favoritos');
+        const errorMessage = result.message || 'No se pudo actualizar los favoritos';
+        if (onNotify) {
+          onNotify({ success: false, message: errorMessage });
+        } else {
+          showLocalMessage(errorMessage);
+        }
       }
     } catch (error) {
       console.error('Error actualizando favoritos:', error);
-      setMessage('Error actualizando favoritos');
+      const fallbackMessage = 'Error actualizando favoritos';
+      if (onNotify) {
+        onNotify({ success: false, message: fallbackMessage });
+      } else {
+        showLocalMessage(fallbackMessage);
+      }
     } finally {
       setIsUpdating(false);
-      setTimeout(() => setMessage(null), 3000);
     }
   };
 

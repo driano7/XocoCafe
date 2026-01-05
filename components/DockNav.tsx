@@ -8,7 +8,7 @@ import {
   FiCalendar,
   FiCoffee,
   FiFileText,
-  FiFolderMinus,
+  FiEyeOff,
   FiHome,
   FiMapPin,
   FiMoreHorizontal,
@@ -195,7 +195,7 @@ export default function DockNav() {
             onClick={() => handleAutoCollapse(true)}
             className={classNames('mt-1', DOCK_BUTTON_BASE, DOCK_BUTTON_INACTIVE)}
           >
-            <FiFolderMinus />
+            <FiEyeOff />
           </button>
         </div>
       )}

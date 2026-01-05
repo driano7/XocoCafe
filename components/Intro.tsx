@@ -93,7 +93,7 @@ export default function Intro() {
       className="relative z-10 bg-black text-white dark:bg-white  dark:text-black"
       id="intro"
     >
-      <div className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-6 py-16 text-3xl font-semibold tracking-tight sm:px-8 sm:py-20 sm:text-4xl md:py-24 md:text-5xl lg:px-20 lg:py-28 lg:text-6xl">
+      <div className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center space-y-4 px-6 py-16 text-3xl font-semibold tracking-tight sm:px-8 sm:py-20 sm:text-4xl md:py-24 md:text-5xl lg:px-20 lg:py-28 lg:text-6xl">
         <div className="w-full space-y-4 text-center leading-tight sm:text-left sm:leading-[1.15]">
           {WORDS.map(({ text }, index) => (
             <span
@@ -108,7 +108,7 @@ export default function Intro() {
 
         <div className="mt-12 w-full">
           <div className="rounded-[32px] border border-white/15 bg-white/5 p-2 shadow-2xl backdrop-blur-2xl dark:border-black/20 dark:bg-black/20">
-            <div className="relative overflow-hidden rounded-[28px] bg-black/70">
+            <div className="relative overflow-hidden rounded-[28px] bg-black/70 transition-transform duration-300 lg:mx-auto lg:max-w-5xl lg:origin-center lg:scale-[1.25]">
               <video
                 ref={videoRef}
                 className="aspect-[4/5] w-full object-cover sm:aspect-video"

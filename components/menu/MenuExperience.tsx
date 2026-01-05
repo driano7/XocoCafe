@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { useMDXComponent } from 'next-contentlayer/hooks';
+import { FiArrowRight } from 'react-icons/fi';
 import { menuItems } from '@/data/menuItems';
 import MenuGalleryGrid from '@/components/menu/MenuGalleryGrid';
 import ReelCarousel from '@/components/menu/ReelCarousel';
@@ -87,21 +88,27 @@ export default function MenuExperience({ simpleCode, simpleContent }: MenuExperi
                 : 'border-[#cfc7bc] bg-[#d8d0c7] text-[#1f1c19]'
             }`}
           >
-            <div
-              className={`max-h-[80vh] w-full overflow-x-auto overflow-y-auto rounded-2xl p-3 sm:max-h-none sm:p-4 ${
-                isDark ? 'bg-white/5' : 'bg-white/60'
-              }`}
-            >
-              <div className="min-w-[680px] sm:min-w-0">
-                <div
-                  className={`menu-simple-prose prose max-w-none text-[13px] sm:text-base ${
-                    isDark
-                      ? 'prose-invert text-white [&_h2]:text-white [&_h3]:text-white [&_li]:text-white [&_strong]:text-white [&_p]:text-white'
-                      : 'prose-neutral text-[#1f1c19]'
-                  }`}
-                >
-                  <SimpleContent content={simpleContent} components={mdxComponents} />
+            <div className="relative">
+              <div
+                className={`max-h-[80vh] w-full overflow-x-auto overflow-y-auto rounded-2xl p-3 sm:max-h-none sm:p-4 ${
+                  isDark ? 'bg-white/5' : 'bg-white/60'
+                }`}
+              >
+                <div className="min-w-[680px] sm:min-w-0">
+                  <div
+                    className={`menu-simple-prose prose max-w-none text-[13px] sm:text-base ${
+                      isDark
+                        ? 'prose-invert text-white [&_h2]:text-white [&_h3]:text-white [&_li]:text-white [&_strong]:text-white [&_p]:text-white'
+                        : 'prose-neutral text-[#1f1c19]'
+                    }`}
+                  >
+                    <SimpleContent content={simpleContent} components={mdxComponents} />
+                  </div>
                 </div>
+              </div>
+              <div className="pointer-events-none absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-sm text-gray-700 shadow-md dark:bg-black/70 dark:text-white sm:hidden">
+                <span className="sr-only">Desliza horizontalmente para ver más</span>
+                <FiArrowRight aria-hidden />
               </div>
             </div>
           </div>
