@@ -237,7 +237,7 @@ export async function GET(request: NextRequest) {
             packageItems: Array.isArray(item.packageItems)
               ? item.packageItems.map((value: unknown) => String(value))
               : Array.isArray(item.metadata?.items)
-              ? item.metadata.items.map((value: unknown) => String(value))
+              ? item.metadata?.items.map((value: unknown) => String(value))
               : null,
           }))
         : [];
