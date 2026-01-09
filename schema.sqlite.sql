@@ -72,13 +72,12 @@ CREATE TABLE IF NOT EXISTS addresses (
   id TEXT PRIMARY KEY,
   userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   type TEXT NOT NULL,
-  street TEXT NOT NULL,
-  city TEXT NOT NULL,
-  state TEXT,
-  postalCode TEXT NOT NULL,
-  country TEXT NOT NULL,
-  isDefault INTEGER NOT NULL DEFAULT 0,
   label TEXT,
+  payload TEXT,
+  payload_iv TEXT,
+  payload_tag TEXT,
+  payload_salt TEXT,
+  isDefault INTEGER NOT NULL DEFAULT 0,
   createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

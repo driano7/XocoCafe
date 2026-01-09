@@ -1375,9 +1375,17 @@ type ProfileModalProps = {
 };
 
 function ProfileModal({ open, onClose, title, children }: ProfileModalProps) {
+  // Scroll to top when modal opens
+  useEffect(() => {
+    if (open && typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [open]);
+
   if (!open) {
     return null;
   }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm"
@@ -1390,7 +1398,7 @@ function ProfileModal({ open, onClose, title, children }: ProfileModalProps) {
         }
       }}
       onKeyDown={(event) => {
-        if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
+        if (event.key === 'Escape') {
           onClose();
         }
       }}

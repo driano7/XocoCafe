@@ -27,6 +27,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
 import { verifyToken } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { addressSchema } from '@/lib/validations/auth';
@@ -76,7 +77,7 @@ export async function GET(request: NextRequest) {
     const addresses = data?.map((row) => decryptAddressRow(decoded.email, row as AddressRow)) ?? [];
 
     return NextResponse.json({ success: true, data: addresses });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error obteniendo direcciones:', error);
     return NextResponse.json(
       { success: false, message: 'No pudimos cargar tus direcciones guardadas' },
@@ -125,6 +126,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('addresses')
       .insert({
+        id: randomUUID(),
         userId: decoded.userId,
         label: parsed.data.label,
         nickname: parsed.data.nickname ?? parsed.data.label,
@@ -146,12 +148,10 @@ export async function POST(request: NextRequest) {
       success: true,
       data: decryptAddressRow(decoded.email, data as AddressRow),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'No pudimos guardar tu dirección';
     console.error('Error guardando dirección:', error);
-    return NextResponse.json(
-      { success: false, message: 'No pudimos guardar tu dirección' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
 
@@ -204,12 +204,10 @@ export async function PUT(request: NextRequest) {
       success: true,
       data: decryptAddressRow(decoded.email, data as AddressRow),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'No pudimos actualizar la dirección';
     console.error('Error actualizando dirección:', error);
-    return NextResponse.json(
-      { success: false, message: 'No pudimos actualizar la dirección' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
 
@@ -248,11 +246,9 @@ export async function DELETE(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'No pudimos eliminar la dirección';
     console.error('Error eliminando dirección:', error);
-    return NextResponse.json(
-      { success: false, message: 'No pudimos eliminar la dirección' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }

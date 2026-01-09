@@ -32,9 +32,9 @@ import { ScrollContext } from '@/components/Providers/ScrollProvider';
 
 const WORDS = [
   { text: 'Minimalista.', offset: 0 },
-  { text: 'Intencional.', offset: 0.45 },
-  { text: 'Vanguardista.', offset: 0.9 },
-  { text: 'Sensorial.', offset: 1.35 },
+  { text: 'Intencional.', offset: 0.35 },
+  { text: 'Vanguardista.', offset: 0.7 },
+  { text: 'Sensorial.', offset: 1.05 },
 ];
 
 function blockAnimation(sectionProgress: number, blockNumber: number) {
@@ -94,7 +94,7 @@ export default function Intro() {
       id="intro"
     >
       {/* SECCIÓN 1: TEXTO (Minimalista...) */}
-      <div className="mx-auto flex py-24 min-h-[60vh] max-w-5xl flex-col items-center justify-center lg:items-start lg:justify-center px-6 text-3xl font-semibold tracking-tight sm:px-8 sm:text-4xl md:text-5xl lg:px-20 lg:text-6xl">
+      <div className="mx-auto flex py-24 min-h-[85vh] max-w-5xl flex-col items-center justify-center lg:items-start lg:justify-center px-6 text-3xl font-semibold tracking-tight sm:px-8 sm:text-4xl md:text-5xl lg:px-20 lg:text-6xl">
         <div className="w-full space-y-8 sm:space-y-12 text-center lg:text-left leading-tight sm:text-left sm:leading-[1.15] z-20">
           {WORDS.map(({ text }, index) => (
             <span

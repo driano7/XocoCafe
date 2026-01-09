@@ -155,11 +155,16 @@ export async function GET(request: NextRequest) {
     const handlerIds = Array.from(
       new Set(
         orders.flatMap((order) =>
-          (order.order_items ?? []).flatMap((item) =>
-            (item.prep_queue ?? [])
+          (order.order_items ?? []).flatMap((item) => {
+            const queue = Array.isArray(item.prep_queue)
+              ? item.prep_queue
+              : item.prep_queue
+              ? [item.prep_queue]
+              : [];
+            return queue
               .map((task) => task.handledByStaffId)
-              .filter((id): id is string => Boolean(id))
-          )
+              .filter((id): id is string => Boolean(id));
+          })
         )
       )
     );
@@ -194,7 +199,13 @@ export async function GET(request: NextRequest) {
       const baseStatus = (entry.status ?? 'pending').toLowerCase();
 
       // Extract all prep tasks from nested order_items
-      const tasks = (entry.order_items ?? []).flatMap((item) => item.prep_queue ?? []);
+      const tasks = (entry.order_items ?? []).flatMap((item) => {
+        return Array.isArray(item.prep_queue)
+          ? item.prep_queue
+          : item.prep_queue
+          ? [item.prep_queue]
+          : [];
+      });
       const taskStatuses = tasks.map((task) => (task.status ?? '').toLowerCase()).filter(Boolean);
 
       const hasInProgress =

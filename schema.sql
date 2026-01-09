@@ -173,37 +173,6 @@ CREATE TABLE IF NOT EXISTS public.order_items (
 CREATE INDEX IF NOT EXISTS order_items_order_id_idx ON public.order_items ("orderId");
 
 -- ---------------------------------------------------------------------
--- Turnos de caja y ventas presenciales
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.turnos (
-  id SERIAL PRIMARY KEY,
-  usuario_id TEXT NOT NULL REFERENCES public.staff_users(id) ON DELETE RESTRICT,
-  fecha_apertura TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  fecha_cierre TIMESTAMPTZ,
-  saldo_inicial NUMERIC(12,2) NOT NULL DEFAULT 0,
-  total_ventas_efectivo NUMERIC(12,2) NOT NULL DEFAULT 0,
-  total_gastos_efectivo NUMERIC(12,2) NOT NULL DEFAULT 0,
-  estado TEXT NOT NULL DEFAULT 'abierto' CHECK (estado IN ('abierto','cerrado'))
-);
-
-CREATE INDEX IF NOT EXISTS turnos_usuario_idx ON public.turnos (usuario_id);
-CREATE INDEX IF NOT EXISTS turnos_estado_idx ON public.turnos (estado);
-
-CREATE TABLE IF NOT EXISTS public.ventas (
-  id SERIAL PRIMARY KEY,
-  turno_id INTEGER REFERENCES public.turnos(id) ON DELETE SET NULL,
-  order_id TEXT REFERENCES public.orders(id) ON DELETE SET NULL,
-  total NUMERIC(12,2) NOT NULL,
-  metodo_pago TEXT NOT NULL CHECK (metodo_pago IN ('efectivo','tarjeta','transferencia')),
-  monto_recibido NUMERIC(12,2),
-  cambio_entregado NUMERIC(12,2),
-  fecha TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS ventas_turno_id_idx ON public.ventas (turno_id);
-CREATE UNIQUE INDEX IF NOT EXISTS ventas_order_id_idx ON public.ventas (order_id);
-
--- ---------------------------------------------------------------------
 -- Programa de lealtad
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.loyalty_points (
@@ -324,7 +293,9 @@ CREATE TABLE IF NOT EXISTS public.products (
   "lowStockThreshold" INTEGER NOT NULL DEFAULT 10,
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "isActive" BOOLEAN NOT NULL DEFAULT TRUE
+  "isActive" BOOLEAN NOT NULL DEFAULT TRUE,
+  metadata JSONB,
+  items JSONB
 );
 
 DROP TRIGGER IF EXISTS trg_products_touch_updated_at ON public.products;
@@ -911,6 +882,61 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- ---------------------------------------------------------------------
+-- Turnos de caja y ventas (corte NOM-251)
+-- Ajustes incrementales: evitamos recrear tablas existentes.
+-- ---------------------------------------------------------------------
+ALTER TABLE public.turnos
+  ADD COLUMN IF NOT EXISTS usuario_id TEXT,
+  ADD COLUMN IF NOT EXISTS fecha_apertura TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS fecha_cierre TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS saldo_inicial NUMERIC(12,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS total_ventas_efectivo NUMERIC(12,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS total_gastos_efectivo NUMERIC(12,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS estado TEXT NOT NULL DEFAULT 'abierto';
+
+ALTER TABLE public.turnos
+  ALTER COLUMN usuario_id SET NOT NULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'turnos_estado_ck'
+      AND conrelid = 'public.turnos'::regclass
+  ) THEN
+    ALTER TABLE public.turnos
+      ADD CONSTRAINT turnos_estado_ck
+        CHECK (estado IN ('abierto','cerrado'));
+  END IF;
+END$$;
+
+CREATE INDEX IF NOT EXISTS turnos_usuario_idx ON public.turnos (usuario_id);
+CREATE INDEX IF NOT EXISTS turnos_estado_idx ON public.turnos (estado);
+
+ALTER TABLE public.ventas
+  ADD COLUMN IF NOT EXISTS turno_id INTEGER REFERENCES public.turnos(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS total NUMERIC(12,2) NOT NULL,
+  ADD COLUMN IF NOT EXISTS metodo_pago TEXT NOT NULL,
+  ADD COLUMN IF NOT EXISTS monto_recibido NUMERIC(12,2),
+  ADD COLUMN IF NOT EXISTS cambio_entregado NUMERIC(12,2),
+  ADD COLUMN IF NOT EXISTS fecha TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'ventas_metodo_pago_ck'
+      AND conrelid = 'public.ventas'::regclass
+  ) THEN
+    ALTER TABLE public.ventas
+      ADD CONSTRAINT ventas_metodo_pago_ck
+        CHECK (metodo_pago IN ('efectivo','tarjeta','transferencia'));
+  END IF;
+END$$;
+
+CREATE INDEX IF NOT EXISTS ventas_turno_id_idx ON public.ventas (turno_id);
+
 DROP TRIGGER IF EXISTS trg_order_items_enqueue ON public.order_items;
 CREATE TRIGGER trg_order_items_enqueue
   AFTER INSERT ON public.order_items
@@ -1118,15 +1144,6 @@ ALTER TABLE public.users
 ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS items JSONB NOT NULL DEFAULT '[]'::jsonb,
   ADD COLUMN IF NOT EXISTS "totalAmount" NUMERIC(10,2) NOT NULL DEFAULT 0.00;
-
-ALTER TABLE public.orders
-  ADD COLUMN IF NOT EXISTS "queuedPaymentMethod" TEXT,
-  ADD COLUMN IF NOT EXISTS "queuedPaymentReference" TEXT,
-  ADD COLUMN IF NOT EXISTS "queuedPaymentReferenceType" TEXT,
-  ADD COLUMN IF NOT EXISTS "paymentMethod" TEXT,
-  ADD COLUMN IF NOT EXISTS "paymentReference" TEXT,
-  ADD COLUMN IF NOT EXISTS "cashTendered" NUMERIC(12,2),
-  ADD COLUMN IF NOT EXISTS "cashChange" NUMERIC(12,2);
 
 -- Agrega las columnas faltantes (no pasa nada si ya existen)
 ALTER TABLE public.reservations
@@ -1868,3 +1885,82 @@ FROM (
 ) lp
 WHERE u.id = lp."userId"
   AND u."loyaltyActivatedAt" IS NULL;
+
+-- 1. Bitácora de Higiene (Baños, Cocina, Área Común)
+CREATE TABLE IF NOT EXISTS public.hygiene_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "area" TEXT NOT NULL CHECK (area IN ('BAÑO', 'COCINA', 'BARRA', 'MESAS')),
+  "staffId" TEXT REFERENCES public.staff_users(id),
+  "is_clean" BOOLEAN DEFAULT TRUE,
+  "supplies_refilled" BOOLEAN DEFAULT TRUE, -- Papel, jabón, gel
+  "observations" TEXT,
+  "createdAt" TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. Control de Plagas (Documentación NOM-251)
+CREATE TABLE IF NOT EXISTS public.pest_control_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "service_date" DATE NOT NULL,
+  "provider_name" TEXT,
+  "certificate_number" TEXT, -- Folio del certificado de fumigación
+  "next_service_date" DATE,
+  "staffId" TEXT REFERENCES public.staff_users(id),
+  "observations" TEXT,
+  "createdAt" TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. Bitácora de residuos y limpieza profunda
+CREATE TABLE IF NOT EXISTS public.waste_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "organicBeveragesKg" NUMERIC(10,2) NOT NULL DEFAULT 0,
+  "organicFoodsKg" NUMERIC(10,2) NOT NULL DEFAULT 0,
+  "inorganicKg" NUMERIC(10,2) NOT NULL DEFAULT 0,
+  "trashRemoved" BOOLEAN NOT NULL DEFAULT FALSE,
+  "binsWashed" BOOLEAN NOT NULL DEFAULT FALSE,
+  "branchId" TEXT REFERENCES public.branches(id) ON DELETE SET NULL,
+  "staffId" TEXT REFERENCES public.staff_users(id) ON DELETE SET NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 4. Recetas (Unión Venta-Inventario)
+CREATE TABLE IF NOT EXISTS public.product_recipes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "productId" TEXT NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+  "inventoryItemId" TEXT NOT NULL REFERENCES public.inventory_items(id) ON DELETE CASCADE,
+  "quantityUsed" NUMERIC(12,3) NOT NULL, -- Gramos o ml
+  "createdAt" TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 4. Banderas de Stock para App de Clientes
+ALTER TABLE public.products 
+ADD COLUMN IF NOT EXISTS "is_low_stock" BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS "out_of_stock_reason" TEXT;
+
+
+-- 1. Eliminar la tabla antigua para recrearla limpia con la nueva estructura
+DROP TABLE IF EXISTS public.addresses CASCADE;
+
+-- 2. Crear la tabla con soporte para encriptación
+CREATE TABLE public.addresses (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  "userId" TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  nickname TEXT,
+  type TEXT NOT NULL,
+  payload TEXT NOT NULL, -- Aquí irán street, city, etc. encriptados
+  payload_iv TEXT NOT NULL,
+  payload_tag TEXT NOT NULL,
+  payload_salt TEXT NOT NULL,
+  "isDefault" BOOLEAN NOT NULL DEFAULT FALSE,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 3. Índices y Triggers (necesarios para el funcionamiento)
+CREATE INDEX IF NOT EXISTS addresses_user_id_idx ON public.addresses ("userId");
+
+DROP TRIGGER IF EXISTS trg_addresses_touch_updated_at ON public.addresses;
+CREATE TRIGGER trg_addresses_touch_updated_at
+  BEFORE UPDATE ON public.addresses
+  FOR EACH ROW
+  EXECUTE FUNCTION public.touch_users_updated_at();

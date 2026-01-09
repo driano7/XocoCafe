@@ -631,9 +631,7 @@ export default function OrdersDashboardPage() {
     if (typeof window === 'undefined') {
       return;
     }
-    if (!window.matchMedia('(min-width: 1024px)').matches) {
-      return;
-    }
+    // Ajustado para funcionar en móvil y escritorio como solicitado
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, []);
   const headerHeight = useHeaderHeight();

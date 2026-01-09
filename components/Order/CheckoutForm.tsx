@@ -216,7 +216,7 @@ export default function CheckoutForm({ token, user, onAddressesUpdate }: Checkou
         setCustomerName(fullName);
       }
     }
-  }, [user?.firstName, user?.lastName]);
+  }, [user?.firstName, user?.lastName, user]);
 
   useEffect(() => {
     if (!addressToast) {
@@ -413,8 +413,9 @@ export default function CheckoutForm({ token, user, onAddressesUpdate }: Checkou
       setSelectedAddressId(result.data.id ?? null);
       setNewAddressLabel('');
       setAddressToast('Dirección guardada en tu perfil.');
-    } catch (error: any) {
-      setAddressError(error.message ?? 'No pudimos guardar la dirección.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'No pudimos guardar la dirección.';
+      setAddressError(message);
     } finally {
       setIsSavingAddress(false);
     }
@@ -507,9 +508,10 @@ export default function CheckoutForm({ token, user, onAddressesUpdate }: Checkou
       });
       clearCart();
       router.push('/dashboard/pedidos');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      setFormError(error.message);
+      const message = error instanceof Error ? error.message : 'Error desconocido';
+      setFormError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -858,7 +860,7 @@ export default function CheckoutForm({ token, user, onAddressesUpdate }: Checkou
             </div>
           </div>
 
-          <div className="rounded-2xl border border-primary-200/80 bg-white/80 p-3 dark:border-primary-800/60 dark:bg-primary-950/20">
+          <div className="rounded-lg border border-primary-100 bg-white p-4 text-sm dark:border-primary-700 dark:bg-primary-900/10">
             <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.35em] text-primary-900 dark:text-primary-100">
               <span>Propina de entrega</span>
               <span className="tracking-normal text-[11px] text-gray-500 dark:text-gray-300">
