@@ -109,7 +109,7 @@ export default function Intro() {
       </div>
 
       {/* SECCIÓN DE ESPACIADO: Ajuste de proximidad ultra ajustada (-20%) */}
-      <div className="h-[1.1vh] lg:h-[3vh]" />
+      <div className="h-[0.8vh] lg:h-[3vh]" />
 
       {/* SECCIÓN 2: VIDEO GIGANTE - Aparece después del vacío */}
       <div className="pb-[40vh] w-full px-6 sm:px-8 lg:px-20 z-10 relative">
