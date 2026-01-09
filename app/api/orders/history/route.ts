@@ -61,11 +61,55 @@ const normalizeStaffName = (staffId?: string | null) => {
   return trimmed.split(/\s+/)[0] ?? trimmed;
 };
 
-type PrepTaskRecord = {
-  orderItemId?: string | null;
-  status?: string | null;
-  handledByStaffId?: string | null;
-};
+interface DbOrderItem {
+  id: string;
+  orderId: string;
+  name?: string;
+  productName?: string;
+  displayName?: string;
+  title?: string;
+  productId?: string;
+  quantity?: number;
+  qty?: number;
+  price?: number;
+  unitPrice?: number;
+  amount?: number;
+  category?: string;
+  type?: string;
+  size?: string | null;
+  packageItems?: string[];
+  metadata?: {
+    items?: string[];
+  };
+  prep_queue?: {
+    status: string | null;
+    handledByStaffId: string | null;
+  }[];
+  product?: {
+    name: string;
+  };
+}
+
+interface DbOrder {
+  id: string;
+  status: string | null;
+  createdAt: string;
+  userId: string;
+  items: unknown;
+  customer_name: string | null;
+  pos_customer_id: string | null;
+  deliveryTipAmount: number | null;
+  deliveryTipPercent: number | null;
+  shipping: unknown;
+  shipping_address_id: string | null;
+  orderNumber: string | null;
+  ticketId?: string;
+  ticketCode?: string;
+  order_items: DbOrderItem[];
+  tickets?: {
+    qrPayload: unknown;
+  }[];
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -81,13 +125,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Token inválido' }, { status: 401 });
     }
 
-    const { data, error } = await supabase
+    const { data: ordersData, error } = await supabase
       .from('orders')
       .select(
         `
+        *,
+        order_items (
           *,
-          order_items(*)
-        `
+          prep_queue (
+            status,
+            handledByStaffId
+          )
+        ),
+        tickets (
+          qrPayload
+        )
+      `
       )
       .eq('userId', decoded.userId)
       .order('createdAt', { ascending: false });
@@ -96,65 +149,18 @@ export async function GET(request: NextRequest) {
       throw new Error(error.message);
     }
 
-    const orders = data ?? [];
-    const orderIds = orders
-      .map((entry: any) => (typeof entry?.id === 'string' ? entry.id : null))
-      .filter((value): value is string => Boolean(value));
-    const ticketQrMap = new Map<string, unknown>();
-    if (orderIds.length > 0) {
-      const { data: ticketRows, error: ticketError } = await supabase
-        .from('tickets')
-        .select('orderId,qrPayload')
-        .in('orderId', orderIds);
-      if (ticketError) {
-        throw new Error(ticketError.message);
-      }
-      (ticketRows ?? []).forEach((row) => {
-        if (row?.orderId) {
-          ticketQrMap.set(row.orderId, row.qrPayload ?? null);
-        }
-      });
-    }
-    const orderItemIds = orders
-      .flatMap((order: any) => (order.order_items ?? []).map((item: any) => item.id))
-      .filter((value): value is string => Boolean(value));
-    const orderIdByItemId = new Map<string, string>();
-    orders.forEach((order: any) => {
-      (order.order_items ?? []).forEach((item: any) => {
-        if (item?.id) {
-          orderIdByItemId.set(item.id, order.id);
-        }
-      });
-    });
+    const orders = (ordersData ?? []) as DbOrder[];
 
-    let prepTasks: PrepTaskRecord[] = [];
-    if (orderItemIds.length) {
-      const { data: prepTasksData, error: prepTasksError } = await supabase
-        .from('prep_queue')
-        .select('orderItemId,status,handledByStaffId')
-        .in('orderItemId', orderItemIds);
-      if (prepTasksError) {
-        throw new Error(prepTasksError.message);
-      }
-      prepTasks = prepTasksData ?? [];
-    }
-
-    const tasksByOrder = new Map<string, PrepTaskRecord[]>();
-    prepTasks.forEach((task) => {
-      const orderItemId = task.orderItemId ?? undefined;
-      if (!orderItemId) return;
-      const orderId = orderIdByItemId.get(orderItemId);
-      if (!orderId) return;
-      const collection = tasksByOrder.get(orderId) ?? [];
-      collection.push(task);
-      tasksByOrder.set(orderId, collection);
-    });
-
+    // Collect unique handler IDs for staff name resolution
     const handlerIds = Array.from(
       new Set(
-        prepTasks
-          .map((task) => (typeof task.handledByStaffId === 'string' ? task.handledByStaffId : null))
-          .filter((value): value is string => Boolean(value))
+        orders.flatMap((order) =>
+          (order.order_items ?? []).flatMap((item) =>
+            (item.prep_queue ?? [])
+              .map((task) => task.handledByStaffId)
+              .filter((id): id is string => Boolean(id))
+          )
+        )
       )
     );
 
@@ -166,30 +172,38 @@ export async function GET(request: NextRequest) {
           'id,email,firstNameEncrypted,firstNameIv,firstNameTag,firstNameSalt,lastNameEncrypted,lastNameIv,lastNameTag,lastNameSalt'
         )
         .in('id', handlerIds);
+
       if (staffError) {
-        throw new Error(staffError.message);
+        console.error('Error fetching staff names:', staffError);
+        // We continue with null names if this fails
+      } else {
+        (staffRecords ?? []).forEach((record) => {
+          if (!record?.id || !record.email) return;
+          const decrypted = decryptUserData(record.email, record);
+          const displayName = [decrypted.firstName, decrypted.lastName]
+            .filter((value): value is string => Boolean(value && value.trim().length > 0))
+            .join(' ')
+            .trim();
+          const fallback = normalizeStaffName(record.email) ?? record.email;
+          staffNames.set(record.id, displayName || fallback);
+        });
       }
-      (staffRecords ?? []).forEach((record) => {
-        if (!record?.id || !record.email) return;
-        const decrypted = decryptUserData(record.email, record);
-        const displayName = [decrypted.firstName, decrypted.lastName]
-          .filter((value): value is string => Boolean(value && value.trim().length > 0))
-          .join(' ')
-          .trim();
-        const fallback = normalizeStaffName(record.email) ?? record.email;
-        staffNames.set(record.id, displayName || fallback);
-      });
     }
 
     const payload = orders.map((entry) => {
       const baseStatus = (entry.status ?? 'pending').toLowerCase();
-      const tasks = tasksByOrder.get(entry.id) ?? [];
+
+      // Extract all prep tasks from nested order_items
+      const tasks = (entry.order_items ?? []).flatMap((item) => item.prep_queue ?? []);
       const taskStatuses = tasks.map((task) => (task.status ?? '').toLowerCase()).filter(Boolean);
+
       const hasInProgress =
         taskStatuses.includes('in_progress') ||
         tasks.some((task) => Boolean(task.handledByStaffId));
+
       const allCompleted =
         tasks.length > 0 && taskStatuses.every((status) => status === 'completed');
+
       let prepStatus: 'pending' | 'in_progress' | 'completed' | null = null;
       if (baseStatus === 'completed' || allCompleted) {
         prepStatus = 'completed';
@@ -198,11 +212,14 @@ export async function GET(request: NextRequest) {
       } else if (tasks.length > 0) {
         prepStatus = 'pending';
       }
+
       const handlerId =
         tasks.find((task) => Boolean(task.handledByStaffId))?.handledByStaffId ?? null;
       const handlerName =
         (handlerId ? staffNames.get(handlerId) : null) ?? normalizeStaffName(handlerId);
-      const { order_items, customer_name, pos_customer_id, ...rest } = entry as any;
+
+      const { order_items, customer_name, pos_customer_id, tickets, ...rest } = entry;
+
       const fallbackItems = Array.isArray(order_items)
         ? order_items.map((item) => ({
             name: String(
@@ -223,12 +240,13 @@ export async function GET(request: NextRequest) {
             category: String(item.category ?? item.type ?? 'other'),
             size: typeof item.size === 'string' ? item.size : null,
             packageItems: Array.isArray(item.packageItems)
-              ? item.packageItems.map((value: any) => String(value))
+              ? item.packageItems.map((value: unknown) => String(value))
               : Array.isArray(item.metadata?.items)
-              ? item.metadata.items.map((value: any) => String(value))
+              ? item.metadata.items.map((value: unknown) => String(value))
               : null,
           }))
         : [];
+
       const rawItems = entry.items;
       const normalizedItems = Array.isArray(rawItems)
         ? rawItems
@@ -237,34 +255,43 @@ export async function GET(request: NextRequest) {
           Array.isArray((rawItems as { list?: unknown[] }).list)
         ? (rawItems as { list: unknown[] }).list
         : fallbackItems;
-      const shippingFromColumn = (entry as { shipping?: any }).shipping ?? null;
+
+      const shippingFromColumn = (entry as { shipping?: unknown }).shipping ?? null;
       const shippingDetails =
         shippingFromColumn ??
         (rawItems && typeof rawItems === 'object' && !Array.isArray(rawItems)
-          ? (rawItems as { shipping?: any }).shipping ?? null
+          ? (rawItems as { shipping?: unknown }).shipping ?? null
           : null);
+
       const shippingAddressId =
         (entry as { shipping_address_id?: string | null }).shipping_address_id ??
-        shippingDetails?.addressId ??
+        (shippingDetails && typeof shippingDetails === 'object' && 'addressId' in shippingDetails
+          ? (shippingDetails as { addressId?: string | null }).addressId
+          : null) ??
         null;
+
       const enrichedShipping =
         shippingDetails || shippingAddressId
           ? {
               ...(shippingDetails ?? {}),
-              addressId: shippingAddressId ?? shippingDetails?.addressId ?? null,
+              addressId: shippingAddressId,
             }
           : null;
+
       const normalizedItemsPayload =
         rawItems && typeof rawItems === 'object' && !Array.isArray(rawItems)
           ? { ...rawItems, list: normalizedItems }
           : normalizedItems;
+
+      // tickets is an array from the joined query
+      const ticket = Array.isArray(tickets) ? tickets[0] : null;
 
       return {
         ...rest,
         customerName: customer_name ?? null,
         posCustomerId: pos_customer_id ?? null,
         items: normalizedItemsPayload,
-        qrPayload: ticketQrMap.get(entry.id) ?? null,
+        qrPayload: ticket?.qrPayload ?? null,
         shipping: enrichedShipping,
         deliveryTipAmount: entry.deliveryTipAmount ?? null,
         deliveryTipPercent: entry.deliveryTipPercent ?? null,
@@ -279,7 +306,7 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, data: payload });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error obteniendo pedidos:', error);
     return NextResponse.json(
       { success: false, message: 'No pudimos cargar tus pedidos' },

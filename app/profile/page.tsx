@@ -34,6 +34,8 @@ import { useAuth } from '@/components/Auth/AuthProvider';
 import UserProfile from '@/components/Auth/UserProfile';
 import CoffeeBackground from '@/components/CoffeeBackground';
 
+import { motion } from 'framer-motion';
+
 export default function ProfilePage() {
   const { user, isLoading, logout } = useAuth();
   const router = useRouter();
@@ -58,7 +60,12 @@ export default function ProfilePage() {
 
   return (
     <CoffeeBackground className="py-10">
-      <div className="mx-auto min-h-[70vh] max-w-6xl rounded-[32px] bg-white/95 shadow-2xl shadow-black/20 dark:bg-gray-950/80">
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: 'easeOut' }}
+        className="mx-auto min-h-[70vh] max-w-6xl rounded-[32px] bg-white/95 shadow-2xl shadow-black/20 dark:bg-gray-950/80 overflow-hidden"
+      >
         <div className="bg-white dark:bg-gray-800 shadow">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
@@ -106,7 +113,7 @@ export default function ProfilePage() {
         <div className="py-8">
           <UserProfile />
         </div>
-      </div>
+      </motion.div>
     </CoffeeBackground>
   );
 }

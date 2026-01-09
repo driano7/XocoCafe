@@ -205,7 +205,9 @@ async function pushSqliteChanges(table, since) {
 
     const { error } = await supabase.from(table.name).upsert(row, { onConflict: table.pk });
     if (error) {
-      throw new Error(`Supabase push (${table.name}) failed for ${row[table.pk]}: ${error.message}`);
+      throw new Error(
+        `Supabase push (${table.name}) failed for ${row[table.pk]}: ${error.message}`
+      );
     }
     lastCursor = row[updatedColumn];
   }
@@ -217,7 +219,11 @@ async function ensureSupabaseCronHeartbeat() {
     return;
   }
 
-  if (!cronHeartbeatConfig.table || !cronHeartbeatConfig.jobColumn || !cronHeartbeatConfig.timestampColumn) {
+  if (
+    !cronHeartbeatConfig.table ||
+    !cronHeartbeatConfig.jobColumn ||
+    !cronHeartbeatConfig.timestampColumn
+  ) {
     console.warn('⚠️  Cron heartbeat config incomplete; skipping heartbeat validation.');
     return;
   }
@@ -230,7 +236,8 @@ async function ensureSupabaseCronHeartbeat() {
 
   if (error) {
     const isMissingTable =
-      error.code === '42P01' || (error.message && /relation .* does not exist/i.test(error.message));
+      error.code === '42P01' ||
+      (error.message && /relation .* does not exist/i.test(error.message));
     if (isMissingTable) {
       console.warn(
         `⚠️  Supabase cron heartbeat table "${cronHeartbeatConfig.table}" not found. ` +
@@ -293,12 +300,7 @@ async function main() {
     }
 
     let lastSupabasePull = state.lastSupabasePull;
-    if (
-      pullSucceeded &&
-      table.updatedColumn &&
-      !table.fullRefresh &&
-      pulledRows.length > 0
-    ) {
+    if (pullSucceeded && table.updatedColumn && !table.fullRefresh && pulledRows.length > 0) {
       lastSupabasePull = pulledRows[pulledRows.length - 1][table.updatedColumn];
     }
 

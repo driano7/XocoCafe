@@ -147,7 +147,7 @@ export default function OrderPage() {
       return {
         id: fromDb.id,
         label: fromDb.name,
-        category: fromDb.category as any,
+        category: fromDb.category as MenuItem['category'],
         price: fromDb.price,
         metadata: {
           items: fromDb.metadata?.items ?? [],
@@ -228,7 +228,7 @@ export default function OrderPage() {
       productId: menuId,
       name: menuItem.label,
       price: inferredPrice,
-      category: menuItem.category as any,
+      category: menuItem.category as MenuItem['category'],
       size: options?.size ?? null,
       packageItems: menuItem.metadata?.items ?? null,
     });
@@ -337,88 +337,100 @@ export default function OrderPage() {
           Usa los mismos dropdowns de tus favoritos para elegir bebidas y alimentos.
         </p>
       </div>
-      {dbLoading ? (
-        <div className="flex justify-center py-4">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
-        </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <SearchableDropdown
-              id="quick-beverage"
-              label="Bebida"
-              options={dynamicBeverages}
-              value={selectedBeverageId}
-              onChange={handleBeverageSelection}
-              helperText={
-                selectedBeverageId
-                  ? beverageRequiresSizeSelection
-                    ? 'Elige el tamaño para agregarla al carrito.'
-                    : `Precio estimado: ${formatCurrency(resolveMenuItemPrice(selectedBeverageId))}`
-                  : 'Selecciona una bebida y la agregamos al instante'
-              }
-            />
-            {selectedBeverageId && beverageRequiresSizeSelection && (
-              <div className="mt-2">
-                <label
-                  className="block text-xs font-medium text-gray-600 dark:text-gray-300"
-                  htmlFor="quick-beverage-size"
-                >
-                  Tamaño
-                </label>
-                <select
-                  id="quick-beverage-size"
-                  value={selectedBeverageSize ?? ''}
-                  onChange={(event) => handleBeverageSizeSelection(event.target.value)}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                >
-                  <option value="" disabled>
-                    Selecciona un tamaño…
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="relative">
+          <SearchableDropdown
+            id="quick-beverage"
+            label="Bebida"
+            options={dynamicBeverages}
+            value={selectedBeverageId}
+            onChange={handleBeverageSelection}
+            helperText={
+              selectedBeverageId
+                ? beverageRequiresSizeSelection
+                  ? 'Elige el tamaño para agregarla al carrito.'
+                  : `Precio estimado: ${formatCurrency(resolveMenuItemPrice(selectedBeverageId))}`
+                : dbLoading
+                ? 'Cargando bebidas premium...'
+                : 'Selecciona una bebida y la agregamos al instante'
+            }
+          />
+          {dbLoading && (
+            <div className="pointer-events-none absolute right-10 top-[38px] flex h-5 w-5 items-center justify-center">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
+            </div>
+          )}
+          {selectedBeverageId && beverageRequiresSizeSelection && (
+            <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-300">
+              <label
+                className="block text-xs font-medium text-gray-600 dark:text-gray-300"
+                htmlFor="quick-beverage-size"
+              >
+                Tamaño
+              </label>
+              <select
+                id="quick-beverage-size"
+                value={selectedBeverageSize ?? ''}
+                onChange={(event) => handleBeverageSizeSelection(event.target.value)}
+                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              >
+                <option value="" disabled>
+                  Selecciona un tamaño…
+                </option>
+                {selectedBeverageSizes.map((size: string) => (
+                  <option key={size} value={size}>
+                    {size[0].toUpperCase() + size.slice(1)}
                   </option>
-                  {selectedBeverageSizes.map((size: string) => (
-                    <option key={size} value={size}>
-                      {size[0].toUpperCase() + size.slice(1)}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  La bebida se agrega automáticamente al elegir el tamaño.
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <SearchableDropdown
-              id="quick-food"
-              label="Alimento"
-              options={dynamicFoods}
-              value={selectedFoodId}
-              onChange={handleFoodSelection}
-              helperText={
-                selectedFoodId
-                  ? `Precio estimado: ${formatCurrency(resolveMenuItemPrice(selectedFoodId))}`
-                  : 'Selecciona un alimento y lo agregamos al momento'
-              }
-            />
-          </div>
-
-          <div>
-            <SearchableDropdown
-              id="quick-package"
-              label="Paquete"
-              options={dynamicPackages}
-              value={selectedPackageId}
-              onChange={handlePackageSelection}
-              helperText={
-                selectedPackageId
-                  ? `Precio estimado: ${formatCurrency(resolveMenuItemPrice(selectedPackageId))}`
-                  : 'Selecciona un combo y lo agregamos automáticamente'
-              }
-            />
-          </div>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
-      )}
+
+        <div className="relative">
+          <SearchableDropdown
+            id="quick-food"
+            label="Alimento"
+            options={dynamicFoods}
+            value={selectedFoodId}
+            onChange={handleFoodSelection}
+            helperText={
+              selectedFoodId
+                ? `Precio estimado: ${formatCurrency(resolveMenuItemPrice(selectedFoodId))}`
+                : dbLoading
+                ? 'Cargando alimentos frescos...'
+                : 'Selecciona un alimento y lo agregamos al momento'
+            }
+          />
+          {dbLoading && (
+            <div className="pointer-events-none absolute right-10 top-[38px] flex h-5 w-5 items-center justify-center">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
+            </div>
+          )}
+        </div>
+
+        <div className="relative">
+          <SearchableDropdown
+            id="quick-package"
+            label="Paquetes y Combos"
+            options={dynamicPackages}
+            value={selectedPackageId}
+            onChange={handlePackageSelection}
+            helperText={
+              selectedPackageId
+                ? `Precio estimado: ${formatCurrency(resolveMenuItemPrice(selectedPackageId))}`
+                : dbLoading
+                ? 'Cargando paquetes especiales...'
+                : 'Selecciona un paquete y lo agregamos al carrito'
+            }
+          />
+          {dbLoading && (
+            <div className="pointer-events-none absolute right-10 top-[38px] flex h-5 w-5 items-center justify-center">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 

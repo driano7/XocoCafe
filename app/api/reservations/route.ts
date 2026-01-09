@@ -129,44 +129,47 @@ const generateReservationCode = async (): Promise<string> => {
 export async function GET(request: NextRequest) {
   try {
     const { decoded } = authenticateRequest(request);
-    await archiveExpiredReservations();
-    await cleanupFailedReservations();
+    // Run internal cleanup in the background to avoid blocking the user
+    void archiveExpiredReservations();
+    void cleanupFailedReservations();
 
-    const { data, error } = await supabase
-      .from('reservations')
-      .select(
-        'id,reservationCode,reservationDate,reservationTime,branchId,branchNumber,peopleCount,message,preOrderItems,status,createdAt,updatedAt'
-      )
-      .eq('userId', decoded.userId)
-      .order('reservationDate', { ascending: true })
-      .order('reservationTime', { ascending: true });
+    // Fetch active and failed reservations in parallel
+    const [reservationsRes, failedRes] = await Promise.all([
+      supabase
+        .from('reservations')
+        .select(
+          'id,reservationCode,reservationDate,reservationTime,branchId,branchNumber,peopleCount,message,preOrderItems,status,createdAt,updatedAt'
+        )
+        .eq('userId', decoded.userId)
+        .order('reservationDate', { ascending: true })
+        .order('reservationTime', { ascending: true }),
+      supabase
+        .from('reservation_failures')
+        .select(
+          'id,originalReservationId,userId,reservationCode,reservationDate,reservationTime,branchId,branchNumber,peopleCount,message,preOrderItems,status,archivedAt,cleanupAt'
+        )
+        .eq('userId', decoded.userId)
+        .order('archivedAt', { ascending: false }),
+    ]);
 
-    if (error) {
-      console.error('Error obteniendo reservaciones:', error);
+    if (reservationsRes.error) {
+      console.error('Error obteniendo reservaciones:', reservationsRes.error);
       throw new HttpError(500, 'No pudimos cargar tus reservaciones.');
     }
 
-    const { data: failed, error: failedError } = await supabase
-      .from('reservation_failures')
-      .select(
-        'id,originalReservationId,userId,reservationCode,reservationDate,reservationTime,branchId,branchNumber,peopleCount,message,preOrderItems,status,archivedAt,cleanupAt'
-      )
-      .eq('userId', decoded.userId)
-      .order('archivedAt', { ascending: false });
-
-    if (failedError) {
-      if (!isMissingReservationFailuresTableError(failedError)) {
-        console.error('Error obteniendo reservaciones fallidas:', failedError);
+    if (failedRes.error) {
+      if (!isMissingReservationFailuresTableError(failedRes.error)) {
+        console.error('Error obteniendo reservaciones fallidas:', failedRes.error);
         throw new HttpError(500, 'No pudimos cargar las reservas no completadas.');
       }
     }
 
     return NextResponse.json({
       success: true,
-      data: data ?? [],
-      failed: failedError ? [] : failed ?? [],
+      data: reservationsRes.data ?? [],
+      failed: failedRes.error ? [] : failedRes.data ?? [],
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof HttpError) {
       return NextResponse.json(
         { success: false, message: error.message },
@@ -291,7 +294,7 @@ export async function POST(request: NextRequest) {
         reservationCode: data.reservationCode,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof HttpError) {
       return NextResponse.json(
         { success: false, message: error.message },

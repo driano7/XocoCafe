@@ -634,7 +634,7 @@ export default function OrdersDashboardPage() {
     if (!window.matchMedia('(min-width: 1024px)').matches) {
       return;
     }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'auto' });
   }, []);
   const headerHeight = useHeaderHeight();
   const orderModalVars = useMemo(() => {
@@ -1496,21 +1496,30 @@ export default function OrdersDashboardPage() {
                   description="Pedidos que aún no entran a barra"
                   orders={pendingOrders}
                   emptyLabel="No hay pedidos en pendientes."
-                  onSelect={(value) => setSelectedOrder(value)}
+                  onSelect={(value) => {
+                    scrollModalIntoView();
+                    setSelectedOrder(value);
+                  }}
                 />
                 <OrdersBoardColumn
                   title="En producción"
                   description="Baristas trabajando en el pedido"
                   orders={prepOrders}
                   emptyLabel="No hay pedidos en producción."
-                  onSelect={(value) => setSelectedOrder(value)}
+                  onSelect={(value) => {
+                    scrollModalIntoView();
+                    setSelectedOrder(value);
+                  }}
                 />
                 <OrdersBoardColumn
                   title="Completados"
                   description="Listos para entregar o ya recolectados"
                   orders={completedOrdersList}
                   emptyLabel="No hay pedidos completados recientes."
-                  onSelect={(value) => setSelectedOrder(value)}
+                  onSelect={(value) => {
+                    scrollModalIntoView();
+                    setSelectedOrder(value);
+                  }}
                 />
               </div>
               <div className="flex justify-end">

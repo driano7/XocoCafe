@@ -28,6 +28,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FaWhatsapp } from 'react-icons/fa';
@@ -751,6 +752,15 @@ export default function UserProfile() {
     [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || user.email || undefined;
   const loyaltyCardLoading = isClientFavoritesLoading || isLoyaltyStatsLoading;
 
+  const sectionVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.6, ease: 'easeOut' },
+    },
+  };
+
   return (
     <>
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 lg:px-0">
@@ -764,7 +774,13 @@ export default function UserProfile() {
           </div>
         )}
 
-        <section className={sectionCardClass}>
+        <motion.section
+          className={sectionCardClass}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          variants={sectionVariants}
+        >
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Mi Perfil</h2>
@@ -987,9 +1003,15 @@ export default function UserProfile() {
             </a>
             <span>y con todo gusto te ayudamos.</span>
           </div>
-        </section>
+        </motion.section>
 
-        <section className={sectionCardClass}>
+        <motion.section
+          className={sectionCardClass}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          variants={sectionVariants}
+        >
           <div
             ref={loyaltyPanelRef}
             className="space-y-4 rounded-[32px] border border-white/30 bg-white/10 p-4 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/40"
@@ -1055,9 +1077,15 @@ export default function UserProfile() {
               />
             </div>
           </div>
-        </section>
+        </motion.section>
 
-        <section className={sectionCardClass}>
+        <motion.section
+          className={sectionCardClass}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          variants={sectionVariants}
+        >
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">
             Consumo de favoritos
           </h3>
@@ -1075,9 +1103,15 @@ export default function UserProfile() {
             </p>
             <ShareExperienceForm />
           </div>
-        </section>
+        </motion.section>
 
-        <section className={sectionCardClass}>
+        <motion.section
+          className={sectionCardClass}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          variants={sectionVariants}
+        >
           <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
             Mis direcciones
           </h3>
@@ -1096,9 +1130,15 @@ export default function UserProfile() {
               Administrar direcciones
             </button>
           </div>
-        </section>
+        </motion.section>
 
-        <section className={sectionCardClass}>
+        <motion.section
+          className={sectionCardClass}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          variants={sectionVariants}
+        >
           <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
             Seguridad de la cuenta
           </h3>
@@ -1135,9 +1175,15 @@ export default function UserProfile() {
               </button>
             </div>
           )}
-        </section>
+        </motion.section>
 
-        <section className={sectionCardClass}>
+        <motion.section
+          className={sectionCardClass}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          variants={sectionVariants}
+        >
           <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
             Preferencias de Marketing
           </h3>
@@ -1182,9 +1228,15 @@ export default function UserProfile() {
               <p className="text-xs text-gray-600 dark:text-gray-400">{pushPermissionInfo}</p>
             )}
           </div>
-        </section>
+        </motion.section>
 
-        <section className={sectionCardClass}>
+        <motion.section
+          className={sectionCardClass}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          variants={sectionVariants}
+        >
           <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
             Gestión de Datos (GDPR)
           </h3>
@@ -1200,10 +1252,14 @@ export default function UserProfile() {
               Exportar Datos
             </button>
           </div>
-        </section>
+        </motion.section>
 
-        <section
+        <motion.section
           className={`${sectionCardClass} border-red-200/60 bg-red-50/80 dark:border-red-500/40 dark:bg-red-900/40`}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          variants={sectionVariants}
         >
           <h3 className="mb-2 text-lg font-semibold text-red-900 dark:text-red-100">
             Eliminar cuenta
@@ -1217,7 +1273,7 @@ export default function UserProfile() {
           >
             Eliminar Cuenta
           </button>
-        </section>
+        </motion.section>
       </div>
 
       <ProfileModal
