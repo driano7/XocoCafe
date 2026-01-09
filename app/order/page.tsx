@@ -49,12 +49,12 @@ import CoffeeBackground from '@/components/CoffeeBackground';
 interface DbProduct {
   id: string;
   name: string;
-  category: 'beverage' | 'food' | 'package';
+  category: string;
   price: number;
   isActive: boolean;
   metadata?: {
     availableSizes?: string[];
-    items?: any[];
+    items?: string[];
     mediumPrice?: number;
     largePrice?: number;
   };
@@ -97,41 +97,48 @@ export default function OrderPage() {
   }, []);
 
   const dynamicBeverages = useMemo(() => {
-    if (!dbProducts.length) return beverageOptions;
-    return dbProducts
+    const fromDb = dbProducts
       .filter((p) => p.category === 'beverage' && p.isActive)
       .map((p) => ({
         id: p.id,
         label: p.name,
         category: 'beverage' as const,
         price: p.price,
-        metadata: { availableSizes: ['único'] },
+        metadata: {
+          availableSizes: p.metadata?.availableSizes ?? ['único'],
+          items: p.metadata?.items ?? [],
+        },
       }));
+    return fromDb.length > 0 ? fromDb : beverageOptions;
   }, [dbProducts]);
 
   const dynamicFoods = useMemo(() => {
-    if (!dbProducts.length) return foodOptions;
-    return dbProducts
+    const fromDb = dbProducts
       .filter((p) => p.category === 'food' && p.isActive)
       .map((p) => ({
         id: p.id,
         label: p.name,
         category: 'food' as const,
         price: p.price,
+        metadata: {
+          items: p.metadata?.items ?? [],
+          availableSizes: p.metadata?.availableSizes ?? ['único'],
+        },
       }));
+    return fromDb.length > 0 ? fromDb : foodOptions;
   }, [dbProducts]);
 
   const dynamicPackages = useMemo(() => {
-    if (!dbProducts.length) return packageOptions;
-    return dbProducts
-      .filter((p) => p.category === 'package' && p.isActive)
+    const fromDb = dbProducts
+      .filter((p) => (p.category === 'package' || p.category === 'other') && p.isActive)
       .map((p) => ({
         id: p.id,
         label: p.name,
         category: 'package' as const,
         price: p.price,
-        metadata: { items: [] },
+        metadata: { items: p.metadata?.items ?? [] },
       }));
+    return fromDb.length > 0 ? fromDb : packageOptions;
   }, [dbProducts]);
 
   const getMenuItem = (id: string): MenuItem | undefined => {
@@ -140,11 +147,11 @@ export default function OrderPage() {
       return {
         id: fromDb.id,
         label: fromDb.name,
-        category: fromDb.category,
+        category: fromDb.category as any,
         price: fromDb.price,
         metadata: {
-          items: [],
-          availableSizes: ['único'],
+          items: fromDb.metadata?.items ?? [],
+          availableSizes: fromDb.metadata?.availableSizes ?? ['único'],
           mediumPrice: null,
           largePrice: null,
         },

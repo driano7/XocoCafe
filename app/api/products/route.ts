@@ -32,7 +32,7 @@ export async function GET() {
   try {
     const { data, error } = await supabase
       .from('products')
-      .select('id,"productId",name,category,subcategory,price,"isActive"')
+      .select('id,"productId",name,category,subcategory,price,"isActive",metadata,items')
       .order('name', { ascending: true });
 
     if (error) {

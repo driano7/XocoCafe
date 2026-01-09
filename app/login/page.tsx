@@ -140,7 +140,7 @@ export default function LoginPage() {
       const target = postAuthRedirect || '/profile';
       const timer = setTimeout(() => {
         router.replace(target);
-      }, 2200);
+      }, 1500);
       return () => clearTimeout(timer);
     }
   }, [user, router, postAuthRedirect]);
@@ -247,7 +247,7 @@ export default function LoginPage() {
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1.4, opacity: 0 }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' }}
             className="absolute inset-0 rounded-full bg-success-500/20"
           />
           <div className="relative h-24 w-24">
@@ -316,7 +316,7 @@ export default function LoginPage() {
           <motion.div
             initial={{ x: '-100%' }}
             animate={{ x: '0%' }}
-            transition={{ duration: 2, ease: 'linear' }}
+            transition={{ duration: 1.5, ease: 'linear' }}
             className="h-full w-full bg-success-500"
           />
         </div>
