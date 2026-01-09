@@ -106,9 +106,10 @@ export default function MenuExperience({ simpleCode, simpleContent }: MenuExperi
                   </div>
                 </div>
               </div>
-              <div className="pointer-events-none absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-sm text-gray-700 shadow-md dark:bg-black/70 dark:text-white sm:hidden">
+              <div className="pointer-events-none absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-primary-600/20 text-sm text-primary-600 shadow-md ring-1 ring-primary-600/30 dark:bg-primary-500/30 dark:text-primary-400 sm:hidden">
+                <span className="absolute inset-0 animate-ping rounded-full bg-primary-400 opacity-75" />
                 <span className="sr-only">Desliza horizontalmente para ver más</span>
-                <FiArrowRight aria-hidden />
+                <FiArrowRight aria-hidden className="relative z-10" />
               </div>
             </div>
           </div>

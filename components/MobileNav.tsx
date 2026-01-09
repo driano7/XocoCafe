@@ -43,7 +43,6 @@ export default function MobileNav() {
         onClick={() => setNavShow(!navShow)}
         className="relative flex h-10 w-10 items-center justify-center rounded-full bg-primary-600 text-white shadow-lg transition-transform hover:scale-110 active:scale-95 sm:hidden"
       >
-        <span className="absolute inset-0 animate-ping rounded-full bg-primary-400 opacity-75" />
         <span className="relative z-10 text-2xl">
           <svg
             stroke="currentColor"

@@ -34,7 +34,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import CommandPalette from './CommandPalette/CommandPalette';
-import MobileNav from './MobileNav';
+
 import ThemeSwitch from './ThemeSwitch';
 
 export default function Header() {
@@ -154,7 +154,6 @@ export default function Header() {
             <AuthNav />
             <CommandPalette />
             <ThemeSwitch />
-            <MobileNav />
           </div>
         </div>
       </header>
