@@ -28,17 +28,37 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import CheckoutForm from '@/components/Order/CheckoutForm';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import { useCartStore } from '@/hooks/useCartStore';
 import SearchableDropdown from '@/components/SearchableDropdown';
-import { beverageOptions, foodOptions, getMenuItemById, packageOptions } from '@/lib/menuData';
+import {
+  beverageOptions,
+  foodOptions,
+  getMenuItemById,
+  packageOptions,
+  type MenuItem,
+} from '@/lib/menuData';
 import LoyaltyProgressCard from '@/components/LoyaltyProgressCard';
 import { useClientFavorites } from '@/hooks/useClientFavorites';
 import type { AddressInput } from '@/lib/validations/auth';
 import CoffeeBackground from '@/components/CoffeeBackground';
+
+interface DbProduct {
+  id: string;
+  name: string;
+  category: 'beverage' | 'food' | 'package';
+  price: number;
+  isActive: boolean;
+  metadata?: {
+    availableSizes?: string[];
+    items?: any[];
+    mediumPrice?: number;
+    largePrice?: number;
+  };
+}
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-MX', {
@@ -56,10 +76,88 @@ export default function OrderPage() {
   const [selectedBeverageSize, setSelectedBeverageSize] = useState<string | null>(null);
   const [selectedFoodId, setSelectedFoodId] = useState('');
   const [selectedPackageId, setSelectedPackageId] = useState('');
+  const [dbProducts, setDbProducts] = useState<DbProduct[]>([]);
+  const [dbLoading, setDbLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchProducts() {
+      try {
+        const response = await fetch('/api/products');
+        const result = await response.json();
+        if (result.success) {
+          setDbProducts(result.data);
+        }
+      } catch (error) {
+        console.error('Error fetching DB products:', error);
+      } finally {
+        setDbLoading(false);
+      }
+    }
+    fetchProducts();
+  }, []);
+
+  const dynamicBeverages = useMemo(() => {
+    if (!dbProducts.length) return beverageOptions;
+    return dbProducts
+      .filter((p) => p.category === 'beverage' && p.isActive)
+      .map((p) => ({
+        id: p.id,
+        label: p.name,
+        category: 'beverage' as const,
+        price: p.price,
+        metadata: { availableSizes: ['único'] },
+      }));
+  }, [dbProducts]);
+
+  const dynamicFoods = useMemo(() => {
+    if (!dbProducts.length) return foodOptions;
+    return dbProducts
+      .filter((p) => p.category === 'food' && p.isActive)
+      .map((p) => ({
+        id: p.id,
+        label: p.name,
+        category: 'food' as const,
+        price: p.price,
+      }));
+  }, [dbProducts]);
+
+  const dynamicPackages = useMemo(() => {
+    if (!dbProducts.length) return packageOptions;
+    return dbProducts
+      .filter((p) => p.category === 'package' && p.isActive)
+      .map((p) => ({
+        id: p.id,
+        label: p.name,
+        category: 'package' as const,
+        price: p.price,
+        metadata: { items: [] },
+      }));
+  }, [dbProducts]);
+
+  const getMenuItem = (id: string): MenuItem | undefined => {
+    const fromDb = dbProducts.find((p) => p.id === id);
+    if (fromDb) {
+      return {
+        id: fromDb.id,
+        label: fromDb.name,
+        category: fromDb.category,
+        price: fromDb.price,
+        metadata: {
+          items: [],
+          availableSizes: ['único'],
+          mediumPrice: null,
+          largePrice: null,
+        },
+      };
+    }
+    return getMenuItemById(id);
+  };
+
   const { data: clientFavorites, isLoading: isOrderFavoritesLoading } = useClientFavorites(
     user?.clientId ?? null,
     token
   );
+
   const loyaltyWeeklyCoffees =
     clientFavorites?.loyalty?.weeklyCoffeeCount ?? user?.weeklyCoffeeCount ?? 0;
   const loyaltyGoal = clientFavorites?.loyalty?.stampsGoal ?? 7;
@@ -69,7 +167,8 @@ export default function OrderPage() {
     [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() ||
     user?.clientId ||
     undefined;
-  const selectedBeverage = selectedBeverageId ? getMenuItemById(selectedBeverageId) : null;
+
+  const selectedBeverage = selectedBeverageId ? getMenuItem(selectedBeverageId) : null;
   const beverageSizeList = selectedBeverage?.metadata?.availableSizes;
   const selectedBeverageSizes = selectedBeverage
     ? Array.isArray(beverageSizeList) && beverageSizeList.length > 0
@@ -79,7 +178,7 @@ export default function OrderPage() {
   const beverageRequiresSizeSelection = selectedBeverageSizes.length > 1;
 
   const resolveMenuItemPrice = (menuId: string): number => {
-    const menuItem = getMenuItemById(menuId);
+    const menuItem = getMenuItem(menuId);
     if (!menuItem) return 55;
     return menuItem.price ?? menuItem.metadata?.mediumPrice ?? menuItem.metadata?.largePrice ?? 55;
   };
@@ -115,14 +214,14 @@ export default function OrderPage() {
   }, [determineRewardLineId, items]);
 
   const handleQuickAdd = (menuId: string, options?: { size?: string | null }) => {
-    const menuItem = getMenuItemById(menuId);
+    const menuItem = getMenuItem(menuId);
     if (!menuItem) return;
     const inferredPrice = resolveMenuItemPrice(menuId);
     addItem({
       productId: menuId,
       name: menuItem.label,
       price: inferredPrice,
-      category: menuItem.category,
+      category: menuItem.category as any,
       size: options?.size ?? null,
       packageItems: menuItem.metadata?.items ?? null,
     });
@@ -139,7 +238,7 @@ export default function OrderPage() {
       setSelectedBeverageSize(null);
       return;
     }
-    const menuItem = getMenuItemById(menuId);
+    const menuItem = getMenuItem(menuId);
     if (!menuItem) return;
     const sizeOptions =
       Array.isArray(menuItem.metadata?.availableSizes) && menuItem.metadata?.availableSizes.length
@@ -231,84 +330,88 @@ export default function OrderPage() {
           Usa los mismos dropdowns de tus favoritos para elegir bebidas y alimentos.
         </p>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <div>
-          <SearchableDropdown
-            id="quick-beverage"
-            label="Bebida"
-            options={beverageOptions}
-            value={selectedBeverageId}
-            onChange={handleBeverageSelection}
-            helperText={
-              selectedBeverageId
-                ? beverageRequiresSizeSelection
-                  ? 'Elige el tamaño para agregarla al carrito.'
-                  : `Precio estimado: ${formatCurrency(resolveMenuItemPrice(selectedBeverageId))}`
-                : 'Selecciona una bebida y la agregamos al instante'
-            }
-          />
-          {selectedBeverageId && beverageRequiresSizeSelection && (
-            <div className="mt-2">
-              <label
-                className="block text-xs font-medium text-gray-600 dark:text-gray-300"
-                htmlFor="quick-beverage-size"
-              >
-                Tamaño
-              </label>
-              <select
-                id="quick-beverage-size"
-                value={selectedBeverageSize ?? ''}
-                onChange={(event) => handleBeverageSizeSelection(event.target.value)}
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="" disabled>
-                  Selecciona un tamaño…
-                </option>
-                {selectedBeverageSizes.map((size) => (
-                  <option key={size} value={size}>
-                    {size[0].toUpperCase() + size.slice(1)}
+      {dbLoading ? (
+        <div className="flex justify-center py-4">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <SearchableDropdown
+              id="quick-beverage"
+              label="Bebida"
+              options={dynamicBeverages}
+              value={selectedBeverageId}
+              onChange={handleBeverageSelection}
+              helperText={
+                selectedBeverageId
+                  ? beverageRequiresSizeSelection
+                    ? 'Elige el tamaño para agregarla al carrito.'
+                    : `Precio estimado: ${formatCurrency(resolveMenuItemPrice(selectedBeverageId))}`
+                  : 'Selecciona una bebida y la agregamos al instante'
+              }
+            />
+            {selectedBeverageId && beverageRequiresSizeSelection && (
+              <div className="mt-2">
+                <label
+                  className="block text-xs font-medium text-gray-600 dark:text-gray-300"
+                  htmlFor="quick-beverage-size"
+                >
+                  Tamaño
+                </label>
+                <select
+                  id="quick-beverage-size"
+                  value={selectedBeverageSize ?? ''}
+                  onChange={(event) => handleBeverageSizeSelection(event.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                >
+                  <option value="" disabled>
+                    Selecciona un tamaño…
                   </option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                La bebida se agrega automáticamente al elegir el tamaño.
-              </p>
-            </div>
-          )}
-        </div>
+                  {selectedBeverageSizes.map((size: string) => (
+                    <option key={size} value={size}>
+                      {size[0].toUpperCase() + size.slice(1)}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  La bebida se agrega automáticamente al elegir el tamaño.
+                </p>
+              </div>
+            )}
+          </div>
 
-        <div>
-          <SearchableDropdown
-            id="quick-food"
-            label="Alimento"
-            options={foodOptions}
-            value={selectedFoodId}
-            onChange={handleFoodSelection}
-            helperText={
-              selectedFoodId
-                ? `Precio estimado: ${formatCurrency(resolveMenuItemPrice(selectedFoodId))}`
-                : 'Selecciona un alimento y lo agregamos al momento'
-            }
-          />
-        </div>
+          <div>
+            <SearchableDropdown
+              id="quick-food"
+              label="Alimento"
+              options={dynamicFoods}
+              value={selectedFoodId}
+              onChange={handleFoodSelection}
+              helperText={
+                selectedFoodId
+                  ? `Precio estimado: ${formatCurrency(resolveMenuItemPrice(selectedFoodId))}`
+                  : 'Selecciona un alimento y lo agregamos al momento'
+              }
+            />
+          </div>
 
-        <div>
-          <SearchableDropdown
-            id="quick-package"
-            label="Paquete"
-            options={packageOptions}
-            value={selectedPackageId}
-            onChange={handlePackageSelection}
-            helperText={
-              selectedPackageId
-                ? `Incluye: ${
-                    (getMenuItemById(selectedPackageId)?.metadata?.items ?? []).join(', ') || '—'
-                  }`
-                : 'Selecciona un combo y lo agregamos automáticamente'
-            }
-          />
+          <div>
+            <SearchableDropdown
+              id="quick-package"
+              label="Paquete"
+              options={dynamicPackages}
+              value={selectedPackageId}
+              onChange={handlePackageSelection}
+              helperText={
+                selectedPackageId
+                  ? `Precio estimado: ${formatCurrency(resolveMenuItemPrice(selectedPackageId))}`
+                  : 'Selecciona un combo y lo agregamos automáticamente'
+              }
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 

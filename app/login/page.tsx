@@ -52,7 +52,7 @@ export default function LoginPage() {
   const [error, setError] = useState<ReactNode>(null);
   const [postAuthRedirect, setPostAuthRedirect] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<SnackbarState | null>(null);
-  const { login, user, logout, isLoading } = useAuth();
+  const { login, user, isLoading } = useAuth();
   const router = useRouter();
   const formCardRef = useRef<HTMLDivElement | null>(null);
   const [formVisible, setFormVisible] = useState(false);
@@ -139,6 +139,15 @@ export default function LoginPage() {
     if (user && postAuthRedirect) {
       router.replace(postAuthRedirect);
       setPostAuthRedirect(null);
+    }
+  }, [user, router, postAuthRedirect]);
+
+  useEffect(() => {
+    if (user && !postAuthRedirect) {
+      const timer = setTimeout(() => {
+        router.push('/profile');
+      }, 1800);
+      return () => clearTimeout(timer);
     }
   }, [user, router, postAuthRedirect]);
 
@@ -233,49 +242,69 @@ export default function LoginPage() {
     );
   }
 
+  const LoginSuccessAnimation = () => (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="brand-auth-card space-y-6 text-center"
+    >
+      <div className="flex justify-center">
+        <div className="relative">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1.2, opacity: 0 }}
+            transition={{ duration: 1, repeat: Infinity }}
+            className="absolute inset-0 rounded-full bg-success-500"
+          />
+          <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-success-500 text-white shadow-lg">
+            <svg
+              className="h-10 w-10"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <motion.path
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="3"
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h2 className="text-3xl font-black text-primary-900 dark:text-white">
+          ¡Bienvenido de vuelta, {greetingName}!
+        </h2>
+        <p className="mt-2 text-primary-800/80 dark:text-primary-100/80">
+          Tu sesión está activa. Te estamos redirigiendo a tu perfil...
+        </p>
+      </div>
+      <div className="flex justify-center">
+        <div className="h-1.5 w-48 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+          <motion.div
+            initial={{ x: '-100%' }}
+            animate={{ x: '0%' }}
+            transition={{ duration: 1.5, ease: 'easeInOut' }}
+            className="h-full w-full bg-primary-600"
+          />
+        </div>
+      </div>
+    </motion.div>
+  );
+
   if (user) {
     return (
       <>
         {snackbarElement}
         <div className={pageShellClasses}>
-          <div className="relative z-10 mx-auto max-w-3xl">
-            <div className="brand-auth-card space-y-6 text-center">
-              <div>
-                <p className="text-xs uppercase tracking-[0.5em] text-primary-500/80">
-                  Sesión activa
-                </p>
-                <h2 className="mt-2 text-4xl font-black text-primary-900 dark:text-white">
-                  Hola, {greetingName}
-                </h2>
-                <p className="mt-3 text-sm text-primary-800/80 dark:text-primary-100/80">
-                  Ya tienes una sesión activa. Ve directo a tu perfil o cierra sesión para ingresar
-                  con otra cuenta.
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => router.push('/profile')}
-                  className="brand-primary-btn"
-                >
-                  Ir a mi perfil
-                </button>
-                <button type="button" onClick={() => void logout()} className="brand-secondary-btn">
-                  Cerrar sesión
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsLogin(true);
-                  setShowForgotPassword(false);
-                  setSnackbar(null);
-                }}
-                className="brand-tertiary-btn w-full justify-center"
-              >
-                ¿Quieres registrar otra cuenta?
-              </button>
-            </div>
+          <div className="relative z-10 mx-auto max-w-lg">
+            <LoginSuccessAnimation />
           </div>
         </div>
       </>

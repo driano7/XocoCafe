@@ -27,47 +27,67 @@
 
 'use client';
 
-import TypewriterText from '@/components/TypewriterText';
+import { motion } from 'framer-motion';
+import Link from 'next/link';
 
 export default function Contact() {
+  const containerVariants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.8, ease: 'easeOut' },
+    },
+  };
+
   return (
-    <section className="relative h-screen w-screen py-10 px-12 md:px-32 xl:px-36 dark:bg-black dark:text-white bg-white  text-black">
-      <div className="flex flex-col justify-evenly h-5/6">
-        <p className="text-3xl md:text-6xl xl:text-8xl">
-          <TypewriterText
-            className="inline-block"
-            segments={[
-              { text: '¿A poco no se te antoja ' },
-              { text: '\n', kind: 'lineBreak' },
-              { text: 'un buen ' },
-              {
-                text: 'Café',
-                kind: 'link',
-                href: '/blog/cafe',
-                className:
-                  'font-black text-primary-600 underline decoration-4 underline-offset-8 dark:text-primary-400',
-              },
-            ]}
-            startDelay={600}
-          />
-        </p>
-        <p className="text-3xl md:text-6xl xl:text-8xl text-end">
-          <TypewriterText
-            className="inline-block"
-            segments={[
-              { text: 'ó ' },
-              {
-                text: 'Chocolate',
-                kind: 'link',
-                href: '/blog/chocolate',
-                className:
-                  'font-black text-primary-600 underline decoration-4 underline-offset-8 dark:text-primary-400',
-              },
-              { text: '?' },
-            ]}
-            startDelay={1200}
-          />
-        </p>
+    <section className="relative w-full bg-white py-24 text-black dark:bg-black dark:text-white lg:py-40">
+      {/* Resaltado perimetral Permanente (Color Café) */}
+      <div className="pointer-events-none absolute inset-0 z-50 border-[20px] border-primary-600/30" />
+
+      <div className="mx-auto max-w-7xl px-6 md:px-12 lg:px-20">
+        <div className="flex flex-col gap-20 lg:gap-32">
+          {/* Bloque 1: Café */}
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-100px' }}
+            variants={containerVariants}
+            className="flex flex-col items-start"
+          >
+            <p className="text-4xl font-semibold leading-tight md:text-7xl lg:text-8xl">
+              ¿A poco no se te antoja
+              <br />
+              un buen{' '}
+              <Link
+                href="/blog/cafe"
+                className="font-black text-primary-600 underline decoration-4 underline-offset-8 transition-colors hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+              >
+                Café
+              </Link>
+            </p>
+          </motion.div>
+
+          {/* Bloque 2: Chocolate */}
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-100px' }}
+            variants={containerVariants}
+            className="flex flex-col items-end text-end"
+          >
+            <p className="text-4xl font-semibold leading-tight md:text-7xl lg:text-8xl">
+              ó{' '}
+              <Link
+                href="/blog/chocolate"
+                className="font-black text-primary-600 underline decoration-4 underline-offset-8 transition-colors hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+              >
+                Chocolate
+              </Link>
+              ?
+            </p>
+          </motion.div>
+        </div>
       </div>
     </section>
   );
