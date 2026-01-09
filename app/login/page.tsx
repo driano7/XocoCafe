@@ -35,6 +35,7 @@ import { useAuth } from '@/components/Auth/AuthProvider';
 import LoginForm from '@/components/Auth/LoginForm';
 import RegisterForm from '@/components/Auth/RegisterForm';
 import ForgotPasswordForm from '@/components/Auth/ForgotPasswordForm';
+import Image from '@/components/Image';
 import type { AuthSuccessContext } from '@/components/Auth/types';
 import type { AuthUser } from '@/lib/validations/auth';
 
@@ -118,7 +119,6 @@ export default function LoginPage() {
     const targetPath = context.source === 'register' ? '/onboarding/favorites' : '/profile';
     setPostAuthRedirect(targetPath);
     router.prefetch(targetPath);
-    router.replace(targetPath);
   };
 
   const handleError = (message: string | ReactNode) => {
@@ -136,17 +136,11 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    if (user && postAuthRedirect) {
-      router.replace(postAuthRedirect);
-      setPostAuthRedirect(null);
-    }
-  }, [user, router, postAuthRedirect]);
-
-  useEffect(() => {
-    if (user && !postAuthRedirect) {
+    if (user) {
+      const target = postAuthRedirect || '/profile';
       const timer = setTimeout(() => {
-        router.push('/profile');
-      }, 1800);
+        router.replace(target);
+      }, 2200);
       return () => clearTimeout(timer);
     }
   }, [user, router, postAuthRedirect]);
@@ -244,54 +238,86 @@ export default function LoginPage() {
 
   const LoginSuccessAnimation = () => (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="brand-auth-card space-y-6 text-center"
+      className="brand-auth-card space-y-8 py-10 text-center"
     >
       <div className="flex justify-center">
         <div className="relative">
           <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1.2, opacity: 0 }}
-            transition={{ duration: 1, repeat: Infinity }}
-            className="absolute inset-0 rounded-full bg-success-500"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1.4, opacity: 0 }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
+            className="absolute inset-0 rounded-full bg-success-500/20"
           />
-          <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-success-500 text-white shadow-lg">
-            <svg
-              className="h-10 w-10"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
+          <div className="relative h-24 w-24">
+            {user?.avatarUrl ? (
+              <div className="h-full w-full overflow-hidden rounded-full border-4 border-success-500 shadow-xl">
+                <Image
+                  src={user.avatarUrl}
+                  alt={greetingName || 'Usuario'}
+                  width={96}
+                  height={96}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="flex h-full w-full items-center justify-center rounded-full bg-primary-100 text-3xl font-bold text-primary-600 shadow-inner dark:bg-primary-900/40 dark:text-primary-200">
+                {greetingName?.charAt(0).toUpperCase() || 'U'}
+              </div>
+            )}
+            <motion.div
+              initial={{ scale: 0, opacity: 0, rotate: -45 }}
+              animate={{ scale: 1, opacity: 1, rotate: 0 }}
+              transition={{ delay: 0.5, type: 'spring', stiffness: 200, damping: 12 }}
+              className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full bg-success-500 text-white shadow-lg ring-4 ring-white dark:ring-gray-900"
             >
-              <motion.path
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="3"
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
+              <svg
+                className="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <motion.path
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{ duration: 0.4, delay: 0.9 }}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="3.5"
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </motion.div>
           </div>
         </div>
       </div>
-      <div>
-        <h2 className="text-3xl font-black text-primary-900 dark:text-white">
+      <div className="px-4">
+        <motion.h2
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="text-3xl font-black text-primary-900 dark:text-white"
+        >
           ¡Bienvenido de vuelta, {greetingName}!
-        </h2>
-        <p className="mt-2 text-primary-800/80 dark:text-primary-100/80">
-          Tu sesión está activa. Te estamos redirigiendo a tu perfil...
-        </p>
+        </motion.h2>
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="mt-3 text-base font-medium text-primary-800/80 dark:text-primary-100/80"
+        >
+          Tu sesión está activa. Te estamos redirigiendo...
+        </motion.p>
       </div>
-      <div className="flex justify-center">
-        <div className="h-1.5 w-48 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+      <div className="flex justify-center px-8">
+        <div className="h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-gray-100 dark:bg-primary-900/20">
           <motion.div
             initial={{ x: '-100%' }}
             animate={{ x: '0%' }}
-            transition={{ duration: 1.5, ease: 'easeInOut' }}
-            className="h-full w-full bg-primary-600"
+            transition={{ duration: 2, ease: 'linear' }}
+            className="h-full w-full bg-success-500"
           />
         </div>
       </div>
