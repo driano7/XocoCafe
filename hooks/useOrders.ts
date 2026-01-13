@@ -58,10 +58,15 @@ export interface OrderRecord {
       state?: string;
       postalCode?: string;
       reference?: string;
+      label?: string | null;
+      nickname?: string | null;
     };
     contactPhone?: string;
     isWhatsapp?: boolean;
     addressId?: string | null;
+    addressLabel?: string | null;
+    label?: string | null;
+    nickname?: string | null;
     deliveryTip?: {
       amount?: number | null;
       percent?: number | null;

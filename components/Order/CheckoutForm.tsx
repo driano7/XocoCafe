@@ -56,6 +56,17 @@ const parsePositiveNumber = (value: string) => {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 };
 
+const calculateDeliveryTipAmount = (
+  shouldShip: boolean,
+  tipPercent: number | null,
+  subtotal: number
+) => {
+  if (!shouldShip || typeof tipPercent !== 'number' || tipPercent <= 0) {
+    return 0;
+  }
+  return subtotal * (tipPercent / 100);
+};
+
 type SavedAddress = AddressInput & { id: string };
 
 export default function CheckoutForm({ token, user, onAddressesUpdate }: CheckoutFormProps) {
@@ -272,6 +283,24 @@ export default function CheckoutForm({ token, user, onAddressesUpdate }: Checkou
     }
   }, [selectedAddress, user?.phone]);
 
+  const shippingAddressLabel = useMemo(() => {
+    const savedLabel = selectedAddress?.label?.trim();
+    if (savedLabel) {
+      return savedLabel;
+    }
+    const savedNickname = selectedAddress?.nickname?.trim();
+    if (savedNickname) {
+      return savedNickname;
+    }
+    if (wantsToSaveAddress) {
+      const trimmed = newAddressLabel.trim();
+      if (trimmed.length >= 3) {
+        return trimmed;
+      }
+    }
+    return null;
+  }, [newAddressLabel, selectedAddress, wantsToSaveAddress]);
+
   const canSubmit = useMemo(() => {
     if (!token) return false;
     if (!items.length) return false;
@@ -325,32 +354,85 @@ export default function CheckoutForm({ token, user, onAddressesUpdate }: Checkou
     useCustomTipAmount,
   ]);
 
-  const deliveryTipAmount = useMemo(() => {
-    if (!needsShipping || typeof deliveryTipPercent !== 'number' || deliveryTipPercent <= 0) {
-      return 0;
+  const { deliveryTipAmount, totalWithTip } = useMemo(() => {
+    const computedDeliveryTipAmount = calculateDeliveryTipAmount(
+      needsShipping,
+      deliveryTipPercent,
+      subtotal
+    );
+    return {
+      deliveryTipAmount: computedDeliveryTipAmount,
+      totalWithTip: subtotal + tipAmount + computedDeliveryTipAmount,
+    };
+  }, [deliveryTipPercent, needsShipping, subtotal, tipAmount]);
+  const shippingAddressSummary = useMemo(() => {
+    if (!needsShipping) {
+      return null;
     }
-    return subtotal * (deliveryTipPercent / 100);
-  }, [deliveryTipPercent, needsShipping, subtotal]);
+    const trim = (value?: string | null) => (typeof value === 'string' ? value.trim() : '');
+    const street = trim(shippingForm.street);
+    const city = trim(shippingForm.city);
+    const state = trim(shippingForm.state);
+    const postalCode = trim(shippingForm.postalCode);
+    const country = trim(shippingForm.country);
+    const reference = trim(shippingForm.reference);
+    const derivedLabel = shippingAddressLabel ?? null;
+    const label = derivedLabel || 'Dirección sin etiqueta';
+    if (!street && !city && !state && !postalCode && !country) {
+      return null;
+    }
+    const cityState = [city, state].filter(Boolean).join(', ');
+    const postalCountry = [
+      postalCode ? `CP ${postalCode}` : null,
+      country.length > 0 ? country : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    const lines = [street, cityState, postalCountry].filter((line): line is string =>
+      Boolean(line && line.trim().length > 0)
+    );
+    return {
+      label,
+      lines,
+      reference: reference || null,
+    };
+  }, [needsShipping, shippingAddressLabel, shippingForm]);
 
-  const shippingDetails =
-    needsShipping && contactPhone.trim().length >= 10
-      ? {
-          address: shippingForm,
-          addressId: selectedAddressId,
-          contactPhone,
-          saveContactPhone: saveNewPhone && !useSavedPhone,
-          isWhatsapp,
-          deliveryTip:
-            deliveryTipAmount > 0
-              ? {
-                  amount: Math.round(deliveryTipAmount * 100) / 100,
-                  percent: deliveryTipPercent,
-                }
-              : null,
-        }
-      : null;
-
-  const totalWithTip = subtotal + tipAmount + deliveryTipAmount;
+  const shippingDetails = useMemo(() => {
+    if (!needsShipping || contactPhone.trim().length < 10) {
+      return null;
+    }
+    return {
+      address: {
+        ...shippingForm,
+        label: shippingAddressLabel ?? undefined,
+        nickname: shippingAddressLabel ?? undefined,
+      },
+      addressId: selectedAddressId,
+      addressLabel: shippingAddressLabel ?? null,
+      contactPhone,
+      saveContactPhone: saveNewPhone && !useSavedPhone,
+      isWhatsapp,
+      deliveryTip:
+        deliveryTipAmount > 0
+          ? {
+              amount: Math.round(deliveryTipAmount * 100) / 100,
+              percent: deliveryTipPercent,
+            }
+          : null,
+    };
+  }, [
+    contactPhone,
+    deliveryTipAmount,
+    deliveryTipPercent,
+    needsShipping,
+    saveNewPhone,
+    selectedAddressId,
+    shippingAddressLabel,
+    shippingForm,
+    useSavedPhone,
+    isWhatsapp,
+  ]);
 
   const handleSaveShippingAddress = async () => {
     if (!wantsToSaveAddress) {
@@ -1050,7 +1132,7 @@ export default function CheckoutForm({ token, user, onAddressesUpdate }: Checkou
           <span>Propina</span>
           <span className="font-semibold">{formatCurrency(tipAmount)}</span>
         </div>
-        {deliveryTipAmount > 0 && (
+        {needsShipping && (
           <div className="mt-2 flex items-center justify-between text-gray-600 dark:text-gray-200">
             <span>Propina de entrega</span>
             <span className="font-semibold">{formatCurrency(deliveryTipAmount)}</span>
@@ -1060,6 +1142,26 @@ export default function CheckoutForm({ token, user, onAddressesUpdate }: Checkou
           <span>Total estimado</span>
           <span>{formatCurrency(totalWithTip)}</span>
         </div>
+        {needsShipping && shippingAddressSummary && (
+          <div className="mt-4 rounded-2xl border border-dashed border-primary-200 bg-white/80 p-4 text-xs text-primary-900 shadow-sm dark:border-primary-700/60 dark:bg-gray-900/40 dark:text-primary-50">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-primary-700 dark:text-primary-200">
+              Entrega a domicilio
+            </p>
+            <p className="mt-1 text-sm font-semibold text-primary-900 dark:text-primary-50">
+              Dirección de envío
+            </p>
+            <div className="mt-1 space-y-0.5 text-sm text-primary-800 dark:text-primary-100">
+              {shippingAddressSummary.lines.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </div>
+            {shippingAddressSummary.reference && (
+              <p className="mt-2 text-[11px] text-primary-600 dark:text-primary-200">
+                Referencias: {shippingAddressSummary.reference}
+              </p>
+            )}
+          </div>
+        )}
         <p className="mt-1 text-xs text-gray-500">
           Los costos de envío se calculan al confirmar tu pedido.
         </p>

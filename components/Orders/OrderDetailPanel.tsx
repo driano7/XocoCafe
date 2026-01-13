@@ -78,6 +78,18 @@ const CUSTOMER_NOTES_METADATA_KEYS = [
 
 const STAFF_NOTES_METADATA_KEYS = ['posNote', 'staffNote', 'notaPos', 'barraNote', 'kitchenNote'];
 
+const formatCurrency = (value?: number | null) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return null;
+  }
+  return new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: 'MXN',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+};
+
 interface OrderDetailPanelProps {
   order: OrderRecord & { status: string };
   ticketDetails?: TicketDetailsPayload | null;
@@ -266,6 +278,59 @@ export function OrderDetailPanel({
       email?: string | null;
     } | null;
   };
+  const shippingPayload = enhancedOrder.shipping ?? null;
+  const normalizedShippingObject =
+    shippingPayload && isPlainObject(shippingPayload)
+      ? (shippingPayload as Record<string, unknown>)
+      : null;
+  const nestedShippingAddress =
+    normalizedShippingObject &&
+    isPlainObject((normalizedShippingObject as { address?: unknown }).address)
+      ? ((normalizedShippingObject as { address?: Record<string, unknown> }).address as Record<
+          string,
+          unknown
+        >)
+      : null;
+  const resolveShippingField = (key: string) => {
+    const nestedValue =
+      nestedShippingAddress && key in nestedShippingAddress
+        ? toTrimmedString(nestedShippingAddress[key])
+        : null;
+    if (nestedValue) {
+      return nestedValue;
+    }
+    return normalizedShippingObject && key in normalizedShippingObject
+      ? toTrimmedString(
+          (normalizedShippingObject as Record<string, unknown>)[
+            key as keyof typeof normalizedShippingObject
+          ]
+        )
+      : null;
+  };
+  const shippingAddressLines: string[] = [];
+  const shippingStreet = resolveShippingField('street');
+  const shippingCity = resolveShippingField('city');
+  const shippingState = resolveShippingField('state');
+  const shippingCountry = resolveShippingField('country');
+  const shippingPostalCode = resolveShippingField('postalCode');
+  const shippingReference = resolveShippingField('reference');
+  if (shippingStreet) {
+    shippingAddressLines.push(shippingStreet);
+  }
+  const locationLine = [shippingCity, shippingState, shippingCountry].filter(Boolean).join(', ');
+  if (locationLine) {
+    shippingAddressLines.push(locationLine);
+  }
+  if (shippingPostalCode) {
+    shippingAddressLines.push(`CP ${shippingPostalCode}`);
+  }
+  const shippingLabel =
+    resolveShippingField('label') ??
+    resolveShippingField('nickname') ??
+    toTrimmedString((normalizedShippingObject as { addressLabel?: string | null })?.addressLabel) ??
+    toTrimmedString((normalizedShippingObject as { label?: string | null })?.label) ??
+    null;
+  const shippingContact = toTrimmedString(shippingPayload?.contactPhone);
 
   const orderQueuedByStaffName = toTrimmedString(enhancedOrder.queuedByStaffName);
   const rawPaymentMethod =
@@ -312,6 +377,28 @@ export function OrderDetailPanel({
   const staffNotes = extractStaffNotes(metadata);
   const generalNotes = extractGeneralNotes(orderSnapshot);
   const fallbackNotes = !customerNotes && !staffNotes ? generalNotes : null;
+  const rawDeliveryTipAmount =
+    typeof enhancedOrder.deliveryTipAmount === 'number'
+      ? enhancedOrder.deliveryTipAmount
+      : typeof shippingPayload?.deliveryTip?.amount === 'number'
+      ? shippingPayload?.deliveryTip?.amount ?? null
+      : null;
+  const fallbackTipAmount =
+    typeof enhancedOrder.tipAmount === 'number' ? enhancedOrder.tipAmount : null;
+  const deliveryTipAmount = rawDeliveryTipAmount ?? fallbackTipAmount;
+  const formattedDeliveryTip = formatCurrency(deliveryTipAmount);
+  const deliveryTipPercent =
+    typeof shippingPayload?.deliveryTip?.percent === 'number'
+      ? shippingPayload?.deliveryTip?.percent
+      : typeof enhancedOrder.deliveryTipPercent === 'number'
+      ? enhancedOrder.deliveryTipPercent
+      : typeof enhancedOrder.tipPercent === 'number'
+      ? enhancedOrder.tipPercent
+      : null;
+  const deliveryPercentLabel =
+    typeof deliveryTipPercent === 'number' ? `${deliveryTipPercent}%` : null;
+  const showShippingCard =
+    shippingAddressLines.length > 0 || shippingContact || formattedDeliveryTip !== null;
 
   return (
     <section
@@ -379,6 +466,57 @@ export function OrderDetailPanel({
           }
         />
       </div>
+      {showShippingCard && (
+        <div className="rounded-2xl border border-primary-100 bg-primary-50/70 p-3 text-sm text-primary-900 shadow-inner dark:border-primary-800/60 dark:bg-primary-950/30 dark:text-primary-50">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-primary-700 dark:text-primary-200">
+            Entrega a domicilio
+          </p>
+          {shippingLabel && (
+            <p className="mt-0.5 text-base font-semibold text-primary-900 dark:text-primary-50">
+              {shippingLabel}
+            </p>
+          )}
+          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.25em] text-primary-600 dark:text-primary-100">
+            Dirección de envío
+          </p>
+          {shippingAddressLines.length > 0 ? (
+            <div className="mt-1 space-y-0.5 text-primary-900 dark:text-primary-50">
+              {shippingAddressLines.map((line, index) => (
+                <p key={`${line}-${index}`} className="text-sm">
+                  {line}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-1 text-sm text-primary-800/80 dark:text-primary-100/80">
+              Sin dirección registrada.
+            </p>
+          )}
+          {shippingReference && (
+            <p className="mt-2 text-sm text-primary-900 dark:text-primary-50">
+              Referencias: {shippingReference}
+            </p>
+          )}
+          {shippingContact && (
+            <p className="mt-2 text-sm text-primary-900 dark:text-primary-50">
+              <span className="font-semibold">Contacto:</span> {shippingContact}
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-primary-900 dark:text-primary-50">
+            <span className="text-xs font-semibold uppercase tracking-[0.35em] text-primary-700 dark:text-primary-200">
+              Propina para baristas
+            </span>
+            <span className="text-base font-semibold">
+              {formattedDeliveryTip ?? 'Sin propina registrada'}
+              {deliveryPercentLabel && formattedDeliveryTip && (
+                <span className="ml-2 text-xs font-semibold text-primary-700/80 dark:text-primary-200/80">
+                  {deliveryPercentLabel}
+                </span>
+              )}
+            </span>
+          </div>
+        </div>
+      )}
       {customerNotes && <OrderNotesCard note={customerNotes} label="Comentario del cliente" />}
       {staffNotes && <OrderNotesCard note={staffNotes} label="Notas internas" />}
       {fallbackNotes && <OrderNotesCard note={fallbackNotes} label="Comentarios adicionales" />}

@@ -80,6 +80,7 @@ export default function UserProfile() {
   const [deviceInfo, setDeviceInfo] = useState(() => detectDeviceInfo());
   const [loyaltyCoffeeCount, setLoyaltyCoffeeCount] = useState(() => user?.weeklyCoffeeCount ?? 0);
   const loyaltyPanelRef = useRef<HTMLDivElement | null>(null);
+  const addressesSectionRef = useRef<HTMLDivElement | null>(null);
   const [isExportingLoyaltyPanel, setIsExportingLoyaltyPanel] = useState(false);
   const [loyaltyPanelActionError, setLoyaltyPanelActionError] = useState<string | null>(null);
   const [isWebShareAvailable, setIsWebShareAvailable] = useState(
@@ -87,6 +88,29 @@ export default function UserProfile() {
   );
   const { snackbar, showSnackbar, dismissSnackbar } = useSnackbarNotifications();
   const { stats: loyaltyStats, isLoading: isLoyaltyStatsLoading } = useLoyalty();
+  const scrollToAddressesSection = useCallback(() => {
+    if (!addressesSectionRef.current || typeof window === 'undefined') {
+      return;
+    }
+    const scroller = document.querySelector('[data-profile-scroll-root]') as HTMLElement | null;
+    const target = addressesSectionRef.current;
+    const adjustScroll = (container: HTMLElement) => {
+      const containerTop = container.getBoundingClientRect().top;
+      const targetTop = target.getBoundingClientRect().top;
+      const offset = Math.max(window.innerHeight * 0.1, 64);
+      container.scrollTo({
+        top: container.scrollTop + (targetTop - containerTop) - offset,
+        behavior: 'smooth',
+      });
+    };
+    if (scroller) {
+      adjustScroll(scroller);
+    } else {
+      const offset = Math.max(window.innerHeight * 0.1, 80);
+      const top = target.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+    }
+  }, []);
 
   const {
     register: registerProfile,
@@ -775,6 +799,7 @@ export default function UserProfile() {
         )}
 
         <motion.section
+          ref={addressesSectionRef}
           className={sectionCardClass}
           initial="hidden"
           whileInView="visible"
@@ -1006,6 +1031,7 @@ export default function UserProfile() {
         </motion.section>
 
         <motion.section
+          ref={addressesSectionRef}
           className={sectionCardClass}
           initial="hidden"
           whileInView="visible"
@@ -1124,7 +1150,10 @@ export default function UserProfile() {
             </p>
             <button
               type="button"
-              onClick={() => setIsAddressModalOpen(true)}
+              onClick={() => {
+                scrollToAddressesSection();
+                setIsAddressModalOpen(true);
+              }}
               className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             >
               Administrar direcciones
@@ -1280,6 +1309,7 @@ export default function UserProfile() {
         open={isAddressModalOpen}
         onClose={() => setIsAddressModalOpen(false)}
         title="Mis direcciones"
+        autoScrollTop={false}
       >
         <AddressManager showIntro={false} />
       </ProfileModal>
@@ -1372,15 +1402,18 @@ type ProfileModalProps = {
   onClose: () => void;
   title: string;
   children: ReactNode;
+  autoScrollTop?: boolean;
 };
 
-function ProfileModal({ open, onClose, title, children }: ProfileModalProps) {
-  // Scroll to top when modal opens
+function ProfileModal({ open, onClose, title, children, autoScrollTop = true }: ProfileModalProps) {
   useEffect(() => {
+    if (!autoScrollTop) {
+      return;
+    }
     if (open && typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'auto' });
     }
-  }, [open]);
+  }, [autoScrollTop, open]);
 
   if (!open) {
     return null;

@@ -43,6 +43,11 @@ export type BuildOrderQrPayloadInput = {
   tipPercent: number | null;
   items: OrderQrItemInput[];
   shippingAddressId?: string | null;
+  shippingLabel?: string | null;
+  shippingLines?: string[] | null;
+  shippingReference?: string | null;
+  shippingContact?: string | null;
+  shippingIsWhatsapp?: boolean | null;
   deliveryTipAmount?: number | null;
   deliveryTipPercent?: number | null;
   createdAt?: string | null;
@@ -68,6 +73,13 @@ export type CompactOrderQrPayload = {
   dt?: {
     a: number;
     p: number | null;
+  };
+  ship?: {
+    label?: string | null;
+    lines?: string[];
+    ref?: string | null;
+    phone?: string | null;
+    isw?: boolean | null;
   };
   ts: string;
   clientId?: string;
@@ -133,6 +145,26 @@ export const buildOrderQrPayload = (input: BuildOrderQrPayloadInput): CompactOrd
 
   if (input.shippingAddressId) {
     payload.addr = input.shippingAddressId;
+  }
+  if (
+    (input.shippingLabel && input.shippingLabel.trim().length > 0) ||
+    (input.shippingLines && input.shippingLines.length > 0) ||
+    (input.shippingReference && input.shippingReference.trim().length > 0) ||
+    (input.shippingContact && input.shippingContact.trim().length > 0)
+  ) {
+    payload.ship = {
+      ...(input.shippingLabel ? { label: input.shippingLabel.trim() } : {}),
+      ...(input.shippingLines && input.shippingLines.length > 0
+        ? { lines: input.shippingLines.slice(0, 5) }
+        : {}),
+      ...(input.shippingReference && input.shippingReference.trim().length > 0
+        ? { ref: input.shippingReference.trim() }
+        : {}),
+      ...(input.shippingContact && input.shippingContact.trim().length > 0
+        ? { phone: input.shippingContact.trim() }
+        : {}),
+      ...(typeof input.shippingIsWhatsapp === 'boolean' ? { isw: input.shippingIsWhatsapp } : {}),
+    };
   }
   if (typeof input.deliveryTipAmount === 'number' && input.deliveryTipAmount > 0) {
     payload.dt = {

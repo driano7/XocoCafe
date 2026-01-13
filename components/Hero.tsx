@@ -72,6 +72,15 @@ export default function Hero(): ReactElement {
               >
                 ¿Quiénes somos? &rarr;
               </Link>
+              <div className="pt-6">
+                <Link
+                  href="/login"
+                  className="group relative inline-flex overflow-hidden rounded-full border border-primary-700 px-4 py-1.5 text-sm font-semibold text-primary-700 transition-colors duration-300 hover:text-primary-600 dark:border-primary-200 dark:text-primary-100"
+                >
+                  <span className="absolute inset-0 scale-0 rounded-full bg-current opacity-10 transition-transform duration-300 group-hover:scale-100" />
+                  <span className="relative">Iniciar Sesión</span>
+                </Link>
+              </div>
             </div>
             <motion.div
               animate={{

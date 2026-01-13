@@ -53,6 +53,65 @@ function generateOrderNumber(source: 'client' | 'store' = 'client') {
 
 const DEFAULT_POS_CUSTOMER_ID = 'AAA-1111';
 
+const deriveShippingSummaryForQr = (shipping: unknown) => {
+  if (!shipping || typeof shipping !== 'object') {
+    return null;
+  }
+  const record = shipping as Record<string, unknown>;
+  const nestedAddress =
+    record.address && typeof record.address === 'object'
+      ? (record.address as Record<string, unknown>)
+      : null;
+  const resolveField = (key: string) => {
+    const nestedValue =
+      nestedAddress && key in nestedAddress
+        ? typeof nestedAddress[key] === 'string'
+          ? (nestedAddress[key] as string).trim()
+          : ''
+        : '';
+    if (nestedValue) {
+      return nestedValue;
+    }
+    return typeof record[key] === 'string' ? (record[key] as string).trim() : '';
+  };
+  const street = resolveField('street');
+  const city = resolveField('city');
+  const state = resolveField('state');
+  const country = resolveField('country');
+  const postalCode = resolveField('postalCode');
+  const reference = resolveField('reference');
+  const label =
+    resolveField('addressLabel') ||
+    resolveField('label') ||
+    resolveField('nickname') ||
+    (typeof record.addressId === 'string' ? record.addressId : '');
+  const lines = [
+    street || null,
+    [city, state, country].filter(Boolean).join(', ') || null,
+    postalCode ? `CP ${postalCode}` : null,
+  ].filter((line): line is string => Boolean(line && line.trim().length));
+  const contactPhone =
+    typeof record.contactPhone === 'string' && record.contactPhone.trim().length > 0
+      ? record.contactPhone.trim()
+      : null;
+  const isWhatsapp =
+    typeof record.isWhatsapp === 'boolean'
+      ? record.isWhatsapp
+      : typeof nestedAddress?.isWhatsapp === 'boolean'
+      ? (nestedAddress.isWhatsapp as boolean)
+      : null;
+  if (!label && lines.length === 0 && !reference && !contactPhone) {
+    return null;
+  }
+  return {
+    label: label || null,
+    lines,
+    reference: reference || null,
+    contactPhone,
+    isWhatsapp,
+  };
+};
+
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -163,6 +222,7 @@ export async function POST(request: NextRequest) {
           }
         : null;
     const shippingAddressId = normalizedShipping?.addressId ?? null;
+    const shippingSummaryForQr = deriveShippingSummaryForQr(normalizedShipping);
 
     const orderPayload = {
       id: randomUUID(),
@@ -242,6 +302,11 @@ export async function POST(request: NextRequest) {
         size: item.size ?? null,
       })),
       shippingAddressId,
+      shippingLabel: shippingSummaryForQr?.label ?? null,
+      shippingLines: shippingSummaryForQr?.lines ?? null,
+      shippingReference: shippingSummaryForQr?.reference ?? null,
+      shippingContact: shippingSummaryForQr?.contactPhone ?? null,
+      shippingIsWhatsapp: shippingSummaryForQr?.isWhatsapp ?? null,
       deliveryTipAmount: normalizedDeliveryTipAmount ?? null,
       deliveryTipPercent: normalizedDeliveryTipPercent ?? null,
       createdAt: data.createdAt ?? null,

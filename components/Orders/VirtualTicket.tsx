@@ -45,10 +45,15 @@ export interface VirtualTicketProps {
         state?: string;
         postalCode?: string;
         reference?: string;
+        label?: string | null;
+        nickname?: string | null;
       };
       contactPhone?: string | null;
       isWhatsapp?: boolean | null;
       addressId?: string | null;
+      addressLabel?: string | null;
+      label?: string | null;
+      nickname?: string | null;
       deliveryTip?: {
         amount?: number | null;
         percent?: number | null;
@@ -101,6 +106,9 @@ const CATEGORY_LABELS: Record<ItemCategory, string> = {
   package: 'Paquetes',
   other: 'Otros',
 };
+
+const toTrimmedString = (value: unknown) =>
+  typeof value === 'string' ? value.trim() || null : null;
 
 const normalizeText = (value?: string | null) =>
   (value ?? '').toString().toLowerCase().normalize('NFD');
@@ -423,6 +431,72 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
           })),
       [items]
     );
+    const shippingSummary = useMemo(() => {
+      const resolveShippingSource = () => {
+        if (order.shipping && typeof order.shipping === 'object') {
+          return order.shipping as Record<string, unknown>;
+        }
+        if (order.items && typeof order.items === 'object' && (order.items as any)?.shipping) {
+          const candidate = (order.items as any).shipping;
+          if (candidate && typeof candidate === 'object') {
+            return candidate as Record<string, unknown>;
+          }
+        }
+        return null;
+      };
+      const shippingRecord = resolveShippingSource();
+      if (!shippingRecord) {
+        return null;
+      }
+      const nestedAddress =
+        shippingRecord.address && typeof shippingRecord.address === 'object'
+          ? (shippingRecord.address as Record<string, unknown>)
+          : null;
+      const resolveField = (key: string) => {
+        const nestedValue =
+          nestedAddress && key in nestedAddress
+            ? toTrimmedString((nestedAddress[key] as string) ?? null)
+            : null;
+        if (nestedValue) {
+          return nestedValue;
+        }
+        return toTrimmedString((shippingRecord[key] as string) ?? null);
+      };
+      const street = resolveField('street');
+      const city = resolveField('city');
+      const state = resolveField('state');
+      const postalCode = resolveField('postalCode');
+      const country = resolveField('country');
+      const reference = resolveField('reference');
+      const label =
+        toTrimmedString(
+          (shippingRecord.addressLabel as string | undefined) ??
+            (shippingRecord.label as string | undefined)
+        ) ??
+        resolveField('label') ??
+        resolveField('nickname');
+      if (!street && !city && !state && !postalCode && !reference && !country && !label) {
+        return null;
+      }
+      const lines = [
+        street,
+        [city, state, country].filter(Boolean).join(', ') || null,
+        postalCode ? `CP ${postalCode}` : null,
+      ].filter((line): line is string => Boolean(line && line.trim().length));
+      const contactPhone = toTrimmedString(
+        (shippingRecord.contactPhone as string | undefined) ?? order.shipping?.contactPhone ?? null
+      );
+      const isWhatsapp = Boolean(
+        (shippingRecord.isWhatsapp as boolean | undefined) ?? order.shipping?.isWhatsapp ?? false
+      );
+      return {
+        label: label ?? null,
+        lines,
+        reference: reference ? reference.trim() : null,
+        contactPhone,
+        isWhatsapp,
+      };
+    }, [order.shipping, order.items]);
 
     const deliveryTipAmount = useMemo(() => {
       if (typeof order.deliveryTipAmount === 'number') {
@@ -545,11 +619,17 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
           size: item.size ?? null,
         })),
         shippingAddressId: order.shipping?.addressId ?? null,
+        shippingLabel: shippingSummary?.label ?? null,
+        shippingLines: shippingSummary?.lines ?? null,
+        shippingReference: shippingSummary?.reference ?? null,
+        shippingContact: shippingSummary?.contactPhone ?? null,
+        shippingIsWhatsapp: shippingSummary?.isWhatsapp ?? null,
         deliveryTipAmount: deliveryTipAmount > 0 ? deliveryTipAmount : null,
         deliveryTipPercent: deliveryTipPercent ?? null,
         createdAt: order.createdAt ?? null,
       });
     }, [
+      shippingSummary,
       deliveryTipAmount,
       deliveryTipPercent,
       grandTotal,
@@ -651,40 +731,6 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
           )}
         </div>
 
-        {(() => {
-          const address = order.shipping?.address;
-          const hasAddressDetails =
-            !!address &&
-            [address.street, address.city, address.state, address.postalCode, address.reference]
-              .filter((value) => typeof value === 'string')
-              .some((value) => Boolean((value as string).trim().length));
-          const contactPhone = order.shipping?.contactPhone?.trim();
-          if (!hasAddressDetails) {
-            return null;
-          }
-          return (
-            <div className="mt-4 rounded-2xl border border-dashed border-primary-100 bg-primary-50/40 p-3 text-xs text-primary-900">
-              <p className="font-semibold uppercase tracking-[0.35em] text-[10px] text-primary-600">
-                Entrega
-              </p>
-              <p className="mt-1">
-                {address?.street}
-                {address?.city ? `, ${address.city}` : ''}
-                {address?.state ? `, ${address.state}` : ''}
-                {address?.postalCode ? ` · CP ${address.postalCode}` : ''}
-              </p>
-              {address?.reference && (
-                <p className="text-[11px] text-primary-700">Referencia: {address.reference}</p>
-              )}
-              {contactPhone && (
-                <p className="mt-1 text-[11px] font-medium">
-                  Contacto: {contactPhone} {order.shipping?.isWhatsapp ? '(WhatsApp)' : ''}
-                </p>
-              )}
-            </div>
-          );
-        })()}
-
         {summary.total > 0 && <TicketOrderSummary stats={summary} packages={packageDetails} />}
 
         <div className="my-3 border-t border-dashed border-gray-200" />
@@ -720,6 +766,19 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
           </span>
           <span className="font-semibold text-gray-900">{formatCurrency(tipAmount)}</span>
         </div>
+        {deliveryTipAmount > 0 && (
+          <div className="mt-2 flex items-center justify-between text-sm text-gray-600">
+            <span className="flex items-center gap-2">
+              {typeof deliveryTipPercent === 'number' && deliveryTipPercent > 0 && (
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-900">
+                  {deliveryTipPercent}%
+                </span>
+              )}
+              <span>Propina de entrega</span>
+            </span>
+            <span className="font-semibold text-gray-900">{formatCurrency(deliveryTipAmount)}</span>
+          </div>
+        )}
 
         <div className="my-3 border-t border-dashed border-gray-200" />
 
@@ -727,6 +786,40 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
           <span>Total general</span>
           <span>{formatCurrency(grandTotal)}</span>
         </div>
+        {shippingSummary && (
+          <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-100">
+            <h4 className="text-xs font-semibold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-300">
+              Entrega a domicilio
+            </h4>
+            {shippingSummary.label && (
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-200">
+                ID: {shippingSummary.label}
+              </p>
+            )}
+            {shippingSummary.lines.length > 0 ? (
+              <div className="mt-1 text-sm leading-relaxed text-gray-800 dark:text-gray-100">
+                {shippingSummary.lines.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                Sin dirección registrada.
+              </p>
+            )}
+            {shippingSummary.reference && (
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                Referencia: {shippingSummary.reference}
+              </p>
+            )}
+            {shippingSummary.contactPhone && (
+              <p className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-50">
+                Contacto: {shippingSummary.contactPhone}{' '}
+                {shippingSummary.isWhatsapp ? '(WhatsApp)' : ''}
+              </p>
+            )}
+          </div>
+        )}
         {showQr && (
           <div className="mt-4 flex flex-col items-center space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary-600">

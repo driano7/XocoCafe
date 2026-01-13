@@ -29,6 +29,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { decryptUserData } from '@/lib/encryption';
+import { decryptAddressRow, type AddressRow, type AddressPayload } from '@/lib/address-vault';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -150,6 +151,50 @@ export async function GET(request: NextRequest) {
     }
 
     const orders = (ordersData ?? []) as DbOrder[];
+
+    const shippingAddressIds = new Set<string>();
+    orders.forEach((entry) => {
+      const rawItems = entry.items;
+      const shippingFromColumn = (entry as { shipping?: unknown }).shipping ?? null;
+      const shippingDetails =
+        shippingFromColumn ??
+        (rawItems && typeof rawItems === 'object' && !Array.isArray(rawItems)
+          ? (rawItems as { shipping?: unknown }).shipping ?? null
+          : null);
+      const shippingAddressId =
+        (entry as { shipping_address_id?: string | null }).shipping_address_id ??
+        (shippingDetails && typeof shippingDetails === 'object' && 'addressId' in shippingDetails
+          ? (shippingDetails as { addressId?: string | null }).addressId
+          : null);
+      if (shippingAddressId) {
+        shippingAddressIds.add(shippingAddressId);
+      }
+    });
+
+    const addressMap = new Map<string, AddressPayload>();
+
+    if (shippingAddressIds.size > 0) {
+      const { data: addressRows, error: addressesError } = await supabase
+        .from('addresses')
+        .select(
+          'id,"userId",label,nickname,type,"isDefault","createdAt","updatedAt",payload,payload_iv,payload_tag,payload_salt'
+        )
+        .in('id', Array.from(shippingAddressIds));
+
+      if (addressesError) {
+        console.error('Error fetching addresses for orders:', addressesError);
+      } else {
+        (addressRows ?? []).forEach((address) => {
+          if (!address?.id) {
+            return;
+          }
+          const decrypted = decryptAddressRow(decoded.email, address as AddressRow);
+          if (decrypted?.id) {
+            addressMap.set(decrypted.id, decrypted);
+          }
+        });
+      }
+    }
 
     // Collect unique handler IDs for staff name resolution
     const handlerIds = Array.from(
@@ -281,11 +326,42 @@ export async function GET(request: NextRequest) {
           : null) ??
         null;
 
+      const savedAddress = shippingAddressId ? addressMap.get(shippingAddressId) ?? null : null;
+      const hasAddressObject =
+        shippingDetails &&
+        typeof shippingDetails === 'object' &&
+        'address' in shippingDetails &&
+        shippingDetails.address &&
+        typeof shippingDetails.address === 'object';
+      const resolvedAddress =
+        (hasAddressObject
+          ? (shippingDetails as { address: Record<string, unknown> }).address
+          : null) ??
+        savedAddress ??
+        null;
+      const resolvedContactPhone =
+        (shippingDetails && typeof shippingDetails === 'object'
+          ? (shippingDetails as { contactPhone?: string }).contactPhone ?? null
+          : null) ??
+        savedAddress?.contactPhone ??
+        null;
+      const resolvedIsWhatsapp =
+        (shippingDetails && typeof shippingDetails === 'object'
+          ? (shippingDetails as { isWhatsapp?: boolean | null }).isWhatsapp
+          : null) ??
+        savedAddress?.isWhatsapp ??
+        null;
+
       const enrichedShipping =
-        shippingDetails || shippingAddressId
+        shippingDetails || shippingAddressId || resolvedAddress || resolvedContactPhone
           ? {
               ...(shippingDetails ?? {}),
               addressId: shippingAddressId,
+              ...(resolvedAddress ? { address: resolvedAddress } : {}),
+              ...(resolvedContactPhone ? { contactPhone: resolvedContactPhone } : {}),
+              ...(typeof resolvedIsWhatsapp === 'boolean'
+                ? { isWhatsapp: resolvedIsWhatsapp }
+                : {}),
             }
           : null;
 

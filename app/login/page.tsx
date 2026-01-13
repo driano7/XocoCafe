@@ -69,7 +69,7 @@ export default function LoginPage() {
     },
     {
       title: 'Recompensas siempre visibles',
-      description: 'Consulta metas de lealtad y anima a tus clientes a canjearlas.',
+      description: 'Consultas tus métricas del programa de lealtad. ¡Más compras, más ganas!',
       accent: 'Rewards',
     },
   ];

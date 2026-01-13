@@ -74,6 +74,9 @@ export default function AddressManager({ showIntro = true }: AddressManagerProps
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const hasFetchedRef = useRef(false);
   const userRef = useRef(user);
+  const addressRefs = useRef<Record<string, HTMLLIElement | null>>({});
+  const [recentAddressId, setRecentAddressId] = useState<string | null>(null);
+  const [highlightedAddressId, setHighlightedAddressId] = useState<string | null>(null);
 
   const syncAddresses = useCallback(
     (next: AddressInput[]) => {
@@ -287,6 +290,9 @@ export default function AddressManager({ showIntro = true }: AddressManagerProps
         type: 'success',
         message: editingId ? 'Dirección actualizada.' : 'Dirección guardada.',
       });
+      if (!editingId && result.data?.id) {
+        setRecentAddressId(result.data.id);
+      }
       resetForm();
     } catch (error) {
       setAlert({
@@ -297,6 +303,31 @@ export default function AddressManager({ showIntro = true }: AddressManagerProps
       setIsSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (!recentAddressId) {
+      return undefined;
+    }
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+    const element = addressRefs.current[recentAddressId];
+    if (!element) {
+      const fallback = window.setTimeout(() => setRecentAddressId(null), 300);
+      return () => window.clearTimeout(fallback);
+    }
+    const headerOffset = Math.max(window.innerHeight * 0.2, 140);
+    window.requestAnimationFrame(() => {
+      const top = Math.max(element.getBoundingClientRect().top + window.scrollY - headerOffset, 0);
+      window.scrollTo({ top, behavior: 'smooth' });
+    });
+    setHighlightedAddressId(recentAddressId);
+    const timer = window.setTimeout(() => {
+      setHighlightedAddressId((current) => (current === recentAddressId ? null : current));
+      setRecentAddressId(null);
+    }, 1800);
+    return () => window.clearTimeout(timer);
+  }, [recentAddressId]);
 
   return (
     <section className="space-y-4">
@@ -345,7 +376,19 @@ export default function AddressManager({ showIntro = true }: AddressManagerProps
             {addresses.map((address) => (
               <li
                 key={address.id ?? address.label}
-                className="rounded-2xl border border-gray-200 p-4 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-800"
+                ref={(element) => {
+                  if (!address.id) return;
+                  if (element) {
+                    addressRefs.current[address.id] = element;
+                  } else {
+                    delete addressRefs.current[address.id];
+                  }
+                }}
+                className={`rounded-2xl border border-gray-200 p-4 text-sm shadow-sm transition dark:border-gray-700 dark:bg-gray-800 ${
+                  highlightedAddressId && address.id === highlightedAddressId
+                    ? 'ring-2 ring-primary-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900'
+                    : ''
+                }`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-base font-semibold text-gray-900 dark:text-white">
@@ -434,20 +477,20 @@ export default function AddressManager({ showIntro = true }: AddressManagerProps
                 className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
               />
             </label>
-            <div className="space-y-2 rounded-xl border border-primary-200 bg-white/80 p-3 text-sm shadow-sm dark:border-primary-700/60 dark:bg-primary-950">
+            <div className="space-y-2 rounded-xl border border-primary-200 bg-white/80 p-3 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-900/80 dark:text-gray-100">
               {user?.phone && (
-                <label className="flex items-center gap-2 text-primary-800 dark:text-primary-100">
+                <label className="flex items-center gap-2 text-primary-800 dark:text-gray-100">
                   <input
                     type="checkbox"
                     checked={useSavedPhone}
                     onChange={(event) => setUseSavedPhone(event.target.checked)}
-                    className="h-4 w-4 rounded border-primary-300 text-primary-600 focus:ring-primary-500"
+                    className="h-4 w-4 rounded border-primary-300 text-primary-600 focus:ring-primary-500 dark:border-gray-500 dark:bg-gray-900 dark:checked:bg-primary-500"
                   />
                   Usar mi teléfono guardado ({user.phone})
                 </label>
               )}
               <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
+                <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-gray-200">
                   Teléfono de contacto
                   <input
                     type="tel"
@@ -457,18 +500,18 @@ export default function AddressManager({ showIntro = true }: AddressManagerProps
                     }
                     disabled={useSavedPhone && Boolean(user?.phone)}
                     placeholder="10 dígitos"
-                    className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-500"
+                    className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-500"
                   />
                 </label>
               </div>
-              <label className="flex items-center gap-2 text-primary-800 dark:text-primary-100">
+              <label className="flex items-center gap-2 text-primary-800 dark:text-gray-100">
                 <input
                   type="checkbox"
                   checked={form.isWhatsapp ?? false}
                   onChange={(event) =>
                     setForm((prev) => ({ ...prev, isWhatsapp: event.target.checked }))
                   }
-                  className="h-4 w-4 rounded border-primary-300 text-primary-600 focus:ring-primary-500"
+                  className="h-4 w-4 rounded border-primary-300 text-primary-600 focus:ring-primary-500 dark:border-gray-500 dark:bg-gray-900 dark:checked:bg-primary-500"
                 />
                 Este número es de WhatsApp
               </label>

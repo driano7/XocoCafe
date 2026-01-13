@@ -1621,49 +1621,6 @@ export default function OrdersDashboardPage() {
                   </div>
                 )}
 
-                {(() => {
-                  const address = selectedOrder.shipping?.address;
-                  const contactPhone = selectedOrder.shipping?.contactPhone?.trim();
-                  const hasAddressDetails =
-                    !!address &&
-                    [
-                      address.street,
-                      address.city,
-                      address.state,
-                      address.postalCode,
-                      address.reference,
-                    ]
-                      .filter((value) => typeof value === 'string')
-                      .some((value) => Boolean((value as string).trim().length));
-                  if (!hasAddressDetails) {
-                    return null;
-                  }
-                  return (
-                    <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
-                      <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-300">
-                        Detalles de entrega
-                      </h4>
-                      <p>
-                        {address?.street}
-                        {address?.city ? `, ${address.city}` : ''}
-                        {address?.state ? `, ${address.state}` : ''}
-                        {address?.postalCode ? ` · CP ${address.postalCode}` : ''}
-                      </p>
-                      {address?.reference && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Referencia: {address.reference}
-                        </p>
-                      )}
-                      {contactPhone && (
-                        <p className="mt-2 text-sm font-medium">
-                          Contacto: {contactPhone}{' '}
-                          {selectedOrder.shipping?.isWhatsapp ? '(WhatsApp)' : ''}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })()}
-
                 {!expiredSelectedOrder && (
                   <div className="border-t border-gray-100 pb-2 pt-3 space-y-2">
                     <button
