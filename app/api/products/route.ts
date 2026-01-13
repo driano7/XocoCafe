@@ -32,14 +32,36 @@ export async function GET() {
   try {
     const { data, error } = await supabase
       .from('products')
-      .select('id,"productId",name,category,subcategory,price,"isActive",metadata,items')
+      .select(
+        'id,"productId",name,category,subcategory,price,"isActive","stockQuantity","lowStockThreshold",metadata,items'
+      )
       .order('name', { ascending: true });
 
     if (error) {
       throw new Error(error.message);
     }
 
-    return NextResponse.json({ success: true, data });
+    const payload = (data ?? []).map((product) => {
+      const stockQuantity =
+        typeof product.stockQuantity === 'number'
+          ? product.stockQuantity
+          : Number(product.stockQuantity ?? 0);
+      const lowStockThreshold =
+        typeof product.lowStockThreshold === 'number'
+          ? product.lowStockThreshold
+          : Number(product.lowStockThreshold ?? 0);
+      const soldOut = !product.isActive || stockQuantity <= 0;
+      const lowStock = !soldOut && stockQuantity > 0 && stockQuantity <= lowStockThreshold;
+      return {
+        ...product,
+        stockQuantity,
+        lowStockThreshold,
+        lowStock,
+        soldOut,
+      };
+    });
+
+    return NextResponse.json({ success: true, data: payload });
   } catch (error: any) {
     console.error('Error obteniendo productos:', error);
     return NextResponse.json(

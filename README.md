@@ -93,6 +93,8 @@ Xoco Café es un proyecto de café artesanal inspirado en la riqueza del café m
 - **Librería compartida para campos seguros.** `lib/secure-fields.ts` expone los helpers de cifrado/descifrado para cualquier módulo del front que necesite sincronizarse con el POS.
 - **Direcciones enriquecidas en pedidos y tickets.** Los endpoints `app/api/orders/history` y `app/api/orders/public` leen la tabla cifrada `addresses` (ver `schema.sql`) para enviar calle, referencias, contacto y bandera de WhatsApp junto con cada pedido, lo mismo que renderiza el dashboard y el ticket virtual.
 - **Payload QR extendido.** `lib/orderQrPayload.ts`, `components/Orders/VirtualTicket.tsx` y `app/api/orders/web/route.ts` adjuntan en el QR el alias de la dirección, líneas del domicilio, teléfono (incluyendo si es WhatsApp) y la propina de entrega cuando el cliente la proporciona.
+- **Pagos y envíos alineados.** `OrderDetailPanel` y `VirtualTicket` muestran ahora el nombre del cliente asignado a la entrega junto con método, referencia, monto recibido y cambio en efectivo, de modo que barra, cocina y reparto consultan la misma evidencia.
+- **Alertas low-stock/out-of-stock.** `/api/products` expone los flags `lowStock` y `soldOut`, y la página `/order` usa esos campos para prevenir la selección de productos agotados y lanzar snackbars amarillos/naranja cuando la disponibilidad es limitada.
 
 ---
 
@@ -221,6 +223,8 @@ Xoco Café is an artisanal Mexican coffee project centered on sustainability, co
 - **Shared secure-fields helper.** `lib/secure-fields.ts` centralizes AES-GCM helpers so any frontend workflow stays in sync with the POS encryption scheme.
 - **Enriched shipping data in orders and tickets.** Both `app/api/orders/history` and `app/api/orders/public` hydrate responses with decrypted address payloads (see the `addresses` definition in `schema.sql`), so the dashboard and ticket UI receive streets, references, contact phone, and WhatsApp flags.
 - **Extended QR payload.** `lib/orderQrPayload.ts`, `components/Orders/VirtualTicket.tsx`, and `app/api/orders/web/route.ts` now embed the address label, address lines, contact info (including WhatsApp), and delivery-tip snapshot into the ticket QR body when the customer supplied those fields.
+- **Aligned payment & delivery snapshots.** `OrderDetailPanel` and `VirtualTicket` now show the destination customer name plus payment method, reference, cash tendered, and change so front-of-house and couriers share the same proof.
+- **Low-stock/out-of-stock warnings.** `/api/products` returns `lowStock`/`soldOut` flags that the `/order` page consumes to block depleted items and trigger yellow/orange snackbars when stock runs low.
 
 ---
 

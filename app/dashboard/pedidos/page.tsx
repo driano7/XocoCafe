@@ -1617,6 +1617,7 @@ export default function OrdersDashboardPage() {
                       ref={ticketRef}
                       showQr={shouldShowQr}
                       orderStatus={selectedOrderEffectiveStatus ?? selectedOrder.status}
+                      ticketDetails={ticketDetails}
                     />
                   </div>
                 )}

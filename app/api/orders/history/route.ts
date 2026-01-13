@@ -62,6 +62,43 @@ const normalizeStaffName = (staffId?: string | null) => {
   return trimmed.split(/\s+/)[0] ?? trimmed;
 };
 
+const toTrimmedString = (value: unknown) => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+  return null;
+};
+
+const toNumericValue = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.replace(/[^\d.-]/g, '');
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const coerceMetadataObject = (value: unknown): Record<string, unknown> | null => {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return { ...(value as Record<string, unknown>) };
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
 interface DbOrderItem {
   id: string;
   orderId: string;
@@ -110,6 +147,15 @@ interface DbOrder {
   tickets?: {
     qrPayload: unknown;
   }[];
+  metadata?: unknown;
+  notes?: string | null;
+  message?: string | null;
+  instructions?: string | null;
+  queuedPaymentMethod?: string | null;
+  queuedPaymentReference?: string | null;
+  queuedPaymentReferenceType?: string | null;
+  montoRecibido?: number | null;
+  cambioEntregado?: number | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -372,6 +418,39 @@ export async function GET(request: NextRequest) {
 
       // tickets is an array from the joined query
       const ticket = Array.isArray(tickets) ? tickets[0] : null;
+      const metadataObject = coerceMetadataObject((entry as { metadata?: unknown }).metadata);
+      const paymentMetadata =
+        metadataObject?.payment &&
+        typeof metadataObject.payment === 'object' &&
+        !Array.isArray(metadataObject.payment)
+          ? (metadataObject.payment as Record<string, unknown>)
+          : null;
+      const queuedPaymentMethod =
+        toTrimmedString((entry as { queuedPaymentMethod?: unknown }).queuedPaymentMethod) ??
+        toTrimmedString(paymentMetadata?.method) ??
+        null;
+      const queuedPaymentReference =
+        toTrimmedString((entry as { queuedPaymentReference?: unknown }).queuedPaymentReference) ??
+        toTrimmedString(paymentMetadata?.reference) ??
+        null;
+      const queuedPaymentReferenceType =
+        toTrimmedString(
+          (entry as { queuedPaymentReferenceType?: unknown }).queuedPaymentReferenceType
+        ) ?? toTrimmedString(paymentMetadata?.referenceType);
+      const montoRecibido =
+        toNumericValue((entry as { montoRecibido?: unknown }).montoRecibido) ??
+        toNumericValue((entry as { monto_recibido?: unknown }).monto_recibido) ??
+        toNumericValue(paymentMetadata?.amountReceived) ??
+        toNumericValue(paymentMetadata?.cashTendered) ??
+        toNumericValue(paymentMetadata?.montoRecibido) ??
+        null;
+      const cambioEntregado =
+        toNumericValue((entry as { cambioEntregado?: unknown }).cambioEntregado) ??
+        toNumericValue((entry as { cambio_entregado?: unknown }).cambio_entregado) ??
+        toNumericValue(paymentMetadata?.changeGiven) ??
+        toNumericValue(paymentMetadata?.cashChange) ??
+        toNumericValue(paymentMetadata?.cambioEntregado) ??
+        null;
 
       return {
         ...rest,
@@ -389,6 +468,11 @@ export async function GET(request: NextRequest) {
           entry.id,
         prepStatus,
         prepHandlerName: handlerName,
+        queuedPaymentMethod,
+        queuedPaymentReference,
+        queuedPaymentReferenceType,
+        montoRecibido,
+        cambioEntregado,
       };
     });
 

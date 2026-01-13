@@ -34,6 +34,8 @@ export interface TicketOrderSnapshot {
   queuedPaymentReferenceType?: string | null;
   queuedByStaffId?: string | null;
   queuedByStaffName?: string | null;
+  montoRecibido?: number | null;
+  cambioEntregado?: number | null;
 }
 
 export interface TicketCustomerSnapshot {

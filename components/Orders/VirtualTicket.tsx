@@ -3,7 +3,15 @@
 import Image from 'next/image';
 import { forwardRef, useMemo } from 'react';
 import TicketOrderSummary from '@/components/Orders/TicketOrderSummary';
+import type { TicketDetailsPayload } from '@/hooks/useTicketDetails';
 import { buildOrderQrPayload } from '@/lib/orderQrPayload';
+import {
+  formatPaymentTraceSummary,
+  isCashPaymentMethod,
+  maskPaymentReference,
+  resolveMethodLabel,
+  resolveReferenceTypeLabel,
+} from '@/lib/paymentDisplay';
 
 type ItemCategory = 'beverage' | 'food' | 'package' | 'other';
 
@@ -37,6 +45,12 @@ export interface VirtualTicketProps {
     deliveryTipPercent?: number | null;
     items?: any;
     qrPayload?: any;
+    metadata?: unknown;
+    queuedPaymentMethod?: string | null;
+    queuedPaymentReference?: string | null;
+    queuedPaymentReferenceType?: string | null;
+    montoRecibido?: number | null;
+    cambioEntregado?: number | null;
     type?: string | null;
     shipping?: {
       address?: {
@@ -62,6 +76,7 @@ export interface VirtualTicketProps {
   };
   showQr?: boolean;
   orderStatus?: 'pending' | 'in_progress' | 'completed' | 'past' | null;
+  ticketDetails?: TicketDetailsPayload | null;
 }
 
 const QR_API_URL = '/api/qr';
@@ -107,8 +122,47 @@ const CATEGORY_LABELS: Record<ItemCategory, string> = {
   other: 'Otros',
 };
 
+const toNumericValue = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.replace(/[^\d.-]/g, '');
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const coerceMetadataObject = (value: unknown): Record<string, unknown> | null => {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return { ...(value as Record<string, unknown>) };
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
 const toTrimmedString = (value: unknown) =>
   typeof value === 'string' ? value.trim() || null : null;
+
+const buildFullName = (first?: string | null, last?: string | null) => {
+  const parts = [toTrimmedString(first), toTrimmedString(last)].filter((value): value is string =>
+    Boolean(value)
+  );
+  if (parts.length === 0) {
+    return null;
+  }
+  return parts.join(' ');
+};
 
 const normalizeText = (value?: string | null) =>
   (value ?? '').toString().toLowerCase().normalize('NFD');
@@ -331,7 +385,7 @@ const extractItemsFromSource = (source: any): OrderItem[] => {
 };
 
 const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
-  ({ order, showQr = true, orderStatus }, ref) => {
+  ({ order, showQr = true, orderStatus, ticketDetails = null }, ref) => {
     const items = useMemo<OrderItem[]>(() => {
       const fromOrder = extractItemsFromSource(order.items);
       if (fromOrder.length > 0) {
@@ -486,6 +540,10 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
       const contactPhone = toTrimmedString(
         (shippingRecord.contactPhone as string | undefined) ?? order.shipping?.contactPhone ?? null
       );
+      const contactName =
+        toTrimmedString(shippingRecord.contactName as string | undefined) ??
+        (nestedAddress ? toTrimmedString(nestedAddress.name as string | undefined) : null) ??
+        null;
       const isWhatsapp = Boolean(
         (shippingRecord.isWhatsapp as boolean | undefined) ?? order.shipping?.isWhatsapp ?? false
       );
@@ -493,10 +551,138 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
         label: label ?? null,
         lines,
         reference: reference ? reference.trim() : null,
+        contactName,
         contactPhone,
         isWhatsapp,
       };
     }, [order.shipping, order.items]);
+    const resolvedTicketCustomerName = useMemo(() => {
+      if (!ticketDetails?.customer) {
+        return null;
+      }
+      return (
+        toTrimmedString(ticketDetails.customer.name) ??
+        buildFullName(ticketDetails.customer.firstName, ticketDetails.customer.lastName)
+      );
+    }, [ticketDetails]);
+    const shippingCustomerName = useMemo(() => {
+      return (
+        resolvedTicketCustomerName ??
+        toTrimmedString(shippingSummary?.contactName) ??
+        toTrimmedString(order.customerName) ??
+        toTrimmedString(order.userEmail) ??
+        'Público general'
+      );
+    }, [
+      order.customerName,
+      order.userEmail,
+      resolvedTicketCustomerName,
+      shippingSummary?.contactName,
+    ]);
+
+    const paymentSummary = useMemo(() => {
+      const metadataSources: Record<string, unknown>[] = [];
+      const nestedPaymentSources: Record<string, unknown>[] = [];
+      const pushMetadata = (value: unknown) => {
+        const metadata = coerceMetadataObject(value);
+        if (metadata) {
+          metadataSources.push(metadata);
+          if (
+            metadata.payment &&
+            typeof metadata.payment === 'object' &&
+            !Array.isArray(metadata.payment)
+          ) {
+            nestedPaymentSources.push(metadata.payment as Record<string, unknown>);
+          }
+        }
+      };
+      pushMetadata((order as { metadata?: unknown }).metadata);
+      if (order.items && typeof order.items === 'object' && !Array.isArray(order.items)) {
+        pushMetadata((order.items as { metadata?: unknown }).metadata ?? null);
+      }
+      pushMetadata(ticketDetails?.order?.metadata ?? null);
+      const objectSources: Record<string, unknown>[] = [];
+      const pushObjectSource = (value: unknown) => {
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          objectSources.push(value as Record<string, unknown>);
+        }
+      };
+      pushObjectSource(order);
+      pushObjectSource(ticketDetails?.order ?? null);
+      pushObjectSource(ticketDetails?.ticket ?? null);
+      nestedPaymentSources.forEach(pushObjectSource);
+      const readStringField = (keys: string[]) => {
+        for (const source of objectSources) {
+          for (const key of keys) {
+            if (key in source) {
+              const candidate = toTrimmedString(source[key]);
+              if (candidate) {
+                return candidate;
+              }
+            }
+          }
+        }
+        return null;
+      };
+      const readNumberField = (keys: string[]) => {
+        for (const source of objectSources) {
+          for (const key of keys) {
+            if (key in source) {
+              const candidate = toNumericValue(source[key]);
+              if (candidate !== null) {
+                return candidate;
+              }
+            }
+          }
+        }
+        return null;
+      };
+      const methodRaw = readStringField(['queuedPaymentMethod', 'paymentMethod', 'method']);
+      const reference = readStringField([
+        'queuedPaymentReference',
+        'paymentReference',
+        'reference',
+        'paymentReferenceValue',
+      ]);
+      const referenceType = readStringField([
+        'queuedPaymentReferenceType',
+        'paymentReferenceType',
+        'referenceType',
+        'reference_type',
+      ]);
+      const amountReceived = readNumberField([
+        'montoRecibido',
+        'monto_recibido',
+        'amountReceived',
+        'cashTendered',
+        'cash_received',
+      ]);
+      const changeGiven = readNumberField([
+        'cambioEntregado',
+        'cambio_entregado',
+        'changeGiven',
+        'cashChange',
+        'change',
+      ]);
+      const methodLabel = resolveMethodLabel(methodRaw);
+      return {
+        methodLabel,
+        reference,
+        referenceType,
+        referenceTypeLabel: resolveReferenceTypeLabel(referenceType),
+        maskedReference: maskPaymentReference(reference),
+        trace: formatPaymentTraceSummary(reference, referenceType, methodLabel),
+        amountReceived,
+        changeGiven,
+        isCash: isCashPaymentMethod(methodRaw),
+        hasAnyValue:
+          Boolean(methodRaw) ||
+          Boolean(reference) ||
+          amountReceived !== null ||
+          changeGiven !== null ||
+          nestedPaymentSources.length > 0,
+      };
+    }, [order, ticketDetails]);
 
     const deliveryTipAmount = useMemo(() => {
       if (typeof order.deliveryTipAmount === 'number') {
@@ -786,11 +972,72 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
           <span>Total general</span>
           <span>{formatCurrency(grandTotal)}</span>
         </div>
+        {paymentSummary.hasAnyValue && (
+          <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-100">
+            <h4 className="text-xs font-semibold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-300">
+              Pago
+            </h4>
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span>Método</span>
+                <span className="font-semibold text-gray-900 dark:text-white">
+                  {paymentSummary.methodLabel}
+                </span>
+              </div>
+              {paymentSummary.trace && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">{paymentSummary.trace}</p>
+              )}
+              {paymentSummary.reference ? (
+                <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-200">
+                  <span>Referencia</span>
+                  <span className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                    {paymentSummary.maskedReference ?? paymentSummary.reference}
+                    {paymentSummary.referenceTypeLabel && (
+                      <span className="rounded-full bg-gray-200 px-2 py-[2px] text-[10px] uppercase tracking-[0.2em] text-gray-700 dark:bg-white/10 dark:text-white">
+                        {paymentSummary.referenceTypeLabel}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Sin referencia capturada.
+                </p>
+              )}
+              {paymentSummary.isCash && (
+                <div className="space-y-1 text-sm text-gray-600 dark:text-gray-200">
+                  <div className="flex items-center justify-between">
+                    <span>Monto recibido</span>
+                    <span className="font-semibold text-gray-900 dark:text-white">
+                      {formatCurrency(paymentSummary.amountReceived ?? grandTotal)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Cambio entregado</span>
+                    <span className="font-semibold text-gray-900 dark:text-white">
+                      {formatCurrency(paymentSummary.changeGiven ?? 0)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-base font-semibold text-gray-900 dark:text-white">
+                    <span>Total del ticket</span>
+                    <span>{formatCurrency(grandTotal)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {shippingSummary && (
           <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-100">
             <h4 className="text-xs font-semibold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-300">
               Entrega a domicilio
             </h4>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-200">
+              Cliente
+            </p>
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-50">
+              {shippingCustomerName}
+            </p>
             {shippingSummary.label && (
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-200">
                 ID: {shippingSummary.label}

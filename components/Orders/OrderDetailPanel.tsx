@@ -30,27 +30,12 @@
 import { type ReactNode } from 'react';
 import type { OrderRecord } from '@/hooks/useOrders';
 import type { TicketDetailsPayload } from '@/hooks/useTicketDetails';
-
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  debito: 'Débito',
-  credito: 'Crédito',
-  transferencia: 'Transferencia',
-  efectivo: 'Efectivo',
-  cripto: 'Cripto',
-  tarjeta: 'Tarjeta',
-  stripe: 'Tarjeta',
-  cashapp: 'Cash App',
-  lightning: 'Lightning',
-};
-
-const PAYMENT_REFERENCE_TYPE_LABELS: Record<string, string> = {
-  evm_address: 'Wallet 0x',
-  ens_name: 'ENS',
-  lightning_invoice: 'Lightning',
-  transaction_id: 'Transferencia',
-  text: 'Referencia',
-  card_last4: 'Tarjeta',
-};
+import {
+  formatPaymentTraceSummary,
+  maskPaymentReference,
+  resolveMethodLabel,
+  resolveReferenceTypeLabel,
+} from '@/lib/paymentDisplay';
 
 const COMMENT_METADATA_KEYS = [
   'notes',
@@ -109,6 +94,16 @@ const toTrimmedString = (value: unknown) =>
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const buildFullName = (first?: string | null, last?: string | null) => {
+  const parts = [toTrimmedString(first), toTrimmedString(last)].filter((value): value is string =>
+    Boolean(value)
+  );
+  if (parts.length === 0) {
+    return null;
+  }
+  return parts.join(' ');
+};
+
 const extractNotesFromMetadata = (metadata: unknown, keys: string[]): string | null => {
   if (!metadata) {
     return null;
@@ -160,87 +155,6 @@ const extractCustomerNotes = (metadata?: unknown) =>
 const extractStaffNotes = (metadata?: unknown) =>
   extractNotesFromMetadata(metadata, STAFF_NOTES_METADATA_KEYS);
 
-const resolveMethodLabel = (value?: string | null) => {
-  if (!value) {
-    return 'Pendiente';
-  }
-  const normalized = value.trim().toLowerCase();
-  return PAYMENT_METHOD_LABELS[normalized] ?? value;
-};
-
-const maskPaymentReference = (value?: string | null) => {
-  if (!value) {
-    return null;
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-  const digits = trimmed.replace(/\D/g, '');
-  if (digits.length >= 8) {
-    const last4 = digits.slice(-4);
-    return `•••• ${last4}`;
-  }
-  if (trimmed.length > 6) {
-    return `${trimmed.slice(0, 3)}…${trimmed.slice(-2)}`;
-  }
-  return trimmed;
-};
-
-const shortenReference = (value: string) => {
-  const trimmed = value.trim();
-  if (trimmed.length <= 10) {
-    return trimmed;
-  }
-  return `${trimmed.slice(0, 6)}…${trimmed.slice(-4)}`;
-};
-
-const formatPaymentTraceSummary = (
-  reference?: string | null,
-  type?: string | null,
-  methodLabel?: string | null
-) => {
-  if (!reference) {
-    return null;
-  }
-  const trimmed = reference.trim();
-  if (!trimmed) {
-    return null;
-  }
-  const normalizedType = type?.toLowerCase() ?? '';
-  if (normalizedType === 'evm_address') {
-    return `Wallet ${shortenReference(trimmed)}`;
-  }
-  if (normalizedType === 'ens_name') {
-    return `ENS ${shortenReference(trimmed)}`;
-  }
-  if (normalizedType === 'lightning_invoice') {
-    return `Hash ${shortenReference(trimmed)}`;
-  }
-  const digits = trimmed.replace(/\D/g, '');
-  if (digits.length >= 4) {
-    const last4 = digits.slice(-4);
-    const normalizedMethod = methodLabel
-      ?.normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase();
-    if (normalizedMethod?.includes('debito')) {
-      return `Débito terminación ${last4}`;
-    }
-    if (normalizedMethod?.includes('credito')) {
-      return `Crédito terminación ${last4}`;
-    }
-    if (normalizedMethod?.includes('transfer')) {
-      return `Transferencia referencia ${last4}`;
-    }
-    return `Terminación ${last4}`;
-  }
-  if (trimmed.length > 6) {
-    return `Referencia ${shortenReference(trimmed)}`;
-  }
-  return trimmed;
-};
-
 const DetailRow = ({ label, value }: { label: string; value: ReactNode }) => (
   <div className="flex items-start justify-between text-sm text-gray-600 dark:text-gray-200">
     <span className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400">
@@ -260,11 +174,13 @@ const OrderNotesCard = ({ note, label }: { note: string; label: string }) => (
 export function OrderDetailPanel({
   order,
   ticketDetails,
+  decryptedCustomer,
   decryptedHandlerName,
   className,
 }: OrderDetailPanelProps) {
   const ticket = ticketDetails?.ticket;
   const orderSnapshot = ticketDetails?.order;
+  const ticketCustomer = ticketDetails?.customer ?? null;
   const metadata = orderSnapshot?.metadata;
   const enhancedOrder = order as OrderRecord & {
     queuedByStaffName?: string | null;
@@ -349,10 +265,7 @@ export function OrderDetailPanel({
     toTrimmedString(orderSnapshot?.queuedPaymentReferenceType) ??
     toTrimmedString(ticket?.paymentReferenceType) ??
     null;
-  const paymentReferenceTypeLabel =
-    PAYMENT_REFERENCE_TYPE_LABELS[
-      (paymentReferenceTypeRaw ?? '') as keyof typeof PAYMENT_REFERENCE_TYPE_LABELS
-    ] ?? null;
+  const paymentReferenceTypeLabel = resolveReferenceTypeLabel(paymentReferenceTypeRaw);
   const maskedReference = maskPaymentReference(paymentReference);
   const paymentTraceSummary = formatPaymentTraceSummary(
     paymentReference,
@@ -399,6 +312,16 @@ export function OrderDetailPanel({
     typeof deliveryTipPercent === 'number' ? `${deliveryTipPercent}%` : null;
   const showShippingCard =
     shippingAddressLines.length > 0 || shippingContact || formattedDeliveryTip !== null;
+  const decryptedCustomerName = buildFullName(
+    decryptedCustomer?.firstName,
+    decryptedCustomer?.lastName
+  );
+  const ticketCustomerName =
+    toTrimmedString(ticketCustomer?.name) ??
+    buildFullName(ticketCustomer?.firstName, ticketCustomer?.lastName);
+  const fallbackOrderCustomer = toTrimmedString(enhancedOrder.customerName);
+  const shippingCustomerDisplayName =
+    decryptedCustomerName ?? ticketCustomerName ?? fallbackOrderCustomer ?? 'Público general';
 
   return (
     <section
@@ -476,6 +399,12 @@ export function OrderDetailPanel({
               {shippingLabel}
             </p>
           )}
+          <p className="mt-2 text-xs font-semibold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-100">
+            Cliente
+          </p>
+          <p className="text-sm font-semibold text-primary-900 dark:text-primary-50">
+            {shippingCustomerDisplayName}
+          </p>
           <p className="mt-1 text-xs font-semibold uppercase tracking-[0.25em] text-primary-600 dark:text-primary-100">
             Dirección de envío
           </p>

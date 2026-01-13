@@ -72,6 +72,12 @@ export interface OrderRecord {
       percent?: number | null;
     } | null;
   } | null;
+  metadata?: unknown;
+  queuedPaymentMethod?: string | null;
+  queuedPaymentReference?: string | null;
+  queuedPaymentReferenceType?: string | null;
+  montoRecibido?: number | null;
+  cambioEntregado?: number | null;
 }
 
 const DEFAULT_POLLING_INTERVAL_MS = 30_000;

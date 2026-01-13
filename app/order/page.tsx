@@ -45,6 +45,8 @@ import LoyaltyProgressCard from '@/components/LoyaltyProgressCard';
 import { useClientFavorites } from '@/hooks/useClientFavorites';
 import type { AddressInput } from '@/lib/validations/auth';
 import CoffeeBackground from '@/components/CoffeeBackground';
+import Snackbar from '@/components/Feedback/Snackbar';
+import { useSnackbarNotifications } from '@/hooks/useSnackbarNotifications';
 
 interface DbProduct {
   id: string;
@@ -52,6 +54,10 @@ interface DbProduct {
   category: string;
   price: number;
   isActive: boolean;
+  stockQuantity?: number | null;
+  lowStockThreshold?: number | null;
+  lowStock?: boolean | null;
+  soldOut?: boolean | null;
   metadata?: {
     availableSizes?: string[];
     items?: string[];
@@ -67,9 +73,21 @@ const formatCurrency = (value: number) =>
     minimumFractionDigits: 2,
   }).format(value);
 
+const parseNumericField = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
 export default function OrderPage() {
   const { user, token, isLoading, updateUser } = useAuth();
   const router = useRouter();
+  const { snackbar, showSnackbar, dismissSnackbar } = useSnackbarNotifications();
   const { items, addItem, increment, decrement, removeItem, subtotal, itemCount, clearCart } =
     useCartStore();
   const [selectedBeverageId, setSelectedBeverageId] = useState('');
@@ -78,6 +96,28 @@ export default function OrderPage() {
   const [selectedPackageId, setSelectedPackageId] = useState('');
   const [dbProducts, setDbProducts] = useState<DbProduct[]>([]);
   const [dbLoading, setDbLoading] = useState(true);
+  const productInventoryMap = useMemo(() => {
+    const map = new Map<string, { lowStock: boolean; soldOut: boolean }>();
+    dbProducts.forEach((product) => {
+      const stockQuantity = parseNumericField(product.stockQuantity);
+      const lowStockThreshold = parseNumericField(product.lowStockThreshold);
+      const soldOut =
+        Boolean(product.soldOut) ||
+        !product.isActive ||
+        (stockQuantity !== null && stockQuantity <= 0);
+      const lowStock =
+        !soldOut &&
+        Boolean(
+          product.lowStock ||
+            (stockQuantity !== null &&
+              lowStockThreshold !== null &&
+              stockQuantity > 0 &&
+              stockQuantity <= lowStockThreshold)
+        );
+      map.set(product.id, { lowStock, soldOut });
+    });
+    return map;
+  }, [dbProducts]);
 
   useEffect(() => {
     async function fetchProducts() {
@@ -160,6 +200,27 @@ export default function OrderPage() {
     return getMenuItemById(id);
   };
 
+  const guardInventorySelection = useCallback(
+    (menuId: string, label?: string | null) => {
+      if (!menuId) {
+        return true;
+      }
+      const status = productInventoryMap.get(menuId);
+      if (!status) {
+        return true;
+      }
+      if (status.soldOut) {
+        showSnackbar(`${label ?? 'Este producto'} está agotado.`, 'inventory');
+        return false;
+      }
+      if (status.lowStock) {
+        showSnackbar(`Baja disponibilidad de ${label ?? 'este producto'}.`, 'warning');
+      }
+      return true;
+    },
+    [productInventoryMap, showSnackbar]
+  );
+
   const { data: clientFavorites, isLoading: isOrderFavoritesLoading } = useClientFavorites(
     user?.clientId ?? null,
     token
@@ -223,6 +284,9 @@ export default function OrderPage() {
   const handleQuickAdd = (menuId: string, options?: { size?: string | null }) => {
     const menuItem = getMenuItem(menuId);
     if (!menuItem) return;
+    if (!guardInventorySelection(menuId, menuItem.label)) {
+      return;
+    }
     const inferredPrice = resolveMenuItemPrice(menuId);
     addItem({
       productId: menuId,
@@ -435,134 +499,137 @@ export default function OrderPage() {
   );
 
   return (
-    <CoffeeBackground className="py-10">
-      <div className="mx-auto max-w-6xl px-4 py-10 lg:px-0">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">
-            Pide Online y Recoge o Recibe en Casa
-          </h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Selecciona tus bebidas y alimentos favoritos. Puedes recogerlos en nuestro café o pedir
-            envío.
-          </p>
-        </div>
+    <>
+      <CoffeeBackground className="py-10">
+        <div className="mx-auto max-w-6xl px-4 py-10 lg:px-0">
+          <div className="mb-8 text-center">
+            <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">
+              Pide Online y Recoge o Recibe en Casa
+            </h1>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Selecciona tus bebidas y alimentos favoritos. Puedes recogerlos en nuestro café o
+              pedir envío.
+            </p>
+          </div>
 
-        <div className="grid gap-8 lg:grid-cols-[1.2fr,0.8fr]">
-          <section className="space-y-6">
-            {user && (
-              <div className="hidden" aria-hidden>
-                <LoyaltyProgressCard
-                  coffees={loyaltyWeeklyCoffees}
-                  goal={loyaltyGoal}
-                  orders={loyaltyOrdersCount ?? undefined}
-                  totalInteractions={loyaltyInteractions ?? undefined}
-                  customerName={loyaltyCardName}
-                  isLoading={isOrderFavoritesLoading}
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Recuerda: los pedidos registrados como “Público general” no acumulan sellos de
-                  lealtad. Identifícate con tu ID para seguir sumando cafés.
-                </p>
-              </div>
-            )}
-            {quickAddSection}
-          </section>
-
-          <aside className="rounded-2xl border border-gray-200 bg-white p-5 shadow-lg dark:border-gray-700 dark:bg-gray-900">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tu pedido</h2>
-              {items.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => clearCart()}
-                  className="text-sm text-red-600 hover:underline"
-                >
-                  Vaciar
-                </button>
-              )}
-            </div>
-
-            {items.length === 0 ? (
-              <p className="text-sm text-gray-500">Aún no tienes productos en tu carrito.</p>
-            ) : (
-              <div className="space-y-4">
-                {items.map((item) => (
-                  <div
-                    key={item.lineId}
-                    className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700"
-                  >
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                        {item.name}{' '}
-                        {rewardLineId === item.lineId && (
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-800">
-                            Cortesía
-                          </span>
-                        )}
-                      </p>
-                      {item.size && (
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                          Tamaño: {item.size}
-                        </p>
-                      )}
-                      {item.category === 'package' && item.packageItems?.length ? (
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                          Incluye: {item.packageItems.join(', ')}
-                        </p>
-                      ) : null}
-                      <p className="text-xs text-gray-500">
-                        {rewardLineId === item.lineId ? 'Gratis' : formatCurrency(item.price)}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => decrement(item.lineId)}
-                        className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-100"
-                      >
-                        -
-                      </button>
-                      <span className="min-w-[24px] text-center text-sm font-medium text-gray-700 dark:text-gray-100">
-                        {item.quantity}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => increment(item.lineId)}
-                        className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-100"
-                      >
-                        +
-                      </button>
-                    </div>
-
-                    <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                      {rewardLineId === item.lineId
-                        ? 'Gratis'
-                        : formatCurrency(item.price * item.quantity)}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => removeItem(item.lineId)}
-                      className="text-sm text-red-500 hover:text-red-600"
-                      aria-label={`Eliminar ${item.name}`}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-
-                <div className="flex items-center justify-between border-t border-gray-200 pt-4 text-sm font-semibold text-gray-900 dark:border-gray-700 dark:text-gray-100">
-                  <span>Artículos ({itemCount})</span>
-                  <span>{formatCurrency(subtotal)}</span>
+          <div className="grid gap-8 lg:grid-cols-[1.2fr,0.8fr]">
+            <section className="space-y-6">
+              {user && (
+                <div className="hidden" aria-hidden>
+                  <LoyaltyProgressCard
+                    coffees={loyaltyWeeklyCoffees}
+                    goal={loyaltyGoal}
+                    orders={loyaltyOrdersCount ?? undefined}
+                    totalInteractions={loyaltyInteractions ?? undefined}
+                    customerName={loyaltyCardName}
+                    isLoading={isOrderFavoritesLoading}
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Recuerda: los pedidos registrados como “Público general” no acumulan sellos de
+                    lealtad. Identifícate con tu ID para seguir sumando cafés.
+                  </p>
                 </div>
-              </div>
-            )}
+              )}
+              {quickAddSection}
+            </section>
 
-            <CheckoutForm token={token} user={user} onAddressesUpdate={handleAddressesUpdate} />
-          </aside>
+            <aside className="rounded-2xl border border-gray-200 bg-white p-5 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tu pedido</h2>
+                {items.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => clearCart()}
+                    className="text-sm text-red-600 hover:underline"
+                  >
+                    Vaciar
+                  </button>
+                )}
+              </div>
+
+              {items.length === 0 ? (
+                <p className="text-sm text-gray-500">Aún no tienes productos en tu carrito.</p>
+              ) : (
+                <div className="space-y-4">
+                  {items.map((item) => (
+                    <div
+                      key={item.lineId}
+                      className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700"
+                    >
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                          {item.name}{' '}
+                          {rewardLineId === item.lineId && (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-800">
+                              Cortesía
+                            </span>
+                          )}
+                        </p>
+                        {item.size && (
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                            Tamaño: {item.size}
+                          </p>
+                        )}
+                        {item.category === 'package' && item.packageItems?.length ? (
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                            Incluye: {item.packageItems.join(', ')}
+                          </p>
+                        ) : null}
+                        <p className="text-xs text-gray-500">
+                          {rewardLineId === item.lineId ? 'Gratis' : formatCurrency(item.price)}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => decrement(item.lineId)}
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+                        >
+                          -
+                        </button>
+                        <span className="min-w-[24px] text-center text-sm font-medium text-gray-700 dark:text-gray-100">
+                          {item.quantity}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => increment(item.lineId)}
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                        {rewardLineId === item.lineId
+                          ? 'Gratis'
+                          : formatCurrency(item.price * item.quantity)}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.lineId)}
+                        className="text-sm text-red-500 hover:text-red-600"
+                        aria-label={`Eliminar ${item.name}`}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+
+                  <div className="flex items-center justify-between border-t border-gray-200 pt-4 text-sm font-semibold text-gray-900 dark:border-gray-700 dark:text-gray-100">
+                    <span>Artículos ({itemCount})</span>
+                    <span>{formatCurrency(subtotal)}</span>
+                  </div>
+                </div>
+              )}
+
+              <CheckoutForm token={token} user={user} onAddressesUpdate={handleAddressesUpdate} />
+            </aside>
+          </div>
         </div>
-      </div>
-    </CoffeeBackground>
+      </CoffeeBackground>
+      <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
+    </>
   );
 }

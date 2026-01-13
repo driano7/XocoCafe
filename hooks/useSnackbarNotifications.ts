@@ -36,7 +36,8 @@ export type SnackbarTone =
   | 'error'
   | 'ticket'
   | 'profile'
-  | 'whatsapp';
+  | 'whatsapp'
+  | 'inventory';
 
 export type SnackbarState = {
   id: number;

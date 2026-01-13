@@ -2,26 +2,7 @@
 
 import classNames from 'classnames';
 import type { TicketOrderSnapshot, TicketRecord } from '@/hooks/useTicketDetails';
-
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  debito: 'Débito',
-  credito: 'Crédito',
-  transferencia: 'Transferencia',
-  efectivo: 'Efectivo',
-  cripto: 'Cripto',
-  tarjeta: 'Tarjeta',
-  stripe: 'Tarjeta',
-  cashapp: 'Cash App',
-  lightning: 'Lightning',
-};
-
-const PAYMENT_REFERENCE_TYPE_LABELS: Record<string, string> = {
-  evm_address: 'Wallet 0x',
-  ens_name: 'ENS',
-  lightning_invoice: 'Lightning',
-  transaction_id: 'Transferencia',
-  text: 'Referencia',
-};
+import { resolveMethodLabel, resolveReferenceTypeLabel } from '@/lib/paymentDisplay';
 
 const abbreviateStaffId = (value?: string | null) => {
   if (!value) {
@@ -42,21 +23,6 @@ const abbreviateStaffId = (value?: string | null) => {
     return parts[0].substring(0, 8);
   }
   return `${parts[0]} ${parts[1].charAt(0)}.`;
-};
-
-const resolveMethodLabel = (value?: string | null) => {
-  if (!value) {
-    return 'Sin método';
-  }
-  const normalized = value.trim().toLowerCase();
-  return PAYMENT_METHOD_LABELS[normalized] ?? value;
-};
-
-const resolveReferenceBadge = (value?: string | null) => {
-  if (!value) {
-    return null;
-  }
-  return PAYMENT_REFERENCE_TYPE_LABELS[value] ?? null;
 };
 
 const resolveHandler = (ticket?: TicketRecord | null, order?: TicketOrderSnapshot | null) => {
@@ -82,9 +48,12 @@ export function TicketAssignmentNotice({
   className,
 }: TicketAssignmentNoticeProps) {
   const handler = resolveHandler(ticket, order);
-  const methodLabel = resolveMethodLabel(ticket?.paymentMethod ?? order?.queuedPaymentMethod);
+  const methodLabel = resolveMethodLabel(
+    ticket?.paymentMethod ?? order?.queuedPaymentMethod,
+    'Sin método'
+  );
   const reference = ticket?.paymentReference ?? order?.queuedPaymentReference;
-  const referenceBadge = resolveReferenceBadge(
+  const referenceBadge = resolveReferenceTypeLabel(
     ticket?.paymentReferenceType ?? order?.queuedPaymentReferenceType ?? undefined
   );
 

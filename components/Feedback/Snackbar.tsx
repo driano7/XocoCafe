@@ -38,6 +38,7 @@ const toneClasses: Record<SnackbarTone, string> = {
   ticket: 'snackbar-ticket',
   profile: 'snackbar-profile',
   whatsapp: 'snackbar-whatsapp',
+  inventory: 'bg-orange-500 text-white dark:bg-orange-400 dark:text-slate-900',
 };
 
 interface SnackbarProps {

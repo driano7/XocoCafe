@@ -41,6 +41,18 @@ const toTrimmedString = (value: unknown) => {
   return null;
 };
 
+const toNumericValue = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.replace(/[^\d.-]/g, '');
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
 const coerceMetadataObject = (value: unknown): Record<string, unknown> | null => {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     return { ...(value as Record<string, unknown>) };
@@ -226,6 +238,24 @@ export async function GET(
     const notes = toTrimmedString((order as { notes?: unknown }).notes);
     const message = toTrimmedString((order as { message?: unknown }).message);
     const instructions = toTrimmedString((order as { instructions?: unknown }).instructions);
+    const amountReceived =
+      toNumericValue((order as { montoRecibido?: unknown }).montoRecibido) ??
+      toNumericValue((order as { monto_recibido?: unknown }).monto_recibido) ??
+      toNumericValue((order as { amountReceived?: unknown }).amountReceived) ??
+      toNumericValue((order as { cashTendered?: unknown }).cashTendered) ??
+      toNumericValue(paymentMetadata?.amountReceived) ??
+      toNumericValue(paymentMetadata?.cashTendered) ??
+      toNumericValue(paymentMetadata?.montoRecibido) ??
+      null;
+    const changeGiven =
+      toNumericValue((order as { cambioEntregado?: unknown }).cambioEntregado) ??
+      toNumericValue((order as { cambio_entregado?: unknown }).cambio_entregado) ??
+      toNumericValue((order as { changeGiven?: unknown }).changeGiven) ??
+      toNumericValue((order as { cashChange?: unknown }).cashChange) ??
+      toNumericValue(paymentMetadata?.changeGiven) ??
+      toNumericValue(paymentMetadata?.cashChange) ??
+      toNumericValue(paymentMetadata?.cambioEntregado) ??
+      null;
 
     const effectiveTicket = {
       id: ticketRecord?.id ?? order.id,
@@ -685,6 +715,8 @@ export async function GET(
           queuedPaymentReferenceType: queuedPaymentReferenceType ?? null,
           queuedByStaffId: queuedByStaffId ?? null,
           queuedByStaffName: queuedByStaffName ?? null,
+          montoRecibido: amountReceived ?? null,
+          cambioEntregado: changeGiven ?? null,
         },
         customer: customerPayload,
         items,
