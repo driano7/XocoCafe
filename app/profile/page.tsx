@@ -90,11 +90,11 @@ export default function ProfilePage() {
                   Cerrar Sesión
                 </button>
               </div>
-              <div className="mx-auto flex w-full max-w-xl gap-3 sm:hidden">
+              <div className="mx-auto grid w-full max-w-xl grid-cols-3 gap-3 sm:hidden">
                 <button
                   type="button"
                   onClick={() => router.push('/dashboard/pedidos')}
-                  className="flex-1 rounded-2xl border border-gray-200 bg-white/60 px-4 py-3 text-sm font-semibold text-gray-900 shadow-sm transition hover:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                  className="rounded-2xl border border-gray-200 bg-white/60 px-4 py-3 text-sm font-semibold text-gray-900 shadow-sm transition hover:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 >
                   <span className="flex items-center justify-center gap-2">
                     <FiPackage className="text-lg" />
@@ -104,7 +104,7 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={() => router.push('/reserve')}
-                  className="flex-1 rounded-2xl border border-gray-200 bg-white/60 px-4 py-3 text-sm font-semibold text-gray-900 shadow-sm transition hover:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                  className="rounded-2xl border border-gray-200 bg-white/60 px-4 py-3 text-sm font-semibold text-gray-900 shadow-sm transition hover:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 >
                   <span className="flex items-center justify-center gap-2">
                     <FiCalendar className="text-lg" />
@@ -114,7 +114,7 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={openAddressQuickAction}
-                  className="flex-1 rounded-2xl border border-gray-200 bg-white/60 px-4 py-3 text-sm font-semibold text-gray-900 shadow-sm transition hover:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                  className="rounded-2xl border border-gray-200 bg-white/60 px-4 py-3 text-sm font-semibold text-gray-900 shadow-sm transition hover:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 >
                   <span className="flex items-center justify-center gap-2">
                     <FiMapPin className="text-lg" />
