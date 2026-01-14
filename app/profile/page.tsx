@@ -27,9 +27,9 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { FiCalendar, FiPackage } from 'react-icons/fi';
+import { FiCalendar, FiMapPin, FiPackage } from 'react-icons/fi';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import UserProfile from '@/components/Auth/UserProfile';
 import CoffeeBackground from '@/components/CoffeeBackground';
@@ -39,6 +39,12 @@ import { motion } from 'framer-motion';
 export default function ProfilePage() {
   const { user, isLoading, logout } = useAuth();
   const router = useRouter();
+  const openAddressQuickAction = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('profile-open-addresses'));
+  }, []);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -103,6 +109,16 @@ export default function ProfilePage() {
                   <span className="flex items-center justify-center gap-2">
                     <FiCalendar className="text-lg" />
                     Reservas
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={openAddressQuickAction}
+                  className="flex-1 rounded-2xl border border-gray-200 bg-white/60 px-4 py-3 text-sm font-semibold text-gray-900 shadow-sm transition hover:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <FiMapPin className="text-lg" />
+                    Direcciones
                   </span>
                 </button>
               </div>

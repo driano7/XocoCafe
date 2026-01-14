@@ -112,6 +112,20 @@ export default function UserProfile() {
     }
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+    const handleQuickOpen = () => {
+      scrollToAddressesSection();
+      setIsAddressModalOpen(true);
+    };
+    window.addEventListener('profile-open-addresses', handleQuickOpen as EventListener);
+    return () => {
+      window.removeEventListener('profile-open-addresses', handleQuickOpen as EventListener);
+    };
+  }, [scrollToAddressesSection]);
+
   const {
     register: registerProfile,
     handleSubmit: handleSubmitProfile,
@@ -1309,7 +1323,8 @@ export default function UserProfile() {
         open={isAddressModalOpen}
         onClose={() => setIsAddressModalOpen(false)}
         title="Mis direcciones"
-        autoScrollTop={false}
+        autoScrollTop
+        alignToTop
       >
         <AddressManager showIntro={false} />
       </ProfileModal>
@@ -1403,9 +1418,17 @@ type ProfileModalProps = {
   title: string;
   children: ReactNode;
   autoScrollTop?: boolean;
+  alignToTop?: boolean;
 };
 
-function ProfileModal({ open, onClose, title, children, autoScrollTop = true }: ProfileModalProps) {
+function ProfileModal({
+  open,
+  onClose,
+  title,
+  children,
+  autoScrollTop = true,
+  alignToTop = false,
+}: ProfileModalProps) {
   useEffect(() => {
     if (!autoScrollTop) {
       return;
@@ -1421,7 +1444,9 @@ function ProfileModal({ open, onClose, title, children, autoScrollTop = true }: 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm"
+      className={`fixed inset-0 z-50 flex justify-center bg-black/60 px-4 py-6 backdrop-blur-sm ${
+        alignToTop ? 'items-start pt-12 sm:pt-16 md:pt-20' : 'items-center'
+      }`}
       role="button"
       aria-label="Cerrar modal"
       tabIndex={0}
@@ -1453,7 +1478,9 @@ function ProfileModal({ open, onClose, title, children, autoScrollTop = true }: 
             ×
           </button>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto pr-1">{children}</div>
+        <div className="max-h-[70vh] overflow-y-auto pr-1" data-profile-modal-scroll="true">
+          {children}
+        </div>
       </div>
     </div>
   );

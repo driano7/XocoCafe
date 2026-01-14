@@ -316,10 +316,23 @@ export default function AddressManager({ showIntro = true }: AddressManagerProps
       const fallback = window.setTimeout(() => setRecentAddressId(null), 300);
       return () => window.clearTimeout(fallback);
     }
-    const headerOffset = Math.max(window.innerHeight * 0.2, 140);
     window.requestAnimationFrame(() => {
-      const top = Math.max(element.getBoundingClientRect().top + window.scrollY - headerOffset, 0);
-      window.scrollTo({ top, behavior: 'smooth' });
+      const rect = element.getBoundingClientRect();
+      const modalScrollContainer = element.closest<HTMLElement>(
+        '[data-profile-modal-scroll="true"]'
+      );
+      if (modalScrollContainer) {
+        const containerRect = modalScrollContainer.getBoundingClientRect();
+        const containerHeight = modalScrollContainer.clientHeight;
+        const centerOffset = Math.max((containerHeight - rect.height) / 2, 48);
+        const relativeTop = rect.top - containerRect.top + modalScrollContainer.scrollTop;
+        const targetTop = Math.max(relativeTop - centerOffset, 0);
+        modalScrollContainer.scrollTo({ top: targetTop, behavior: 'smooth' });
+      } else {
+        const centerOffset = Math.max((window.innerHeight - rect.height) / 2, 120);
+        const targetTop = Math.max(rect.top + window.scrollY - centerOffset, 0);
+        window.scrollTo({ top: targetTop, behavior: 'smooth' });
+      }
     });
     setHighlightedAddressId(recentAddressId);
     const timer = window.setTimeout(() => {

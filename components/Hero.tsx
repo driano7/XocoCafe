@@ -50,6 +50,25 @@ export default function Hero(): ReactElement {
     renderCanvas();
   }, []);
 
+  const quienesVariants = {
+    hidden: { opacity: 0, y: 12, scale: 0.96 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: { delay: 0.9, type: 'spring', stiffness: 120 },
+    },
+    pulse: {
+      scale: [1, 1.05, 1],
+      boxShadow: [
+        '0 0 0 rgba(239, 68, 68, 0)',
+        '0 0 18px rgba(239, 68, 68, 0.35)',
+        '0 0 0 rgba(239, 68, 68, 0)',
+      ],
+      transition: { delay: 2.2, duration: 1.2, repeat: 1 },
+    },
+  };
+
   return (
     <div>
       <h1 className="sr-only">Chocolate y café hecho por los dioses.</h1>
@@ -66,12 +85,20 @@ export default function Hero(): ReactElement {
                   startDelay={400}
                 />
               </h2>
-              <Link
-                href="/about"
-                className="underline-magical text-md w-max cursor-pointer sm:text-lg md:text-xl xl:text-2xl"
+              <motion.div
+                initial="hidden"
+                animate={['visible', 'pulse']}
+                variants={quienesVariants}
+                className="inline-flex w-max"
               >
-                ¿Quiénes somos? &rarr;
-              </Link>
+                <Link
+                  href="/about"
+                  className="underline-magical text-md relative cursor-pointer rounded-full px-1.5 py-0.5 text-base font-semibold sm:text-lg md:text-xl xl:text-2xl"
+                >
+                  <span className="absolute inset-0 -z-10 rounded-full bg-primary-100/40 blur-lg dark:bg-primary-500/20" />
+                  ¿Quiénes somos? &rarr;
+                </Link>
+              </motion.div>
               <div className="pt-6">
                 <Link
                   href="/login"
