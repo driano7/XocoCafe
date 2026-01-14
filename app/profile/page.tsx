@@ -90,7 +90,7 @@ export default function ProfilePage() {
                   Cerrar Sesión
                 </button>
               </div>
-              <div className="flex w-full gap-3 sm:hidden">
+              <div className="mx-auto flex w-full max-w-xl gap-3 sm:hidden">
                 <button
                   type="button"
                   onClick={() => router.push('/dashboard/pedidos')}

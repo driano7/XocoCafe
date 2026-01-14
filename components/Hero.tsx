@@ -89,15 +89,27 @@ export default function Hero(): ReactElement {
                 initial="hidden"
                 animate={['visible', 'pulse']}
                 variants={quienesVariants}
-                className="inline-flex w-max"
               >
-                <Link
-                  href="/about"
-                  className="underline-magical text-md relative cursor-pointer rounded-full px-1.5 py-0.5 text-base font-semibold sm:text-lg md:text-xl xl:text-2xl"
-                >
-                  <span className="absolute inset-0 -z-10 rounded-full bg-primary-100/40 blur-lg dark:bg-primary-500/20" />
-                  ¿Quiénes somos? &rarr;
-                </Link>
+                <span className="inline-flex w-max rounded-full px-1.5 py-0.5 text-base font-semibold sm:text-lg md:text-xl xl:text-2xl">
+                  <span className="absolute inset-0 hidden" aria-hidden="true" />
+                  <span className="relative inline-flex items-center rounded-full px-1.5 py-0.5">
+                    <span className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-primary-100/40 blur-lg dark:bg-primary-500/20" />
+                    <TypewriterText
+                      segments={[
+                        {
+                          kind: 'link',
+                          href: '/about',
+                          text: '¿Quiénes somos? →',
+                          className:
+                            'underline-magical cursor-pointer text-primary-700 dark:text-primary-200',
+                        },
+                      ]}
+                      startDelay={900}
+                      speed={35}
+                      showCursor={false}
+                    />
+                  </span>
+                </span>
               </motion.div>
               <div className="pt-6">
                 <Link
