@@ -44,6 +44,7 @@ import {
 import Link from 'next/link';
 import { DayPicker, type Formatters } from 'react-day-picker';
 import { FaWhatsapp } from 'react-icons/fa';
+import { FiCalendar } from 'react-icons/fi';
 import '@/css/react-day-picker.css';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import LoyaltyReminderCard from '@/components/LoyaltyReminderCard';
@@ -58,6 +59,8 @@ import { useSnackbarNotifications, type SnackbarTone } from '@/hooks/useSnackbar
 import { createBrowserSupabaseClient } from '@/lib/supabase-browser';
 import { useHeaderHeight } from '@/hooks/useHeaderHeight';
 import CoffeeBackground from '@/components/CoffeeBackground';
+import { useLanguage } from '@/components/Language/LanguageProvider';
+import TranslatedText from '@/components/Language/TranslatedText';
 import { es as esLocale } from 'date-fns/locale';
 
 const MAX_PEOPLE = 15;
@@ -68,60 +71,61 @@ const QR_EXPIRATION_MINUTES = 30;
 const MAX_ACTIVE_RESERVATIONS = 3;
 const QR_IMAGE_SIZE = '220x220';
 const QR_API_URL = '/api/qr';
-const RESERVATION_VISUALS: Record<
-  string,
-  { label: string; badgeClass: string; dotClass: string; textClass: string }
-> = {
+
+const getReservationVisuals = (
+  t: (key: string) => string
+): Record<string, { label: string; badgeClass: string; dotClass: string; textClass: string }> => ({
   active: {
-    label: 'Activa',
+    label: t('reservations.status_active') || 'Activa',
     badgeClass: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100',
     dotClass: 'bg-emerald-500',
     textClass: 'text-emerald-700 dark:text-emerald-200',
   },
   past: {
-    label: 'Concluida',
+    label: t('reservations.status_past') || 'Concluida',
     badgeClass: 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100',
     dotClass: 'bg-amber-500',
     textClass: 'text-amber-700 dark:text-amber-200',
   },
   failed: {
-    label: 'No completada',
+    label: t('reservations.status_failed') || 'No completada',
     badgeClass: 'bg-orange-100 text-orange-900 dark:bg-orange-900/30 dark:text-orange-100',
     dotClass: 'bg-orange-500',
     textClass: 'text-orange-700 dark:text-orange-200',
   },
   pending: {
-    label: 'Pendiente',
+    label: t('reservations.status_pending') || 'Pendiente',
     badgeClass: 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100',
     dotClass: 'bg-amber-500',
     textClass: 'text-amber-700 dark:text-amber-200',
   },
   confirmed: {
-    label: 'Confirmada',
+    label: t('reservations.status_confirmed') || 'Confirmada',
     badgeClass: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100',
     dotClass: 'bg-emerald-500',
     textClass: 'text-emerald-700 dark:text-emerald-200',
   },
   completed: {
-    label: 'Completada',
+    label: t('reservations.status_completed') || 'Completada',
     badgeClass: 'bg-cyan-100 text-cyan-900 dark:bg-cyan-900/30 dark:text-cyan-100',
     dotClass: 'bg-cyan-500',
     textClass: 'text-cyan-700 dark:text-cyan-200',
   },
   cancelled: {
-    label: 'Cancelada',
+    label: t('reservations.status_cancelled') || 'Cancelada',
     badgeClass: 'bg-red-100 text-red-900 dark:bg-red-900/30 dark:text-red-100',
     dotClass: 'bg-red-500',
     textClass: 'text-red-700 dark:text-red-200',
   },
   default: {
-    label: 'En seguimiento',
+    label: t('reservations.status_default') || 'En seguimiento',
     badgeClass: 'bg-primary-100 text-primary-900 dark:bg-primary-900/30 dark:text-primary-100',
     dotClass: 'bg-primary-500',
     textClass: 'text-primary-700 dark:text-primary-200',
   },
-};
-const DAY_PICKER_WEEKDAYS: Record<number, string> = {
+});
+
+const getDayPickerWeekdays = (): Record<number, string> => ({
   0: 'Do',
   1: 'Lu',
   2: 'Ma',
@@ -129,14 +133,12 @@ const DAY_PICKER_WEEKDAYS: Record<number, string> = {
   4: 'Ju',
   5: 'Vi',
   6: 'Sá',
-};
-const dayPickerFormatters: Partial<Formatters> = {
-  formatWeekdayName: (day) => DAY_PICKER_WEEKDAYS[day.getDay()] ?? '',
-};
+});
 
-const getStatusVisuals = (status: string, fallback?: string) =>
-  RESERVATION_VISUALS[status] ??
-  (fallback ? RESERVATION_VISUALS[fallback] : RESERVATION_VISUALS.default);
+const getStatusVisuals = (status: string, t: (key: string) => string, fallback?: string) => {
+  const visuals = getReservationVisuals(t);
+  return visuals[status] ?? (fallback ? visuals[fallback] : visuals.default);
+};
 
 interface BaseReservationRecord {
   id: string;
@@ -161,12 +163,6 @@ interface FailedReservationRecord extends BaseReservationRecord {
   archivedAt: string;
   cleanupAt: string;
 }
-
-type DetailActionState = {
-  isLoading: boolean;
-  message: string | null;
-  error: string | null;
-};
 
 const formatDateForApi = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
@@ -275,7 +271,15 @@ const clampDateToRange = (date: Date, min: Date, max: Date) => {
   return date;
 };
 export default function ReservePage() {
-  const { token, user, isLoading } = useAuth();
+  const { t } = useLanguage();
+  const DAY_PICKER_WEEKDAYS = getDayPickerWeekdays();
+  const dayPickerFormatters: Partial<Formatters> = useMemo(
+    () => ({
+      formatWeekdayName: (day) => DAY_PICKER_WEEKDAYS[day.getDay()] ?? '',
+    }),
+    [DAY_PICKER_WEEKDAYS]
+  );
+  const { token, user, isLoading: isAuthLoading } = useAuth();
   const isAuthenticated = Boolean(token && user);
   const today = useMemo(() => {
     const d = new Date();
@@ -328,11 +332,7 @@ export default function ReservePage() {
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
-  const [reservationActionState, setReservationActionState] = useState<DetailActionState>({
-    isLoading: false,
-    message: null,
-    error: null,
-  });
+  // reservationActionState removed as it was unused in UI
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const reservationTicketRef = useRef<HTMLDivElement | null>(null);
   const reservationFormRef = useRef<HTMLDivElement | null>(null);
@@ -341,6 +341,13 @@ export default function ReservePage() {
     null
   );
   const [isProcessingReservationTicket, setIsProcessingReservationTicket] = useState(false);
+  const reservationShareState = useMemo(
+    () => ({
+      error: reservationTicketActionError,
+      isProcessing: isProcessingReservationTicket,
+    }),
+    [reservationTicketActionError, isProcessingReservationTicket]
+  );
   const [recentReservationCode, setRecentReservationCode] = useState<string | null>(null);
   const [reservationDeviceInfo, setReservationDeviceInfo] = useState({
     isMobile: false,
@@ -466,16 +473,6 @@ export default function ReservePage() {
     },
     [maxReservationDate, setDisplayMonth, setSelectedDate, today]
   );
-
-  const userDisplayName = useMemo(() => {
-    if (!user) return null;
-    const parts = [user.firstName, user.lastName].map((value) => value?.trim());
-    const filtered = parts.filter((value): value is string => Boolean(value));
-    if (filtered.length === 0) {
-      return null;
-    }
-    return filtered.join(' ');
-  }, [user]);
 
   const loadReservations = useCallback(async () => {
     if (!token) {
@@ -708,11 +705,11 @@ export default function ReservePage() {
     return slots;
   }, []);
 
-  const idPrefix = useId();
   const fieldIds = {
-    people: `${idPrefix}-people`,
-    message: `${idPrefix}-message`,
-    preOrder: `${idPrefix}-preorder`,
+    people: useId(),
+    time: useId(),
+    message: useId(),
+    preOrder: useId(),
   };
 
   const availableTimeSlots = useMemo(() => {
@@ -1067,22 +1064,12 @@ export default function ReservePage() {
       apiCall: (token: string, reservationId: string) => Promise<void>
     ) => {
       if (!token) {
-        setReservationActionState({
-          isLoading: false,
-          message: null,
-          error: 'Inicia sesión de nuevo para administrar la reservación.',
-        });
+        showSnackbar('Inicia sesión de nuevo para administrar la reservación.', 'error');
         return;
       }
-      setReservationActionState({ isLoading: true, message: null, error: null });
       try {
         await apiCall(token, reservation.id);
         await loadReservations();
-        setReservationActionState({
-          isLoading: false,
-          message: `${actionLabel} correctamente`,
-          error: null,
-        });
         showSnackbar(`${actionLabel}.`, action === 'cancel' ? 'warning' : 'success', {
           deviceNotification: {
             title: actionLabel,
@@ -1095,11 +1082,6 @@ export default function ReservePage() {
           error instanceof Error
             ? error.message
             : 'No pudimos actualizar la reservación. Intenta de nuevo.';
-        setReservationActionState({
-          isLoading: false,
-          message: null,
-          error: message,
-        });
         showSnackbar(message, 'error');
       }
     },
@@ -1199,7 +1181,7 @@ export default function ReservePage() {
     }
   };
 
-  if (isLoading) {
+  if (isAuthLoading) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 text-center text-gray-700 dark:text-gray-200">
         Cargando tus reservaciones...
@@ -1348,8 +1330,14 @@ export default function ReservePage() {
           </div>
 
           <div>
-            <p className="mb-3 text-sm font-medium text-gray-800 dark:text-gray-200">Hora</p>
+            <label
+              htmlFor={fieldIds.time}
+              className="mb-3 block text-sm font-medium text-gray-800 dark:text-gray-200"
+            >
+              Hora
+            </label>
             <select
+              id={fieldIds.time}
               value={selectedTime ?? ''}
               onChange={(event) => setSelectedTime(event.target.value || null)}
               disabled={!selectedDate || isLoadingSlots || availableTimeSlots.length === 0}
@@ -1729,7 +1717,7 @@ export default function ReservePage() {
                     {failedReservations.map((reservation) => {
                       const branchLabel =
                         reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
-                      const statusVisuals = getStatusVisuals('failed', 'failed');
+                      const statusVisuals = getStatusVisuals('failed', t, 'failed');
                       const cleanupDate = new Date(reservation.cleanupAt).toLocaleDateString(
                         'es-MX',
                         {
@@ -1799,19 +1787,11 @@ export default function ReservePage() {
                 <ReservationDetailContent
                   reservation={selectedReservation}
                   onCancelReservation={handleCancelReservation}
-                  actionState={reservationActionState}
-                  currentUserName={userDisplayName}
-                  onDownloadTicket={(reservation) =>
-                    void handleDownloadReservationTicket(reservation)
-                  }
-                  onShareReservation={(reservation) =>
-                    void handleShareReservationTicket(reservation)
-                  }
+                  currentUserName={user?.firstName || user?.email || null}
+                  onDownloadTicket={handleDownloadReservationTicket}
+                  onShareReservation={handleShareReservationTicket}
                   ticketRef={reservationTicketRef}
-                  shareState={{
-                    error: reservationTicketActionError,
-                    isProcessing: isProcessingReservationTicket,
-                  }}
+                  shareState={reservationShareState}
                   isMobile={reservationDeviceInfo.isMobile}
                 />
               </DetailModal>
@@ -1863,33 +1843,6 @@ export default function ReservePage() {
     </CoffeeBackground>
   );
 }
-
-const RESERVATION_STATUS_STYLES: Record<string, { badge: string; text: string; label: string }> = {
-  pending: {
-    badge:
-      'border border-primary-200 bg-primary-50 text-primary-700 dark:border-white/15 dark:bg-white/10 dark:text-white',
-    text: 'text-primary-700 dark:text-white',
-    label: 'Pendiente',
-  },
-  completed: {
-    badge:
-      'border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/20 dark:text-emerald-200',
-    text: 'text-emerald-700 dark:text-emerald-100',
-    label: 'Completada',
-  },
-  past: {
-    badge:
-      'border border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-400/30 dark:bg-orange-500/20 dark:text-orange-200',
-    text: 'text-orange-700 dark:text-orange-100',
-    label: 'Histórica',
-  },
-  cancelled: {
-    badge:
-      'border border-red-200 bg-red-50 text-red-700 dark:border-red-400/30 dark:bg-red-500/20 dark:text-red-100',
-    text: 'text-red-700 dark:text-red-200',
-    label: 'Cancelada',
-  },
-};
 
 const ReservationColumn = ({
   title,
@@ -1987,36 +1940,62 @@ const ReservationCard = ({
   reservation: ReservationRecord;
   onSelect: (reservation: ReservationRecord) => void;
 }) => {
-  const statusKey = (reservation.status ?? 'pending').toLowerCase();
-  const statusStyles = RESERVATION_STATUS_STYLES[statusKey] ?? RESERVATION_STATUS_STYLES.pending;
-  const branchLabel = reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
-
+  const { t } = useLanguage();
+  const visuals = getStatusVisuals(reservation.status, t);
+  const parsedDate = parseReservationDate(reservation);
   return (
     <button
       type="button"
       onClick={() => onSelect(reservation)}
-      data-reservation-code={reservation.reservationCode ?? undefined}
-      className="w-full rounded-[32px] border border-gray-200 bg-white px-5 py-4 text-left text-gray-900 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-white/10 dark:bg-[#0f1728] dark:text-white dark:hover:bg-[#151f36]"
+      className="w-full text-left focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-[32px] overflow-hidden group"
     >
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.35em] text-primary-600 dark:text-primary-300">
+      <div className="bg-white/95 dark:bg-gray-900 border border-gray-200 dark:border-white/10 p-5 transition-all hover:bg-white dark:hover:bg-gray-800 shadow-sm hover:shadow-md">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <div className={classNames('w-2 h-2 rounded-full', visuals.dotClass)} />
+            <span
+              className={classNames(
+                'px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider',
+                visuals.badgeClass
+              )}
+            >
+              {visuals.label}
+            </span>
+          </div>
+          <span className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-medium">
             {reservation.reservationCode}
+          </span>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-lg font-bold text-gray-900 dark:text-gray-100 line-clamp-1">
+            {parsedDate
+              ? parsedDate.toLocaleString('es-MX', {
+                  weekday: 'short',
+                  day: '2-digit',
+                  month: 'short',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : `${reservation.reservationDate} · ${reservation.reservationTime}`}
           </p>
-          <p className="text-base font-semibold text-gray-900 dark:text-white">
-            {formatReservationDateTime(reservation)}
+          <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">
+            <TranslatedText tid="reservations.people" fallback="Personas" />:{' '}
+            {reservation.peopleCount} ·{' '}
+            <TranslatedText tid="reservations.branch" fallback="Sucursal" />:{' '}
+            {reservation.branchNumber || '001'}
           </p>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles.badge}`}>
-          {statusStyles.label}
-        </span>
+
+        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
+          <span className="text-[11px] text-primary-600 dark:text-primary-400 font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+            Ver detalle →
+          </span>
+          <div className="w-8 h-8 rounded-full bg-gray-50 dark:bg-white/5 flex items-center justify-center">
+            <FiCalendar className="text-gray-400 dark:text-gray-500" />
+          </div>
+        </div>
       </div>
-      <p className="mt-1 text-sm text-gray-600 dark:text-white/80">
-        {reservation.peopleCount} {reservation.peopleCount === 1 ? 'persona' : 'personas'} ·{' '}
-        {branchLabel}
-        {reservation.branchNumber ? ` (#${reservation.branchNumber})` : ''}
-      </p>
-      <div className={`mt-3 text-xs ${statusStyles.text}`}>Selecciona para ver detalle</div>
     </button>
   );
 };
@@ -2061,11 +2040,16 @@ const ReservationsSearchBar = ({
           handleSubmit();
         }}
       >
-        <label className="flex flex-col text-[var(--brand-muted)]">
-          <span className="font-semibold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-300">
-            Buscar código o fecha
+        <label className="flex flex-col text-[var(--brand-muted)]" htmlFor="reservation-search">
+          <span className="sr-only">Buscar código o fecha</span>
+          <span
+            className="font-semibold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-300"
+            aria-hidden="true"
+          >
+            <TranslatedText tid="reservations.search_label" fallback="Buscar código o fecha" />
           </span>
           <input
+            id="reservation-search"
             value={value}
             onChange={(event) => {
               setValue(event.target.value);
@@ -2081,7 +2065,7 @@ const ReservationsSearchBar = ({
           type="submit"
           className="rounded-full bg-primary-600 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-700"
         >
-          Buscar
+          <TranslatedText tid="common.search" fallback="Buscar" />
         </button>
         <button
           type="button"
@@ -2092,16 +2076,16 @@ const ReservationsSearchBar = ({
           }}
           className="rounded-full border border-gray-300 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300"
         >
-          Limpiar
+          <TranslatedText tid="common.clear" fallback="Limpiar" />
         </button>
         <div className="flex items-center gap-3">
-          {isLoading && <span>Actualizando...</span>}
+          {isLoading && <TranslatedText tid="common.loading" fallback="Actualizando..." />}
           <button
             type="button"
             onClick={() => onRefresh()}
             className="rounded-full border border-primary-200 px-3 py-1 font-semibold text-primary-600 transition hover:bg-primary-50 dark:border-gray-700 dark:text-primary-200"
           >
-            Refrescar
+            <TranslatedText tid="common.refresh" fallback="Refrescar" />
           </button>
         </div>
       </form>
@@ -2113,7 +2097,7 @@ const ReservationsSearchBar = ({
           className="rounded-full bg-primary-600 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
           disabled={disablePastButton}
         >
-          Pasadas
+          <TranslatedText tid="reservations.past_btn" fallback="Pasadas" />
         </button>
         {showCompletedButton && onShowCompleted && (
           <button
@@ -2121,7 +2105,7 @@ const ReservationsSearchBar = ({
             onClick={onShowCompleted}
             className="rounded-full bg-primary-600 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-700"
           >
-            Completadas
+            <TranslatedText tid="reservations.completed_btn" fallback="Completadas" />
           </button>
         )}
       </div>
@@ -2200,46 +2184,9 @@ const DetailModal = ({ children, onClose }: { children: ReactNode; onClose: () =
   );
 };
 
-const DetailActionFooter = ({
-  label,
-  onClick,
-  disabled,
-  actionState,
-  variant = 'primary',
-}: {
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  actionState?: DetailActionState;
-  variant?: 'primary' | 'danger';
-}) => {
-  const baseClasses =
-    variant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-primary-600 hover:bg-primary-700';
-
-  return (
-    <div className="space-y-2">
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        className={`w-full rounded-2xl px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-50 ${baseClasses}`}
-      >
-        {disabled ? 'Procesando…' : label}
-      </button>
-      {actionState?.message && (
-        <p className="text-xs font-semibold text-emerald-600">{actionState.message}</p>
-      )}
-      {actionState?.error && (
-        <p className="text-xs font-semibold text-red-600">{actionState.error}</p>
-      )}
-    </div>
-  );
-};
-
 const ReservationDetailContent = ({
   reservation,
   onCancelReservation,
-  actionState,
   currentUserName,
   onDownloadTicket,
   onShareReservation,
@@ -2249,7 +2196,6 @@ const ReservationDetailContent = ({
 }: {
   reservation: ReservationRecord;
   onCancelReservation?: (reservation: ReservationRecord) => void;
-  actionState?: DetailActionState;
   currentUserName?: string | null;
   onDownloadTicket?: (reservation: ReservationRecord) => void;
   onShareReservation?: (reservation: ReservationRecord) => void;
@@ -2257,6 +2203,13 @@ const ReservationDetailContent = ({
   shareState?: { error: string | null; isProcessing: boolean };
   isMobile?: boolean;
 }) => {
+  const { t } = useLanguage();
+  const visuals = getStatusVisuals(reservation.status, t);
+  const isExpired =
+    reservation.status === 'past' ||
+    reservation.status === 'failed' ||
+    reservation.status === 'cancelled';
+
   const { user } = useAuth();
   const slotDateTime = buildSlotDateTime(reservation.reservationDate, reservation.reservationTime);
   const qrExpiresAt = new Date(slotDateTime.getTime() + QR_EXPIRATION_MINUTES * 60 * 1000);
@@ -2264,6 +2217,7 @@ const ReservationDetailContent = ({
   const branchLabel = reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
   const resolvedCustomerName =
     currentUserName || user?.firstName || user?.email || 'Cliente Xoco Café';
+
   const qrPayload = {
     type: 'reservation',
     reservationId: reservation.id,
@@ -2284,134 +2238,161 @@ const ReservationDetailContent = ({
     email: user?.email ?? null,
     phone: user?.phone ?? null,
   };
+
   const qrImageSrc = `${QR_API_URL}?size=${QR_IMAGE_SIZE}&data=${encodeURIComponent(
     JSON.stringify(qrPayload)
   )}`;
+
+  const displayDateTime = formatReservationDateTime(reservation);
+  const showCancelButton =
+    onCancelReservation && (reservation.status === 'active' || reservation.status === 'pending');
+
   return (
-    <div
-      className="space-y-5"
-      ref={(node) => {
-        if (ticketRef) {
-          ticketRef.current = node;
-        }
-      }}
-    >
-      <div className="rounded-[32px] border border-[#1d2537] bg-[#0f1524] p-6 text-white shadow-[0_25px_60px_rgba(0,0,0,0.55)]">
-        <header className="space-y-1">
-          <p className="text-xs uppercase tracking-[0.35em] text-primary-200">
+    <div className="space-y-6">
+      <div
+        ref={ticketRef}
+        className="flex flex-col items-center justify-center rounded-[40px] border border-gray-100 !bg-white p-8 text-gray-900 shadow-xl dark:border-white/10 dark:!bg-[#0f1524] dark:text-gray-100"
+        style={{ backgroundColor: '#0f1524' }}
+      >
+        <div className="mb-6 flex flex-col items-center">
+          <div className="flex items-center gap-2 mb-2">
+            <div className={classNames('w-2 h-2 rounded-full animate-pulse', visuals.dotClass)} />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-primary-600 dark:text-primary-400">
+              {visuals.label}
+            </span>
+          </div>
+          <p className="text-xs font-medium uppercase tracking-[0.4em] text-gray-400">
             {reservation.reservationCode}
           </p>
-          <h3 className="text-2xl font-semibold text-white">Reservación</h3>
-          <p className="text-sm text-white/70">{formatReservationDateTime(reservation)}</p>
-        </header>
-        <div className="mt-5 grid gap-3 rounded-3xl border border-white/15 bg-[#1a2134] p-4">
+        </div>
+
+        <div className="relative mb-8 p-4 bg-white rounded-3xl shadow-inner">
+          {!qrIsActive || isExpired ? (
+            <div className="flex aspect-square h-52 items-center justify-center rounded-2xl bg-gray-50 text-gray-400">
+              <p className="px-4 text-center text-xs font-bold uppercase tracking-widest">
+                <TranslatedText tid="reservations.expired_qr" fallback="QR expirado" />
+              </p>
+            </div>
+          ) : (
+            <Image
+              src={qrImageSrc}
+              alt="Código QR de la reserva"
+              width={220}
+              height={220}
+              className="rounded-2xl"
+            />
+          )}
+        </div>
+
+        {qrIsActive && !isExpired && (
+          <div className="mb-8 flex flex-col items-center text-center">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">
+              {t('reservations.valid_until')?.replace(
+                '{time}',
+                qrExpiresAt.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+              ) ||
+                `QR válido hasta las ${qrExpiresAt.toLocaleTimeString('es-MX', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}`}
+            </p>
+            <p className="mt-1 text-[9px] font-medium text-gray-400 max-w-[200px] leading-relaxed">
+              {t('reservations.expiration_notice')?.replace(
+                '{min}',
+                String(QR_EXPIRATION_MINUTES)
+              ) || `El QR expira ${QR_EXPIRATION_MINUTES} min después de la hora reservada.`}
+            </p>
+          </div>
+        )}
+
+        <div className="w-full space-y-4 pt-6 border-t border-gray-100 dark:border-white/5">
+          <DetailRow label={t('reservations.state') || 'Estado'} value={visuals.label} />
+          <DetailRow label="Fecha y Hora" value={displayDateTime} />
           <DetailRow
-            label="Personas"
-            value={`${reservation.peopleCount} ${
-              reservation.peopleCount === 1 ? 'persona' : 'personas'
-            }`}
-            variant="dark"
+            label={t('reservations.people') || 'Personas'}
+            value={reservation.peopleCount.toString()}
           />
           <DetailRow
-            label="Sucursal"
-            value={`${branchLabel}${
-              reservation.branchNumber ? ` (#${reservation.branchNumber})` : ''
-            }`}
-            variant="dark"
-          />
-          <DetailRow
-            label="Estado"
-            value={(reservation.status ?? 'Pendiente').toUpperCase()}
-            variant="dark"
+            label={t('reservations.branch') || 'Sucursal'}
+            value={reservation.branchNumber || '001'}
           />
         </div>
-        <div className="mt-5 flex flex-wrap gap-4">
-          <div className="flex flex-1 flex-col items-center gap-2 rounded-3xl border border-white/10 bg-white p-4 text-gray-900 shadow-inner">
-            {qrIsActive ? (
-              <Image
-                src={qrImageSrc}
-                alt={`QR de la reservación ${reservation.reservationCode}`}
-                width={220}
-                height={220}
-                className="h-48 w-48 rounded-2xl bg-white p-3 shadow"
-              />
-            ) : (
-              <div className="flex h-48 w-48 items-center justify-center rounded-2xl border border-dashed border-[#c1a391] text-center text-xs text-white/60">
-                QR expirado
-              </div>
-            )}
-            <p className="text-xs text-gray-600">
-              {qrIsActive
-                ? `QR válido hasta las ${qrExpiresAt.toLocaleTimeString('es-MX', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}`
-                : `El QR expira ${QR_EXPIRATION_MINUTES} min después de la hora reservada.`}
-            </p>
-            <div
-              className="flex flex-wrap items-center justify-center gap-3 text-xs font-semibold text-primary-600"
-              data-html2canvas-ignore="true"
-            >
-              {isMobile
-                ? onShareReservation && (
-                    <button
-                      type="button"
-                      onClick={() => onShareReservation(reservation)}
-                      className="hover:text-primary-800"
-                      disabled={shareState?.isProcessing}
-                    >
-                      {shareState?.isProcessing ? 'Compartiendo…' : 'Compartir reservación'}
-                    </button>
-                  )
-                : onDownloadTicket && (
-                    <button
-                      type="button"
-                      onClick={() => onDownloadTicket(reservation)}
-                      className="hover:text-primary-800"
-                      disabled={shareState?.isProcessing}
-                    >
-                      {shareState?.isProcessing ? 'Descargando…' : 'Descargar reserva'}
-                    </button>
+
+        <div
+          className="mt-8 flex flex-wrap items-center justify-center gap-3 text-xs font-semibold text-primary-600"
+          data-html2canvas-ignore="true"
+        >
+          {isMobile
+            ? onShareReservation && (
+                <button
+                  type="button"
+                  onClick={() => onShareReservation(reservation)}
+                  className="hover:text-primary-800"
+                  disabled={shareState?.isProcessing}
+                >
+                  {shareState?.isProcessing ? (
+                    <TranslatedText tid="common.loading" fallback="Compartiendo…" />
+                  ) : (
+                    <TranslatedText tid="reservations.share" fallback="Compartir reservación" />
                   )}
+                </button>
+              )
+            : onDownloadTicket && (
+                <button
+                  type="button"
+                  onClick={() => onDownloadTicket(reservation)}
+                  className="hover:text-primary-800"
+                  disabled={shareState?.isProcessing}
+                >
+                  {shareState?.isProcessing ? (
+                    <TranslatedText tid="common.loading" fallback="Descargando…" />
+                  ) : (
+                    <TranslatedText tid="reservations.download" fallback="Descargar reserva" />
+                  )}
+                </button>
+              )}
+        </div>
+        {shareState?.error && (
+          <p
+            className="mt-2 text-center text-xs font-semibold text-red-300"
+            data-html2canvas-ignore="true"
+          >
+            {shareState.error}
+          </p>
+        )}
+      </div>
+
+      {(reservation.preOrderItems || reservation.message) && (
+        <div className="flex flex-col gap-4">
+          {reservation.preOrderItems && (
+            <div className="rounded-3xl border border-white/10 bg-[#161d30] px-4 py-3 text-sm text-white">
+              <p className="text-xs uppercase tracking-[0.35em] text-white/70">Pre-orden</p>
+              <p className="mt-1 whitespace-pre-line">{reservation.preOrderItems}</p>
             </div>
-            {shareState?.error && (
-              <p
-                className="mt-2 text-center text-xs font-semibold text-red-300"
-                data-html2canvas-ignore="true"
-              >
-                {shareState.error}
-              </p>
-            )}
-          </div>
-          {(reservation.preOrderItems || reservation.message) && (
-            <div className="flex-1 space-y-4 text-white">
-              {reservation.preOrderItems && (
-                <div className="rounded-3xl border border-white/10 bg-[#161d30] px-4 py-3 text-sm">
-                  <p className="text-xs uppercase tracking-[0.35em] text-white/70">Pre-orden</p>
-                  <p className="mt-1 whitespace-pre-line">{reservation.preOrderItems}</p>
-                </div>
-              )}
-              {reservation.message && (
-                <div className="rounded-3xl border border-white/10 bg-[#161d30] px-4 py-3 text-sm">
-                  <p className="text-xs uppercase tracking-[0.35em] text-white/70">Mensaje</p>
-                  <p className="mt-1">{reservation.message}</p>
-                </div>
-              )}
+          )}
+          {reservation.message && (
+            <div className="rounded-3xl border border-white/10 bg-[#161d30] px-4 py-3 text-sm text-white">
+              <p className="text-xs uppercase tracking-[0.35em] text-white/70">Mensaje</p>
+              <p className="mt-1">{reservation.message}</p>
             </div>
           )}
         </div>
-        {onCancelReservation && (
-          <div className="mt-6" data-html2canvas-ignore="true">
-            <DetailActionFooter
-              label="Cancelar reservación"
-              onClick={() => onCancelReservation(reservation)}
-              disabled={actionState?.isLoading}
-              variant="danger"
-              actionState={actionState}
-            />
-          </div>
-        )}
-      </div>
+      )}
+
+      {showCancelButton && (
+        <div
+          className="border-t border-gray-100 dark:border-white/5 pt-6"
+          data-html2canvas-ignore="true"
+        >
+          <button
+            type="button"
+            onClick={() => onCancelReservation && onCancelReservation(reservation)}
+            className="w-full rounded-2xl border border-red-200 bg-red-50 py-3 text-xs font-bold uppercase tracking-widest text-red-600 transition hover:bg-red-100 dark:border-red-900/30 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40"
+          >
+            <TranslatedText tid="reservations.cancel_btn" fallback="Cancelar reservación" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -2486,9 +2467,13 @@ const ReservationHistoryContent = ({
           Cerrar
         </button>
       </div>
-      <label className="flex flex-col text-xs text-gray-500 dark:text-gray-400">
+      <label
+        className="flex flex-col text-xs text-gray-500 dark:text-gray-400"
+        htmlFor="history-search"
+      >
         Buscar en historial
         <input
+          id="history-search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Código, fecha o sucursal"

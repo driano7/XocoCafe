@@ -9,6 +9,8 @@ import MenuGalleryGrid from '@/components/menu/MenuGalleryGrid';
 import ReelCarousel from '@/components/menu/ReelCarousel';
 import { components as mdxComponents } from '@/components/MDXComponents';
 import SupportBanner from '@/components/SupportBanner';
+import { useLanguage } from '@/components/Language/LanguageProvider';
+import TranslatedText from '@/components/Language/TranslatedText';
 
 type MenuExperienceProps = {
   simpleCode: string;
@@ -17,17 +19,21 @@ type MenuExperienceProps = {
 
 type TabKey = 'dynamic' | 'simple' | 'gallery';
 
-const TAB_LABELS: Record<TabKey, string> = {
-  dynamic: 'Dinámico',
-  simple: 'Simple',
-  gallery: 'Galería',
-};
-
 export default function MenuExperience({ simpleCode, simpleContent }: MenuExperienceProps) {
+  const { t, currentLanguage } = useLanguage();
   const [activeTab, setActiveTab] = useState<TabKey>('dynamic');
   const SimpleContent = useMDXComponent(simpleCode);
   const { resolvedTheme } = useTheme();
   const isDark = useMemo(() => resolvedTheme === 'dark', [resolvedTheme]);
+
+  const TAB_LABELS = useMemo<Record<TabKey, string>>(
+    () => ({
+      dynamic: t('menu.tab_dynamic') || 'Dinámico',
+      simple: t('menu.tab_simple') || 'Simple',
+      gallery: t('menu.tab_gallery') || 'Galería',
+    }),
+    [t]
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-3 py-12 sm:px-6 lg:px-0">
@@ -38,13 +44,16 @@ export default function MenuExperience({ simpleCode, simpleContent }: MenuExperi
               isDark ? 'text-white/50' : 'text-gray-500'
             }`}
           >
-            Menú
+            <TranslatedText tid="menu.title" fallback="Menú" />
           </p>
           <h1 className={`text-3xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>
             Xoco Café
           </h1>
           <p className={`text-sm ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
-            Explora nuestras selecciones especiales
+            <TranslatedText
+              tid="menu.subtitle"
+              fallback="Explora nuestras selecciones especiales"
+            />
           </p>
         </div>
         <div className="hidden sm:block" aria-hidden="true" />
@@ -59,7 +68,7 @@ export default function MenuExperience({ simpleCode, simpleContent }: MenuExperi
           {(Object.keys(TAB_LABELS) as TabKey[]).map((tab) => (
             <button
               type="button"
-              key={tab}
+              key={`${tab}-${currentLanguage}`}
               onClick={() => setActiveTab(tab)}
               className={`rounded-full px-6 py-3 text-sm font-semibold transition ${
                 activeTab === tab

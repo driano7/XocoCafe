@@ -45,6 +45,8 @@ import { useSnackbarNotifications, type SnackbarTone } from '@/hooks/useSnackbar
 import { useOrders, type OrderRecord, type OrderStatus } from '@/hooks/useOrders';
 import { useTicketDetails } from '@/hooks/useTicketDetails';
 import { useClientFavorites } from '@/hooks/useClientFavorites';
+import { useLanguage } from '@/components/Language/LanguageProvider';
+import TranslatedText from '@/components/Language/TranslatedText';
 import { detectDeviceInfo, ensurePushPermission } from '@/lib/pushNotifications';
 import { decryptField } from '@/lib/secure-fields';
 import { consumePendingSnackbar } from '@/lib/pendingSnackbar';
@@ -54,12 +56,12 @@ type Order = OrderRecord & {
   prepStatus?: OrderStatus | null;
 };
 
-const STATUS_LABELS: Record<Order['status'], string> = {
-  pending: 'Pendiente',
-  in_progress: 'En preparación',
-  completed: 'Completado',
-  past: 'Histórico',
-};
+const getStatusLabels = (t: (key: string) => string): Record<Order['status'], string> => ({
+  pending: t('orders.status_pending') || 'Pendiente',
+  in_progress: t('orders.status_in_progress') || 'En preparación',
+  completed: t('orders.status_completed') || 'Completado',
+  past: t('orders.status_past') || 'Histórico',
+});
 
 const getOrderDisplayCode = (order: Order) =>
   order.ticketId ?? order.orderNumber ?? order.id.slice(0, 6);
@@ -286,6 +288,8 @@ const formatOrderChannelLabel = (order: Order) => {
 };
 
 const OrderCard = ({ order, onSelect }: { order: Order; onSelect: (order: Order) => void }) => {
+  const { t } = useLanguage();
+  const STATUS_LABELS = getStatusLabels(t);
   const effectiveStatusKey = (order.prepStatus as Order['status']) ?? order.status ?? 'pending';
   const status = STATUS_LABELS[effectiveStatusKey] ?? STATUS_LABELS.pending;
   const channelLabel = formatOrderChannelLabel(order);
@@ -315,10 +319,14 @@ const OrderCard = ({ order, onSelect }: { order: Order; onSelect: (order: Order)
         </div>
       </div>
       <p className="mt-1 text-sm text-gray-600 dark:text-gray-200">
-        Cliente: {formatOrderCustomer(order)} · Ticket POS: {order.ticketId ?? 'Sin ticket'}
+        Cliente: {formatOrderCustomer(order)} ·{' '}
+        <TranslatedText tid="orders.pos_ticket" fallback="Ticket POS" />:{' '}
+        {order.ticketId ?? <TranslatedText tid="orders.no_ticket" fallback="Sin ticket" />}
       </p>
       <div className="mt-3 flex items-center justify-between text-xs text-gray-600 dark:text-gray-200">
-        <span>Artículos: {getOrderArticles(order)}</span>
+        <span>
+          <TranslatedText tid="orders.articles" fallback="Artículos" />: {getOrderArticles(order)}
+        </span>
         <span className="text-base font-semibold text-primary-700 dark:text-gray-50">
           {formatCurrency(order.total)}
         </span>
@@ -342,29 +350,36 @@ const ColumnPager = ({
   totalItems: number;
   onPrev: () => void;
   onNext: () => void;
-}) => (
-  <div className="mt-4 flex items-center justify-between text-xs text-gray-600 dark:text-white/70">
-    <button
-      type="button"
-      onClick={onPrev}
-      className="rounded-full border border-gray-200 px-3 py-1 font-semibold hover:border-primary-400 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:text-white dark:hover:border-primary-400 dark:hover:text-primary-200"
-      disabled={page === 0}
-    >
-      Anterior
-    </button>
-    <span>
-      Página {page + 1} de {totalPages} · {totalItems} registros
-    </span>
-    <button
-      type="button"
-      onClick={onNext}
-      className="rounded-full border border-gray-200 px-3 py-1 font-semibold hover:border-primary-400 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:text-white dark:hover:border-primary-400 dark:hover:text-primary-200"
-      disabled={page + 1 >= totalPages}
-    >
-      Siguiente
-    </button>
-  </div>
-);
+}) => {
+  const { t } = useLanguage();
+  return (
+    <div className="mt-4 flex items-center justify-between text-xs text-gray-600 dark:text-white/70">
+      <button
+        type="button"
+        onClick={onPrev}
+        className="rounded-full border border-gray-200 px-3 py-1 font-semibold hover:border-primary-400 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:text-white dark:hover:border-primary-400 dark:hover:text-primary-200"
+        disabled={page === 0}
+      >
+        <TranslatedText tid="orders.prev" fallback="Anterior" />
+      </button>
+      <span>
+        {t('orders.page_of')
+          ?.replace('{page}', String(page + 1))
+          ?.replace('{total}', String(totalPages))
+          ?.replace('{count}', String(totalItems)) ||
+          `Página ${page + 1} de ${totalPages} · ${totalItems} registros`}
+      </span>
+      <button
+        type="button"
+        onClick={onNext}
+        className="rounded-full border border-gray-200 px-3 py-1 font-semibold hover:border-primary-400 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:text-white dark:hover:border-primary-400 dark:hover:text-primary-200"
+        disabled={page + 1 >= totalPages}
+      >
+        <TranslatedText tid="orders.next" fallback="Siguiente" />
+      </button>
+    </div>
+  );
+};
 
 const OrdersBoardColumn = ({
   title,
@@ -431,6 +446,7 @@ const HistoricalModal = ({
   onClose: () => void;
   orders: Order[];
 }) => {
+  const { t } = useLanguage();
   const headerHeight = useHeaderHeight();
   const modalVars = useMemo(() => {
     const safeHeaderHeight = Number.isFinite(headerHeight) ? headerHeight : 96;
@@ -510,13 +526,16 @@ const HistoricalModal = ({
             <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-5 pb-3 pt-5 dark:border-white/10">
               <div>
                 <p className="text-xs uppercase tracking-[0.35em] text-primary-600 dark:text-primary-200">
-                  Histórico
+                  <TranslatedText tid="orders.historical" fallback="Histórico" />
                 </p>
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                   Pedidos vencidos
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-white/60">
-                  Pedidos que pasaron el corte 23:59 · se depuran cada 48 horas.
+                  <TranslatedText
+                    tid="orders.historical_desc"
+                    fallback="Pedidos que pasaron el corte 23:59 · se depuran cada 48 horas."
+                  />
                 </p>
               </div>
               <button
@@ -524,7 +543,7 @@ const HistoricalModal = ({
                 onClick={onClose}
                 className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/40 dark:bg-white dark:text-gray-900 dark:hover:bg-white/80"
               >
-                Cerrar
+                <TranslatedText tid="orders.close" fallback="Cerrar" />
               </button>
             </div>
             <div
@@ -543,34 +562,37 @@ const HistoricalModal = ({
             >
               {orders.length === 0 ? (
                 <p className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500 dark:border-white/15 dark:bg-[#111b31] dark:text-white/70">
-                  No hay pedidos históricos disponibles.
+                  <TranslatedText tid="orders.empty" fallback="No hay pedidos disponibles." />
                 </p>
               ) : (
-                orders.map((order) => (
-                  <div
-                    key={order.id}
-                    className="rounded-2xl border border-gray-200 p-4 text-sm text-gray-100 shadow-sm !bg-[#111827] dark:border-white/15 dark:!bg-[#111827]"
-                    style={{ backgroundColor: '#111827' }}
-                  >
-                    <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-gray-300 dark:text-white/60">
-                      <span>{getOrderDisplayCode(order)}</span>
-                      <span>
-                        {order.createdAt
-                          ? new Date(order.createdAt).toLocaleString('es-MX')
-                          : '--:--'}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-lg font-semibold text-white dark:text-gray-100">
-                      {formatOrderChannelLabel(order)} · {STATUS_LABELS.past}
-                    </p>
-                    <div className="mt-2 grid gap-1 text-xs text-gray-200 dark:text-gray-300">
-                      <p>Cliente: {formatOrderCustomer(order)}</p>
-                      <p className="font-semibold text-primary-200 dark:text-gray-50">
-                        Total: {formatCurrency(order.total)}
+                orders.map((order) => {
+                  const labels = getStatusLabels(t);
+                  return (
+                    <div
+                      key={order.id}
+                      className="rounded-2xl border border-gray-200 p-4 text-sm text-gray-100 shadow-sm !bg-[#111827] dark:border-white/15 dark:!bg-[#111827]"
+                      style={{ backgroundColor: '#111827' }}
+                    >
+                      <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-gray-300 dark:text-white/60">
+                        <span>{getOrderDisplayCode(order)}</span>
+                        <span>
+                          {order.createdAt
+                            ? new Date(order.createdAt).toLocaleString('es-MX')
+                            : '--:--'}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-lg font-semibold text-white dark:text-gray-100">
+                        {formatOrderChannelLabel(order)} · {labels.past}
                       </p>
+                      <div className="mt-2 grid gap-1 text-xs text-gray-200 dark:text-gray-300">
+                        <p>Cliente: {formatOrderCustomer(order)}</p>
+                        <p className="font-semibold text-primary-200 dark:text-gray-50">
+                          Total: {formatCurrency(order.total)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
             <div className="border-t border-gray-100 px-5 py-3">
@@ -605,6 +627,7 @@ function formatCurrency(value?: number | null) {
 }
 
 export default function OrdersDashboardPage() {
+  useLanguage();
   const { user, token, isLoading: isAuthLoading } = useAuth();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showHistoricalModal, setShowHistoricalModal] = useState(false);

@@ -24,32 +24,20 @@ import { useLanguage } from './LanguageProvider';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function TranslatedText({ tid, fallback }: { tid: string; fallback?: string }) {
-  const { t, isChanging } = useLanguage();
+  const { t } = useLanguage();
   const text = t(tid) || fallback || tid;
 
   return (
     <AnimatePresence mode="wait">
-      {isChanging ? (
-        <motion.span
-          key="typing"
-          initial={{ opacity: 0.5 }}
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 0.4, repeat: Infinity }}
-          className="inline-block"
-        >
-          ...
-        </motion.span>
-      ) : (
-        <motion.span
-          key={text}
-          initial={{ opacity: 0, x: -2 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: 2 }}
-          transition={{ duration: 0.2 }}
-        >
-          {text}
-        </motion.span>
-      )}
+      <motion.span
+        key={text}
+        initial={{ opacity: 0, y: 3 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -3 }}
+        transition={{ duration: 0.25, ease: 'easeInOut' }}
+      >
+        {text}
+      </motion.span>
     </AnimatePresence>
   );
 }

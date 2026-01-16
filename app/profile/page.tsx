@@ -29,8 +29,9 @@
 
 import { useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { FiCalendar, FiMapPin, FiPackage } from 'react-icons/fi';
+import { FiPackage, FiCalendar, FiMapPin } from 'react-icons/fi';
 import { useAuth } from '@/components/Auth/AuthProvider';
+import TranslatedText from '@/components/Language/TranslatedText';
 import UserProfile from '@/components/Auth/UserProfile';
 import CoffeeBackground from '@/components/CoffeeBackground';
 
@@ -55,7 +56,7 @@ export default function ProfilePage() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
       </div>
     );
   }
@@ -75,19 +76,21 @@ export default function ProfilePage() {
         <div className="bg-white dark:bg-gray-800 shadow">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Mi Cuenta</h1>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                <TranslatedText tid="profile.title" fallback="Mi Cuenta" />
+              </h1>
               <div className="flex flex-wrap gap-3 sm:flex-nowrap">
                 <button
                   onClick={() => router.push('/')}
                   className="flex-1 rounded-md border border-gray-300 px-4 py-2 text-center text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                 >
-                  Volver al Inicio
+                  <TranslatedText tid="profile.back_home" fallback="Volver al Inicio" />
                 </button>
                 <button
                   onClick={logout}
                   className="flex-1 rounded-md bg-red-600 px-4 py-2 text-center text-white hover:bg-red-700"
                 >
-                  Cerrar Sesión
+                  <TranslatedText tid="profile.logout" fallback="Cerrar Sesión" />
                 </button>
               </div>
               <div className="mx-auto grid w-full max-w-xl grid-cols-3 gap-3 sm:hidden">
@@ -98,7 +101,7 @@ export default function ProfilePage() {
                 >
                   <span className="flex items-center justify-center gap-2">
                     <FiPackage className="text-lg" />
-                    Pedidos
+                    <TranslatedText tid="profile.orders" fallback="Pedidos" />
                   </span>
                 </button>
                 <button
@@ -108,7 +111,7 @@ export default function ProfilePage() {
                 >
                   <span className="flex items-center justify-center gap-2">
                     <FiCalendar className="text-lg" />
-                    Reservas
+                    <TranslatedText tid="profile.reservations" fallback="Reservas" />
                   </span>
                 </button>
                 <button
@@ -118,7 +121,7 @@ export default function ProfilePage() {
                 >
                   <span className="flex items-center justify-center gap-2">
                     <FiMapPin className="text-lg" />
-                    Direcciones
+                    <TranslatedText tid="profile.addresses" fallback="Direcciones" />
                   </span>
                 </button>
               </div>

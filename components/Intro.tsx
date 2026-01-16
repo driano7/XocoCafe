@@ -27,7 +27,7 @@
 
 'use client';
 
-import { useContext, useEffect, useRef } from 'react';
+import { useContext, useEffect, useMemo, useRef } from 'react';
 import { ScrollContext } from '@/components/Providers/ScrollProvider';
 import { useLanguage } from './Language/LanguageProvider';
 
@@ -57,12 +57,15 @@ export default function Intro() {
   const { t } = useLanguage();
   const { scrollY } = useContext(ScrollContext);
 
-  const WORDS = [
-    { text: t('intro.minimalist') || 'Minimalista.', offset: 0 },
-    { text: t('intro.intentional') || 'Intencional.', offset: 0.35 },
-    { text: t('intro.vanguardist') || 'Vanguardista.', offset: 0.7 },
-    { text: t('intro.sensorial') || 'Sensorial.', offset: 1.05 },
-  ];
+  const WORDS = useMemo(
+    () => [
+      { text: t('intro.minimalist') || 'Minimalista.', offset: 0 },
+      { text: t('intro.intentional') || 'Intencional.', offset: 0.35 },
+      { text: t('intro.vanguardist') || 'Vanguardista.', offset: 0.7 },
+      { text: t('intro.sensorial') || 'Sensorial.', offset: 1.05 },
+    ],
+    [t]
+  );
 
   const refContainer = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
