@@ -36,8 +36,12 @@ import { useEffect, useState } from 'react';
 import CommandPalette from './CommandPalette/CommandPalette';
 
 import ThemeSwitch from './ThemeSwitch';
+import LanguageToggle from './Language/LanguageToggle';
+import { useLanguage } from './Language/LanguageProvider';
+import TranslatedText from './Language/TranslatedText';
 
 export default function Header() {
+  useLanguage();
   const pathName = usePathname();
   const [isVisible, setIsVisible] = useState(false);
   const [forceVisible, setForceVisible] = useState(false);
@@ -130,7 +134,10 @@ export default function Header() {
                   aria-label={title}
                 >
                   <span className="transition-transform duration-200 group-hover:-translate-y-0.5">
-                    {title}
+                    <TranslatedText
+                      tid={`nav.${title.toLowerCase().replace(' ', '_')}`}
+                      fallback={title}
+                    />
                   </span>
                   <span
                     className={classNames(
@@ -151,7 +158,13 @@ export default function Header() {
             })}
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
+            <div className="hidden sm:block">
+              <LanguageToggle />
+            </div>
             <AuthNav />
+            <div className="sm:hidden">
+              <LanguageToggle />
+            </div>
             <CommandPalette />
             <ThemeSwitch />
           </div>

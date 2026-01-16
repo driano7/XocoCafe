@@ -38,6 +38,8 @@ import ForgotPasswordForm from '@/components/Auth/ForgotPasswordForm';
 import Image from '@/components/Image';
 import type { AuthSuccessContext } from '@/components/Auth/types';
 import type { AuthUser } from '@/lib/validations/auth';
+import TranslatedText from '@/components/Language/TranslatedText';
+import { useLanguage } from '@/components/Language/LanguageProvider';
 
 type SnackbarTone = 'info' | 'success' | 'error' | 'warning' | 'ticket' | 'profile' | 'whatsapp';
 
@@ -54,6 +56,7 @@ export default function LoginPage() {
   const [postAuthRedirect, setPostAuthRedirect] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<SnackbarState | null>(null);
   const { login, user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const formCardRef = useRef<HTMLDivElement | null>(null);
   const [formVisible, setFormVisible] = useState(false);
@@ -61,16 +64,28 @@ export default function LoginPage() {
   const [animationSeed] = useState(() => Math.random());
   const pageShellClasses =
     'relative min-h-screen overflow-hidden bg-gradient-to-br from-primary-50 via-white to-white dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 py-12 px-4 sm:px-6 lg:px-8';
+
   const highlightItems = [
     {
-      title: 'Pedidos inteligentes',
-      description: 'Confirma órdenes, monitorea estados y recibe alertas al instante.',
-      accent: 'Pedidos',
+      title: t('auth.gratis_title') || 'Registro 100% gratuito',
+      description:
+        t('auth.gratis_desc') ||
+        'Sin cuotas de suscripción. Acceso vitalicio a tu perfil digital y beneficios.',
+      accent: t('auth.gratis') || 'Gratis',
     },
     {
-      title: 'Recompensas siempre visibles',
-      description: 'Consultas tus métricas del programa de lealtad. ¡Más compras, más ganas!',
-      accent: 'Rewards',
+      title: t('auth.pedidos_title') || 'Pedidos inteligentes',
+      description:
+        t('auth.pedidos_desc') ||
+        'Confirma órdenes, monitorea estados y recibe alertas al instante.',
+      accent: t('auth.pedidos') || 'Pedidos',
+    },
+    {
+      title: t('auth.rewards_title') || 'Recompensas siempre visibles',
+      description:
+        t('auth.rewards_desc') ||
+        'Consultas tus métricas del programa de lealtad. ¡Más compras, más ganas!',
+      accent: t('auth.rewards') || 'Rewards',
     },
   ];
 
@@ -356,16 +371,23 @@ export default function LoginPage() {
           <section className="flex-1 space-y-8">
             <div className="rounded-3xl border border-primary-100/70 bg-white/90 p-8 shadow-2xl shadow-primary-900/5 backdrop-blur-md dark:border-primary-900/40 dark:bg-gray-900/70">
               <p className="text-sm uppercase tracking-[0.5em] text-primary-500/70">
-                {isLogin ? 'Tu barra digital' : 'Bienvenido a Xoco Café'}
+                <TranslatedText
+                  tid={isLogin ? 'nav.tu_barra_digital' : 'nav.bienvenido'}
+                  fallback={isLogin ? 'Tu barra digital' : 'Bienvenido a Xoco Café'}
+                />
               </p>
               <h1 className="mt-4 text-4xl font-black text-primary-900 dark:text-white">
-                {isLogin
-                  ? 'Inicia sesión en tu barra digital'
-                  : 'Registra tu cuenta y personaliza la experiencia POS'}
+                <TranslatedText
+                  tid={isLogin ? 'auth.login_title' : 'auth.register_title'}
+                  fallback={
+                    isLogin
+                      ? 'Inicia sesión en tu barra digital'
+                      : 'Registra tu cuenta y personaliza la experiencia POS'
+                  }
+                />
               </h1>
               <p className="mt-3 text-sm text-primary-800/80 dark:text-primary-100/80">
-                Mantén sincronizados pedidos, recompensas, notificaciones y campañas de marketing en
-                un mismo flujo.
+                <TranslatedText tid="auth.benefits_desc" />
               </p>
             </div>
 
@@ -388,12 +410,43 @@ export default function LoginPage() {
               ))}
             </div>
           </section>
+
           <section className="flex-1 lg:max-w-xl">
             {error && (
               <div className="mb-4 rounded-2xl border border-danger-200 bg-danger-50/80 px-4 py-3 text-sm font-semibold text-danger-700 dark:border-danger-500/40 dark:bg-danger-900/20 dark:text-danger-100">
                 {error}
               </div>
             )}
+
+            {/* Mobile Chips Layout */}
+            <div className="mb-6 flex flex-wrap items-center justify-center gap-2 lg:hidden">
+              {[
+                {
+                  label: 'Gratis',
+                  color:
+                    'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
+                },
+                {
+                  label: 'Pedidos',
+                  color:
+                    'bg-primary-500/10 text-primary-700 dark:bg-primary-500/20 dark:text-primary-300',
+                },
+                {
+                  label: 'Rewards',
+                  color: 'bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
+                },
+              ].map((chip) => (
+                <span
+                  key={chip.label}
+                  className={classNames(
+                    'rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest',
+                    chip.color
+                  )}
+                >
+                  {chip.label}
+                </span>
+              ))}
+            </div>
 
             <motion.div
               ref={formCardRef}
@@ -411,10 +464,16 @@ export default function LoginPage() {
               <div className="space-y-6 pt-2">
                 <div className="text-center">
                   <p className="text-xs uppercase tracking-[0.5em] text-primary-500/70">
-                    {isLogin ? 'Iniciar sesión' : 'Registrar cuenta'}
+                    <TranslatedText
+                      tid={isLogin ? 'nav.iniciar_sesion' : 'nav.registrar_cuenta'}
+                      fallback={isLogin ? 'Iniciar sesión' : 'Registrar cuenta'}
+                    />
                   </p>
                   <h2 className="mt-2 text-3xl font-black text-primary-900 dark:text-white">
-                    {isLogin ? 'Bienvenido de vuelta' : 'Crea tu cuenta en minutos'}
+                    <TranslatedText
+                      tid={isLogin ? 'auth.welcome_back' : 'auth.create_account'}
+                      fallback={isLogin ? 'Bienvenido de vuelta' : 'Crea tu cuenta en minutos'}
+                    />
                   </h2>
                   <p className="mt-2 text-sm text-primary-800/80 dark:text-primary-100/80">
                     {isLogin

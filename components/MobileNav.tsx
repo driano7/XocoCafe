@@ -16,6 +16,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import TranslatedText from './Language/TranslatedText';
 
 export default function MobileNav() {
   const pathName = usePathname();
@@ -126,7 +127,10 @@ export default function MobileNav() {
                     })}
                     aria-label={title}
                   >
-                    {title}
+                    <TranslatedText
+                      tid={`nav.${title.toLowerCase().replace(' ', '_')}`}
+                      fallback={title}
+                    />
                   </Link>
                 );
               })}

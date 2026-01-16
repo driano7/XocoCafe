@@ -55,9 +55,11 @@ interface CartStoreSnapshot {
   decrement: (lineId: string) => void;
   removeItem: (lineId: string) => void;
   clearCart: () => void;
+  lastActivity: number;
 }
 
 let cartState: CartItem[] = [];
+let lastActivity = Date.now();
 
 const listeners = new Set<() => void>();
 
@@ -143,6 +145,7 @@ function createSnapshot(items: CartItem[]): CartStoreSnapshot {
     decrement,
     removeItem,
     clearCart,
+    lastActivity,
   };
 }
 
@@ -161,6 +164,7 @@ function notify(nextItems: CartItem[]) {
 
 function setState(updater: (prev: CartItem[]) => CartItem[]) {
   const nextItems = updater(cartStateWrapper.items);
+  lastActivity = Date.now();
   cartStateWrapper.items = nextItems;
   cartState = nextItems;
   notify(nextItems);

@@ -34,10 +34,15 @@ import { HiOutlineArrowNarrowDown } from 'react-icons/hi';
 import TypewriterText from './TypewriterText';
 import { ScrollContext } from './Providers/ScrollProvider';
 import { renderCanvas } from './renderCanvas';
+import { useAuth } from './Auth/AuthProvider';
+import { useLanguage } from './Language/LanguageProvider';
+import TranslatedText from './Language/TranslatedText';
 
 export default function Hero(): ReactElement {
+  const { currentLanguage, t } = useLanguage();
   const ref = useRef<HTMLHeadingElement>(null);
   const { scrollY } = useContext(ScrollContext);
+  const { token } = useAuth();
 
   let progress = 0;
   const { current: elContainer } = ref;
@@ -81,7 +86,8 @@ export default function Hero(): ReactElement {
               </h1>
               <h2 className="text-3xl font-medium opacity-80 sm:text-6xl md:text-6xl xl:text-7xl">
                 <TypewriterText
-                  segments={[{ text: 'Sabor ancestral, placer eterno.' }]}
+                  key={`subtitle-${currentLanguage}`}
+                  segments={[{ text: t('hero.subtitle') }]}
                   startDelay={400}
                 />
               </h2>
@@ -95,11 +101,12 @@ export default function Hero(): ReactElement {
                   <span className="relative inline-flex items-center rounded-full px-1.5 py-0.5">
                     <span className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-primary-100/40 blur-lg dark:bg-primary-500/20" />
                     <TypewriterText
+                      key={`about-${currentLanguage}`}
                       segments={[
                         {
                           kind: 'link',
                           href: '/about',
-                          text: '¿Quiénes somos? →',
+                          text: t('hero.about_btn'),
                           className:
                             'underline-magical cursor-pointer text-primary-700 dark:text-primary-200',
                         },
@@ -111,15 +118,19 @@ export default function Hero(): ReactElement {
                   </span>
                 </span>
               </motion.div>
-              <div className="pt-6">
-                <Link
-                  href="/login"
-                  className="group relative inline-flex overflow-hidden rounded-full border border-primary-700 px-4 py-1.5 text-sm font-semibold text-primary-700 transition-colors duration-300 hover:text-primary-600 dark:border-primary-200 dark:text-primary-100"
-                >
-                  <span className="absolute inset-0 scale-0 rounded-full bg-current opacity-10 transition-transform duration-300 group-hover:scale-100" />
-                  <span className="relative">Iniciar Sesión</span>
-                </Link>
-              </div>
+              {!token && (
+                <div className="pt-6">
+                  <Link
+                    href="/login"
+                    className="group relative inline-flex overflow-hidden rounded-full border border-primary-700 px-4 py-1.5 text-sm font-semibold text-primary-700 transition-colors duration-300 hover:text-primary-600 dark:border-primary-200 dark:text-primary-100"
+                  >
+                    <span className="absolute inset-0 scale-0 rounded-full bg-current opacity-10 transition-transform duration-300 group-hover:scale-100" />
+                    <span className="relative">
+                      <TranslatedText tid="hero.login_btn" fallback="Iniciar Sesión" />
+                    </span>
+                  </Link>
+                </div>
+              )}
             </div>
             <motion.div
               animate={{

@@ -162,27 +162,6 @@ interface FailedReservationRecord extends BaseReservationRecord {
   cleanupAt: string;
 }
 
-interface ReservationQrPayload {
-  type?: 'reservation';
-  reservationId: string;
-  id?: string;
-  reservationCode?: string;
-  code: string;
-  user: string;
-  customerName?: string;
-  date: string;
-  time: string;
-  people: number;
-  branch: string;
-  branchNumber: string | number | null;
-  message: string | null;
-  preOrderItems?: string | null;
-  clientId?: string | null;
-  customerId?: string | null;
-  email?: string | null;
-  phone?: string | null;
-}
-
 type DetailActionState = {
   isLoading: boolean;
   message: string | null;
@@ -829,28 +808,6 @@ export default function ReservePage() {
     }
   }, [availableTimeSlots, selectedTime]);
 
-  const buildQrPayload = useCallback(
-    (reservation: ReservationRecord) => {
-      const branchLabel = reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
-      const payload: ReservationQrPayload = {
-        reservationId: reservation.id,
-        code: reservation.reservationCode,
-        user: userDisplayName || user?.email || 'Cliente Xoco Café',
-        date: reservation.reservationDate,
-        time: reservation.reservationTime,
-        people: reservation.peopleCount,
-        branch: branchLabel,
-        branchNumber: reservation.branchNumber || BRANCH_NUMBER,
-        message: reservation.message || null,
-      };
-      if (reservation.preOrderItems) {
-        payload.preOrderItems = reservation.preOrderItems;
-      }
-      return payload;
-    },
-    [userDisplayName, user]
-  );
-
   const buildReservationShareText = useCallback((reservation: ReservationRecord) => {
     const branchLabel = reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
     return [
@@ -862,36 +819,6 @@ export default function ReservePage() {
       }`,
     ].join(' · ');
   }, []);
-
-  const handleDownloadQr = useCallback(
-    async (reservation: ReservationRecord) => {
-      try {
-        const qrPayload = buildQrPayload(reservation);
-        const qrDataString = JSON.stringify(qrPayload);
-        const qrImageSrc = `${QR_API_URL}?size=${QR_IMAGE_SIZE}&data=${encodeURIComponent(
-          qrDataString
-        )}`;
-
-        const response = await fetch(qrImageSrc);
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${reservation.reservationCode}-${reservation.reservationDate}.png`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-      } catch (error) {
-        console.error('Error descargando QR:', error);
-        setAlert({
-          type: 'error',
-          text: 'No pudimos descargar el QR. Intenta de nuevo.',
-        });
-      }
-    },
-    [buildQrPayload, setAlert]
-  );
 
   const waitForReservationAssets = useCallback(async () => {
     if (!reservationTicketRef.current) return;
@@ -1872,7 +1799,6 @@ export default function ReservePage() {
                 <ReservationDetailContent
                   reservation={selectedReservation}
                   onCancelReservation={handleCancelReservation}
-                  onDownloadQr={(reservation) => void handleDownloadQr(reservation)}
                   actionState={reservationActionState}
                   currentUserName={userDisplayName}
                   onDownloadTicket={(reservation) =>
@@ -1886,6 +1812,7 @@ export default function ReservePage() {
                     error: reservationTicketActionError,
                     isProcessing: isProcessingReservationTicket,
                   }}
+                  isMobile={reservationDeviceInfo.isMobile}
                 />
               </DetailModal>
             )}
@@ -2312,23 +2239,23 @@ const DetailActionFooter = ({
 const ReservationDetailContent = ({
   reservation,
   onCancelReservation,
-  onDownloadQr,
   actionState,
   currentUserName,
   onDownloadTicket,
   onShareReservation,
   ticketRef,
   shareState,
+  isMobile,
 }: {
   reservation: ReservationRecord;
   onCancelReservation?: (reservation: ReservationRecord) => void;
-  onDownloadQr?: (reservation: ReservationRecord) => void;
   actionState?: DetailActionState;
   currentUserName?: string | null;
   onDownloadTicket?: (reservation: ReservationRecord) => void;
   onShareReservation?: (reservation: ReservationRecord) => void;
   ticketRef?: MutableRefObject<HTMLDivElement | null>;
   shareState?: { error: string | null; isProcessing: boolean };
+  isMobile?: boolean;
 }) => {
   const { user } = useAuth();
   const slotDateTime = buildSlotDateTime(reservation.reservationDate, reservation.reservationTime);
@@ -2421,39 +2348,37 @@ const ReservationDetailContent = ({
                   })}`
                 : `El QR expira ${QR_EXPIRATION_MINUTES} min después de la hora reservada.`}
             </p>
-            <div className="flex flex-wrap items-center justify-center gap-3 text-xs font-semibold text-primary-600">
-              {qrIsActive && onDownloadQr && (
-                <button
-                  type="button"
-                  onClick={() => onDownloadQr(reservation)}
-                  className="hover:text-primary-800"
-                >
-                  Descargar QR
-                </button>
-              )}
-              {onDownloadTicket && (
-                <button
-                  type="button"
-                  onClick={() => onDownloadTicket(reservation)}
-                  className="hover:text-primary-800"
-                  disabled={shareState?.isProcessing}
-                >
-                  {shareState?.isProcessing ? 'Generando…' : 'Descargar reserva'}
-                </button>
-              )}
-              {onShareReservation && (
-                <button
-                  type="button"
-                  onClick={() => onShareReservation(reservation)}
-                  className="hover:text-primary-800"
-                  disabled={shareState?.isProcessing}
-                >
-                  {shareState?.isProcessing ? 'Compartiendo…' : 'Compartir reservación'}
-                </button>
-              )}
+            <div
+              className="flex flex-wrap items-center justify-center gap-3 text-xs font-semibold text-primary-600"
+              data-html2canvas-ignore="true"
+            >
+              {isMobile
+                ? onShareReservation && (
+                    <button
+                      type="button"
+                      onClick={() => onShareReservation(reservation)}
+                      className="hover:text-primary-800"
+                      disabled={shareState?.isProcessing}
+                    >
+                      {shareState?.isProcessing ? 'Compartiendo…' : 'Compartir reservación'}
+                    </button>
+                  )
+                : onDownloadTicket && (
+                    <button
+                      type="button"
+                      onClick={() => onDownloadTicket(reservation)}
+                      className="hover:text-primary-800"
+                      disabled={shareState?.isProcessing}
+                    >
+                      {shareState?.isProcessing ? 'Descargando…' : 'Descargar reserva'}
+                    </button>
+                  )}
             </div>
             {shareState?.error && (
-              <p className="mt-2 text-center text-xs font-semibold text-red-300">
+              <p
+                className="mt-2 text-center text-xs font-semibold text-red-300"
+                data-html2canvas-ignore="true"
+              >
                 {shareState.error}
               </p>
             )}
@@ -2476,7 +2401,7 @@ const ReservationDetailContent = ({
           )}
         </div>
         {onCancelReservation && (
-          <div className="mt-6">
+          <div className="mt-6" data-html2canvas-ignore="true">
             <DetailActionFooter
               label="Cancelar reservación"
               onClick={() => onCancelReservation(reservation)}

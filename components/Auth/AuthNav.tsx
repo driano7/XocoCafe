@@ -28,30 +28,33 @@
 'use client';
 
 import { useAuth } from '@/components/Auth/AuthProvider';
+import { useLanguage } from '@/components/Language/LanguageProvider';
+import TranslatedText from '@/components/Language/TranslatedText';
 import Link from 'next/link';
 
 export default function AuthNav() {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
 
   if (user) {
     const displayName = user.firstName?.trim() || '';
     return (
       <div className="flex items-center space-x-4">
-        <span className="text-sm text-gray-600 dark:text-gray-300">
-          Hola, {displayName || user.email}
+        <span className="hidden text-sm text-gray-600 dark:text-gray-300 sm:block">
+          {t('nav.hola')}, {displayName || user.email}
         </span>
         <Link
           href="/profile"
           className="text-sm font-semibold text-primary-700 transition-colors hover:text-primary-600 dark:text-primary-200 dark:hover:text-primary-100"
         >
-          Mi Perfil
+          <TranslatedText tid="nav.mi_perfil" fallback="Mi Perfil" />
         </Link>
         <button
           type="button"
           onClick={() => void logout()}
           className="text-sm text-red-600 hover:text-red-500 dark:text-red-400"
         >
-          Cerrar Sesión
+          <TranslatedText tid="nav.cerrar_sesion" fallback="Cerrar Sesión" />
         </button>
       </div>
     );
@@ -64,7 +67,9 @@ export default function AuthNav() {
         className="group relative inline-flex overflow-hidden rounded-full border border-primary-700 px-4 py-1.5 text-sm font-semibold text-primary-700 transition-colors duration-300 hover:text-primary-600 dark:border-primary-200 dark:text-primary-100"
       >
         <span className="absolute inset-0 scale-0 rounded-full bg-current opacity-10 transition-transform duration-300 group-hover:scale-100" />
-        <span className="relative">Iniciar Sesión</span>
+        <span className="relative">
+          <TranslatedText tid="nav.iniciar_sesion" fallback="Iniciar Sesión" />
+        </span>
       </Link>
     </div>
   );

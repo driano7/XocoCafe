@@ -461,35 +461,52 @@ export default function AddressManager({ showIntro = true }: AddressManagerProps
                 </button>
               )}
             </div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
-              Nombre / alias
-              <input
-                type="text"
-                value={form.label}
-                onChange={(event) => setForm((prev) => ({ ...prev, label: event.target.value }))}
-                className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
-                placeholder="Casa, Oficina, etc."
-              />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
-              Calle y número
-              <input
-                type="text"
-                value={form.street}
-                onChange={(event) => setForm((prev) => ({ ...prev, street: event.target.value }))}
-                className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
-                placeholder="Ej. Monterrey 215"
-              />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
-              Ciudad
-              <input
-                type="text"
-                value={form.city}
-                onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value }))}
-                className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
-              />
-            </label>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
+                Nombre / alias
+                <input
+                  type="text"
+                  value={form.label}
+                  onChange={(event) => setForm((prev) => ({ ...prev, label: event.target.value }))}
+                  className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
+                  placeholder="Casa, Oficina, etc."
+                />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
+                Calle y número
+                <input
+                  type="text"
+                  value={form.street}
+                  onChange={(event) => setForm((prev) => ({ ...prev, street: event.target.value }))}
+                  className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
+                  placeholder="Ej. Monterrey 215"
+                />
+              </label>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
+                Ciudad
+                <input
+                  type="text"
+                  value={form.city}
+                  onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value }))}
+                  className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
+                />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
+                Código postal
+                <input
+                  type="text"
+                  value={form.postalCode}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, postalCode: event.target.value }))
+                  }
+                  className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
+                />
+              </label>
+            </div>
             <div className="space-y-2 rounded-xl border border-primary-200 bg-white/80 p-3 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-900/80 dark:text-gray-100">
               {user?.phone && (
                 <label className="flex items-center gap-2 text-primary-800 dark:text-gray-100">
@@ -529,7 +546,16 @@ export default function AddressManager({ showIntro = true }: AddressManagerProps
                 Este número es de WhatsApp
               </label>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
+                Estado
+                <input
+                  type="text"
+                  value={form.state}
+                  onChange={(event) => setForm((prev) => ({ ...prev, state: event.target.value }))}
+                  className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
+                />
+              </label>
               <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
                 País
                 <input
@@ -537,17 +563,6 @@ export default function AddressManager({ showIntro = true }: AddressManagerProps
                   value={form.country}
                   onChange={(event) =>
                     setForm((prev) => ({ ...prev, country: event.target.value }))
-                  }
-                  className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
-                />
-              </label>
-              <label className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
-                Código postal
-                <input
-                  type="text"
-                  value={form.postalCode}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, postalCode: event.target.value }))
                   }
                   className="mt-1 w-full rounded-md border border-primary-200 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-primary-900 dark:text-white"
                 />

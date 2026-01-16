@@ -16,131 +16,100 @@
  *  limitations under the License.
  *
  *  --------------------------------------------------------------------
- *  PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
- *  Copyright (c) 2025 Xoco Café.
- *  Desarrollador Principal: Donovan Riaño.
- *
- *  Este archivo está licenciado bajo la Apache License 2.0.
- *  Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
- * --------------------------------------------------------------------
  */
 
 'use client';
 
-import { createContext, useContext, useEffect, ReactNode } from 'react';
-import { useLanguageDetection, SupportedLanguage } from '@/hooks/useLanguageDetection';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { dictionaries } from '@/lib/i18n/dictionaries';
+
+export type SupportedLanguage = 'es' | 'en';
 
 interface LanguageContextType {
   currentLanguage: SupportedLanguage;
-  isDetecting: boolean;
-  setLanguage: (language: SupportedLanguage) => void;
-  getDeviceInfo: () => any;
-  supportedLanguages: SupportedLanguage[];
+  t: (path: string) => string;
+  setLanguage: (lang: SupportedLanguage) => void;
+  isChanging: boolean;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-interface LanguageProviderProps {
+export function LanguageProvider({
+  children,
+  fallbackLanguage = 'es',
+}: {
   children: ReactNode;
   fallbackLanguage?: SupportedLanguage;
-}
+}) {
+  const [currentLanguage, setCurrentLanguage] = useState<SupportedLanguage>(fallbackLanguage);
+  const [isChanging, setIsChanging] = useState(false);
 
-export function LanguageProvider({ children, fallbackLanguage = 'es' }: LanguageProviderProps) {
-  const { detectedLanguage, isDetecting, setPreferredLanguage, getDeviceInfo, supportedLanguages } =
-    useLanguageDetection({
-      fallbackLanguage,
-      detectFromBrowser: true,
-      detectFromURL: true,
-      detectFromStorage: true,
-    });
+  const detectLanguage = useCallback((): SupportedLanguage => {
+    if (typeof window === 'undefined') return fallbackLanguage;
 
-  // Efecto para aplicar traducciones automáticas
+    // Check localStorage
+    const stored = localStorage.getItem('preferred_language') as SupportedLanguage;
+    if (stored && (stored === 'es' || stored === 'en')) return stored;
+
+    // Check browser language
+    const browserLang = navigator.language.split('-')[0].toLowerCase();
+    // Requisito: Si es inglés, chino, japonés o alemán -> Inglés
+    if (['en', 'zh', 'ja', 'de'].includes(browserLang)) return 'en';
+
+    return 'es';
+  }, [fallbackLanguage]);
+
   useEffect(() => {
-    if (!isDetecting && typeof window !== 'undefined') {
-      // Aplicar traducciones automáticas usando Google Translate
-      applyAutoTranslation(detectedLanguage);
-    }
-  }, [detectedLanguage, isDetecting]);
+    const detected = detectLanguage();
+    setCurrentLanguage(detected);
+    document.documentElement.lang = detected;
+  }, [detectLanguage]);
 
-  const setLanguage = (language: SupportedLanguage) => {
-    setPreferredLanguage(language);
-    applyAutoTranslation(language);
+  const setLanguage = (lang: SupportedLanguage) => {
+    if (lang === currentLanguage) return;
+
+    setIsChanging(true);
+    setTimeout(() => {
+      setCurrentLanguage(lang);
+      localStorage.setItem('preferred_language', lang);
+      document.documentElement.lang = lang;
+
+      // End animation after content has likely updated
+      setTimeout(() => setIsChanging(false), 300);
+    }, 150);
   };
 
-  const applyAutoTranslation = (language: SupportedLanguage) => {
-    if (typeof window === 'undefined') return;
-
-    // Si el idioma detectado no es español, aplicar traducción automática
-    if (language !== 'es') {
-      // Crear script de Google Translate si no existe
-      if (!document.getElementById('google-translate-script')) {
-        const script = document.createElement('script');
-        script.id = 'google-translate-script';
-        script.src =
-          'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
-        document.head.appendChild(script);
-      }
-
-      // Función para inicializar Google Translate
-      (window as any).googleTranslateElementInit = () => {
-        new (window as any).google.translate.TranslateElement(
-          {
-            pageLanguage: 'es',
-            includedLanguages: 'en,fr,pt,de,it',
-            autoDisplay: false,
-            layout: (window as any).google.translate.TranslateElement.InlineLayout.SIMPLE,
-          },
-          'google_translate_element'
-        );
-      };
-
-      // Crear elemento para Google Translate
-      if (!document.getElementById('google_translate_element')) {
-        const translateElement = document.createElement('div');
-        translateElement.id = 'google_translate_element';
-        translateElement.style.display = 'none';
-        document.body.appendChild(translateElement);
-      }
-
-      // Aplicar traducción después de un delay
-      setTimeout(() => {
-        const selectElement = document.querySelector('.goog-te-combo');
-        if (selectElement) {
-          const targetLanguage =
-            language === 'en'
-              ? 'en'
-              : language === 'fr'
-              ? 'fr'
-              : language === 'pt'
-              ? 'pt'
-              : language === 'de'
-              ? 'de'
-              : language === 'it'
-              ? 'it'
-              : 'en';
-
-          (selectElement as HTMLSelectElement).value = targetLanguage;
-          selectElement.dispatchEvent(new Event('change'));
+  const t = (path: string): string => {
+    const keys = path.split('.');
+    let result: unknown = dictionaries[currentLanguage];
+    for (const key of keys) {
+      if (result && typeof result === 'object' && key in result) {
+        result = (result as Record<string, unknown>)[key];
+      } else {
+        // Fallback to Spanish if key missing in English
+        let fallbackDict: unknown = dictionaries['es'];
+        for (const fKey of keys) {
+          if (fallbackDict && typeof fallbackDict === 'object' && fKey in fallbackDict) {
+            fallbackDict = (fallbackDict as Record<string, unknown>)[fKey];
+          } else {
+            return path;
+          }
         }
-      }, 1000);
+        return typeof fallbackDict === 'string' ? fallbackDict : path;
+      }
     }
+    return typeof result === 'string' ? result : path;
   };
 
-  const value: LanguageContextType = {
-    currentLanguage: detectedLanguage,
-    isDetecting,
-    setLanguage,
-    getDeviceInfo,
-    supportedLanguages,
-  };
-
-  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+  return (
+    <LanguageContext.Provider value={{ currentLanguage, t, setLanguage, isChanging }}>
+      {children}
+    </LanguageContext.Provider>
+  );
 }
 
 export function useLanguage() {
   const context = useContext(LanguageContext);
-  if (context === undefined) {
-    throw new Error('useLanguage debe ser usado dentro de LanguageProvider');
-  }
+  if (!context) throw new Error('useLanguage must be used within LanguageProvider');
   return context;
 }

@@ -29,6 +29,7 @@
 
 import { useContext, useEffect, useRef } from 'react';
 import { ScrollContext } from '@/components/Providers/ScrollProvider';
+import { useLanguage } from './Language/LanguageProvider';
 
 const WORDS = [
   { text: 'Minimalista.', offset: 0 },
@@ -53,7 +54,16 @@ function blockAnimation(sectionProgress: number, blockNumber: number) {
 }
 
 export default function Intro() {
+  const { t } = useLanguage();
   const { scrollY } = useContext(ScrollContext);
+
+  const WORDS = [
+    { text: t('intro.minimalist') || 'Minimalista.', offset: 0 },
+    { text: t('intro.intentional') || 'Intencional.', offset: 0.35 },
+    { text: t('intro.vanguardist') || 'Vanguardista.', offset: 0.7 },
+    { text: t('intro.sensorial') || 'Sensorial.', offset: 1.05 },
+  ];
+
   const refContainer = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const numOfPages = 4;
@@ -98,7 +108,7 @@ export default function Intro() {
         <div className="w-full space-y-8 sm:space-y-12 text-center lg:text-left leading-tight sm:text-left sm:leading-[1.15] z-20">
           {WORDS.map(({ text }, index) => (
             <span
-              key={text}
+              key={index}
               className="introText inline-flex items-baseline gap-3 pr-3 text-balance"
               style={blockAnimation(progress, index)}
             >

@@ -48,6 +48,7 @@ import {
   type UpdateProfileInput,
   type UpdateConsentInput,
   type ChangePasswordInput,
+  type AddressInput,
 } from '@/lib/validations/auth';
 import { resolveFavoriteLabel } from '@/lib/menuFavorites';
 import { useClientFavorites } from '@/hooks/useClientFavorites';
@@ -80,6 +81,7 @@ export default function UserProfile() {
   const [deviceInfo, setDeviceInfo] = useState(() => detectDeviceInfo());
   const [loyaltyCoffeeCount, setLoyaltyCoffeeCount] = useState(() => user?.weeklyCoffeeCount ?? 0);
   const loyaltyPanelRef = useRef<HTMLDivElement | null>(null);
+  const profileSectionRef = useRef<HTMLDivElement | null>(null);
   const addressesSectionRef = useRef<HTMLDivElement | null>(null);
   const [isExportingLoyaltyPanel, setIsExportingLoyaltyPanel] = useState(false);
   const [loyaltyPanelActionError, setLoyaltyPanelActionError] = useState<string | null>(null);
@@ -813,7 +815,7 @@ export default function UserProfile() {
         )}
 
         <motion.section
-          ref={addressesSectionRef}
+          ref={profileSectionRef}
           className={sectionCardClass}
           initial="hidden"
           whileInView="visible"
@@ -1146,32 +1148,68 @@ export default function UserProfile() {
         </motion.section>
 
         <motion.section
+          ref={addressesSectionRef}
           className={sectionCardClass}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, amount: 0.2 }}
           variants={sectionVariants}
         >
-          <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
-            Mis direcciones
-          </h3>
-          <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-            Administra tus domicilios guardados y asígnales un nombre para pedir más rápido.
-          </p>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Puedes guardar hasta 3 direcciones activas.
-            </p>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Mis direcciones</h3>
             <button
               type="button"
               onClick={() => {
                 scrollToAddressesSection();
                 setIsAddressModalOpen(true);
               }}
-              className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              className="text-sm font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400"
             >
-              Administrar direcciones
+              Administrar
             </button>
+          </div>
+          <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+            Administra tus domicilios guardados y asígnales un nombre para pedir más rápido.
+          </p>
+
+          <div className="space-y-3">
+            {user.addresses && user.addresses.length > 0 ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {user.addresses.map((address: AddressInput) => (
+                  <div
+                    key={address.id || address.label}
+                    className="rounded-2xl border border-gray-200 bg-white/50 p-3 text-xs dark:border-gray-700 dark:bg-gray-800/50"
+                  >
+                    <p className="font-bold text-gray-900 dark:text-white">{address.label}</p>
+                    <p className="mt-1 line-clamp-2 text-gray-500 dark:text-gray-400">
+                      {address.street}, {address.city}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-gray-200 p-4 text-center text-sm text-gray-500 dark:border-gray-700">
+                No tienes direcciones guardadas.
+              </div>
+            )}
+
+            <div className="mt-2 flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Puedes guardar hasta 3 direcciones activas.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  scrollToAddressesSection();
+                  setIsAddressModalOpen(true);
+                }}
+                className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                {user.addresses && user.addresses.length > 0
+                  ? 'Editar direcciones'
+                  : 'Agregar dirección'}
+              </button>
+            </div>
           </div>
         </motion.section>
 
@@ -1430,12 +1468,21 @@ function ProfileModal({
   alignToTop = false,
 }: ProfileModalProps) {
   useEffect(() => {
-    if (!autoScrollTop) {
-      return;
+    if (!open) {
+      return undefined;
     }
-    if (open && typeof window !== 'undefined') {
+
+    // Bloquear scroll del body
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+
+    if (autoScrollTop && typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'auto' });
     }
+
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
   }, [autoScrollTop, open]);
 
   if (!open) {
