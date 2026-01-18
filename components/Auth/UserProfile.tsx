@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/label-has-associated-control */
 /*
  * --------------------------------------------------------------------
  *  Xoco Café — Software Property
@@ -28,10 +29,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { FaWhatsapp } from 'react-icons/fa';
+import { FaWhatsapp, FaInstagram, FaTiktok } from 'react-icons/fa';
 import siteMetadata from 'content/siteMetadata';
 import FavoritesSelect from '@/components/FavoritesSelect';
 import FavoriteItemsList from '@/components/FavoriteItemsList';
@@ -56,11 +57,35 @@ import { detectDeviceInfo, ensurePushPermission } from '@/lib/pushNotifications'
 import { useSnackbarNotifications } from '@/hooks/useSnackbarNotifications';
 import Snackbar from '@/components/Feedback/Snackbar';
 import { useLoyalty } from '@/hooks/useLoyalty';
+import { useLanguage } from '@/components/Language/LanguageProvider';
+import TranslatedText from '@/components/Language/TranslatedText';
 
 const FREE_COFFEE_NOTICE_KEY = 'xoco_free_coffee_notice';
 
-export default function UserProfile() {
-  const { user, token, updateUser, isLoading } = useAuth();
+interface User {
+  id: string;
+  email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  country?: string | null;
+  walletAddress?: string | null;
+  clientId?: string | null;
+  weeklyCoffeeCount?: number;
+  marketingEmail?: boolean;
+  marketingSms?: boolean;
+  marketingPush?: boolean;
+  addresses?: AddressInput[];
+  favoriteColdDrink?: string | null;
+  favoriteHotDrink?: string | null;
+  favoriteFood?: string | null;
+  authProvider?: string | null;
+}
+
+export default function UserProfile({ user }: { user: User }) {
+  const { token, updateUser, isLoading } = useAuth();
+  const { t } = useLanguage();
   const {
     data: clientFavorites,
     isLoading: isClientFavoritesLoading,
@@ -227,18 +252,23 @@ export default function UserProfile() {
       const hasNotified = window.sessionStorage.getItem(FREE_COFFEE_NOTICE_KEY);
       if (!hasNotified) {
         window.sessionStorage.setItem(FREE_COFFEE_NOTICE_KEY, 'yes');
-        showSnackbar('Tu próximo café americano es cortesía. Mantente al pendiente.', 'profile', {
-          deviceNotification: {
-            title: 'Tu siguiente café es gratis ☕️',
-            body: 'Acumula un sello más para canjearlo en barra.',
-          },
-        });
+        showSnackbar(
+          t('profile.american_courtesy') ||
+            'Tu próximo café americano es cortesía. Mantente al pendiente.',
+          'profile',
+          {
+            deviceNotification: {
+              title: 'Tu siguiente café es gratis ☕️',
+              body: 'Acumula un sello más para canjearlo en barra.',
+            },
+          }
+        );
         void ensurePushPermission(deviceInfo);
       }
     } else {
       window.sessionStorage.removeItem(FREE_COFFEE_NOTICE_KEY);
     }
-  }, [deviceInfo, loyaltyCoffeeCount, showSnackbar]);
+  }, [deviceInfo, loyaltyCoffeeCount, showSnackbar, t]);
 
   useEffect(() => {
     if (typeof clientFavorites?.loyalty?.weeklyCoffeeCount === 'number') {
@@ -349,7 +379,12 @@ export default function UserProfile() {
       canvas.toBlob(
         (blob) => {
           if (!blob) {
-            reject(new Error('No pudimos generar la imagen del programa de lealtad.'));
+            reject(
+              new Error(
+                t('common.loyalty_image_error') ||
+                  'No pudimos generar la imagen del programa de lealtad.'
+              )
+            );
             return;
           }
           resolve(blob);
@@ -358,7 +393,7 @@ export default function UserProfile() {
         1
       );
     });
-  }, [waitForLoyaltyPanelAssets, dataUrlToBlob]);
+  }, [waitForLoyaltyPanelAssets, dataUrlToBlob, t]);
 
   const downloadLoyaltyPanel = useCallback((blob: Blob, filename: string) => {
     const objectUrl = URL.createObjectURL(blob);
@@ -434,21 +469,24 @@ export default function UserProfile() {
         setLoyaltyPanelActionError('Cancelaste la acción antes de completarla.');
       } else if (error instanceof Error && error.message === 'share_not_supported') {
         setLoyaltyPanelActionError(
-          'Tu dispositivo no permite compartir este archivo. Intenta descargarlo desde este botón.'
+          t('common.device_share_error') ||
+            'Tu dispositivo no permite compartir este archivo. Intenta descargarlo desde este botón.'
         );
       } else if (error instanceof Error && error.message === 'share_failed') {
         setLoyaltyPanelActionError(
-          'No pudimos compartir el panel en este dispositivo. Intenta nuevamente o descárgalo.'
+          t('common.share_panel_error') ||
+            'No pudimos compartir el panel en este dispositivo. Intenta nuevamente o descárgalo.'
         );
       } else {
         setLoyaltyPanelActionError(
-          'No pudimos generar la imagen del programa de lealtad. Intenta de nuevo en unos segundos.'
+          t('common.loyalty_error') ||
+            'No pudimos generar la imagen del programa de lealtad. Intenta de nuevo en unos segundos.'
         );
       }
     } finally {
       setIsExportingLoyaltyPanel(false);
     }
-  }, [captureLoyaltyPanelBlob, downloadLoyaltyPanel, shouldShareLoyaltyPanel, deviceInfo]);
+  }, [captureLoyaltyPanelBlob, downloadLoyaltyPanel, shouldShareLoyaltyPanel, deviceInfo, t]);
 
   const updateConsentPreferences = useCallback(
     async (overrides: Partial<UpdateConsentInput>) => {
@@ -482,13 +520,16 @@ export default function UserProfile() {
         return false;
       } catch (error) {
         console.error('Error actualizando consentimientos:', error);
-        setPushPermissionInfo('Ocurrió un error al actualizar tus preferencias.');
+        showSnackbar(
+          t('common.preferences_error') || 'Ocurrió un error al actualizar tus preferencias.',
+          'error'
+        );
         return false;
       } finally {
         setIsUpdatingConsent(false);
       }
     },
-    [prefillConsentForm, token, updateUser, user]
+    [prefillConsentForm, token, updateUser, user, showSnackbar, t]
   );
 
   const handlePushToggle = useCallback(
@@ -533,12 +574,12 @@ export default function UserProfile() {
         prefillProfileForm(result.user);
         setIsEditing(false);
         setMessage('');
-        showSnackbar('Perfil actualizado correctamente.', 'profile');
+        showSnackbar(t('profile.update_success') || 'Perfil actualizado correctamente.', 'profile');
       } else {
         setMessage(result.message);
       }
     } catch (error) {
-      setMessage('Error actualizando perfil');
+      setMessage(t('profile.update_error') || 'Error actualizando el perfil.');
     }
   };
 
@@ -546,7 +587,9 @@ export default function UserProfile() {
     if (!token) {
       setPasswordAlert({
         type: 'error',
-        message: 'No se pudo validar tu sesión. Inicia sesión nuevamente.',
+        message:
+          t('common.session_validate_error') ||
+          'No se pudo validar tu sesión. Inicia sesión nuevamente.',
       });
       return;
     }
@@ -568,7 +611,10 @@ export default function UserProfile() {
       if (result.success) {
         setPasswordAlert({
           type: 'success',
-          message: result.message || 'Contraseña actualizada correctamente.',
+          message:
+            result.message ||
+            t('profile.password_success') ||
+            'Contraseña actualizada correctamente.',
         });
         resetPassword({
           currentPassword: '',
@@ -579,13 +625,18 @@ export default function UserProfile() {
       } else {
         setPasswordAlert({
           type: 'error',
-          message: result.message || 'No pudimos actualizar tu contraseña. Intenta de nuevo.',
+          message:
+            result.message ||
+            t('profile.password_error') ||
+            'No pudimos actualizar tu contraseña. Intenta de nuevo.',
         });
       }
     } catch (error) {
       setPasswordAlert({
         type: 'error',
-        message: 'Error actualizando tu contraseña. Intenta más tarde.',
+        message:
+          t('profile.password_fatal_error') ||
+          'Error actualizando tu contraseña. Intenta más tarde.',
       });
     } finally {
       setIsChangingPassword(false);
@@ -640,12 +691,15 @@ export default function UserProfile() {
         URL.revokeObjectURL(url);
 
         setMessage('');
-        showSnackbar('Descargamos una copia de tus datos personales.', 'profile');
+        showSnackbar(
+          t('profile.export_success') || 'Descargamos una copia de tus datos personales.',
+          'profile'
+        );
       } else {
         setMessage(result.message);
       }
     } catch (error) {
-      setMessage('Error exportando datos');
+      setMessage(t('profile.export_error') || 'Error exportando tus datos.');
     }
   };
 
@@ -673,7 +727,7 @@ export default function UserProfile() {
         setMessage(result.message);
       }
     } catch (error) {
-      setMessage('Error eliminando cuenta');
+      setMessage(t('profile.delete_error') || 'Error eliminando tu cuenta.');
     }
   };
 
@@ -824,9 +878,14 @@ export default function UserProfile() {
         >
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Mi Perfil</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Mantén tu información personal y de contacto al día.
+              <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                <TranslatedText tid="profile.mi_perfil" fallback="Mi Perfil" />
+              </h1>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                <TranslatedText
+                  tid="profile.update_profile_desc"
+                  fallback="Mantén tu información personal y de contacto al día."
+                />
               </p>
             </div>
             <button
@@ -839,7 +898,11 @@ export default function UserProfile() {
               }}
               className="self-start rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 sm:self-auto"
             >
-              {isEditing ? 'Cancelar' : 'Editar'}
+              {isEditing ? (
+                <TranslatedText tid="profile.cancel" fallback="Cancelar" />
+              ) : (
+                <TranslatedText tid="profile.edit" fallback="Editar" />
+              )}
             </button>
           </div>
 
@@ -851,7 +914,7 @@ export default function UserProfile() {
                     htmlFor="profile-firstName"
                     className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    Nombre
+                    <TranslatedText tid="profile.first_name" fallback="Nombre" />
                   </label>
                   <input
                     {...registerProfile('firstName')}
@@ -869,7 +932,7 @@ export default function UserProfile() {
                     htmlFor="profile-lastName"
                     className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    Apellido
+                    <TranslatedText tid="profile.last_name" fallback="Apellido" />
                   </label>
                   <input
                     {...registerProfile('lastName')}
@@ -888,7 +951,7 @@ export default function UserProfile() {
                   htmlFor="profile-phone"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  Teléfono
+                  <TranslatedText tid="profile.phone" fallback="Teléfono" />
                 </label>
                 <input
                   {...registerProfile('phone')}
@@ -907,7 +970,7 @@ export default function UserProfile() {
                     htmlFor="profile-city"
                     className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    Ciudad
+                    <TranslatedText tid="profile.city" fallback="Ciudad" />
                   </label>
                   <input
                     {...registerProfile('city')}
@@ -925,7 +988,7 @@ export default function UserProfile() {
                     htmlFor="profile-country"
                     className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    País
+                    <TranslatedText tid="profile.country" fallback="País" />
                   </label>
                   <input
                     {...registerProfile('country')}
@@ -944,7 +1007,7 @@ export default function UserProfile() {
                   htmlFor="profile-wallet"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  Wallet EVM
+                  <TranslatedText tid="profile.wallet" fallback="Wallet EVM" />
                 </label>
                 <input
                   {...registerProfile('walletAddress')}
@@ -967,13 +1030,13 @@ export default function UserProfile() {
                   }}
                   className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                 >
-                  Cancelar
+                  <TranslatedText tid="profile.cancel" fallback="Cancelar" />
                 </button>
                 <button
                   type="submit"
                   className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
                 >
-                  Guardar
+                  <TranslatedText tid="profile.save" fallback="Guardar" />
                 </button>
               </div>
             </form>
@@ -1022,7 +1085,9 @@ export default function UserProfile() {
 
               {user.walletAddress && (
                 <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Wallet EVM</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <TranslatedText tid="profile.wallet" fallback="Wallet EVM" />
+                  </p>
                   <p className="mt-1 text-sm break-all text-gray-900 dark:text-white">
                     {user.walletAddress}
                   </p>
@@ -1032,7 +1097,9 @@ export default function UserProfile() {
           )}
 
           <div className="mt-8 flex flex-wrap items-center gap-2 rounded-3xl bg-primary-600 px-4 py-3 text-sm text-white shadow-lg dark:bg-primary-900/30 dark:text-primary-100">
-            <span>¿Necesitas ayuda? Mándanos un</span>
+            <span>
+              <TranslatedText tid="profile.help_prompt" fallback="¿Necesitas ayuda? Mándanos un" />
+            </span>
             <a
               href={siteMetadata.whats}
               target="_blank"
@@ -1042,7 +1109,12 @@ export default function UserProfile() {
             >
               <FaWhatsapp />
             </a>
-            <span>y con todo gusto te ayudamos.</span>
+            <span>
+              <TranslatedText
+                tid="profile.whatsapp_help_end"
+                fallback="y con todo gusto te ayudamos."
+              />
+            </span>
           </div>
         </motion.section>
 
@@ -1086,11 +1158,19 @@ export default function UserProfile() {
                 className="w-full rounded-full bg-primary-600 px-5 py-3 text-sm font-semibold uppercase tracking-[0.25em] text-white shadow-lg transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-primary-500 dark:hover:bg-primary-400"
                 disabled={isExportingLoyaltyPanel}
               >
-                {isExportingLoyaltyPanel
-                  ? 'Generando...'
-                  : shouldShareLoyaltyPanel
-                  ? 'Compartir programa de lealtad'
-                  : 'Descargar programa de lealtad'}
+                {isExportingLoyaltyPanel ? (
+                  <TranslatedText tid="profile.generating" fallback="Generando..." />
+                ) : shouldShareLoyaltyPanel ? (
+                  <TranslatedText
+                    tid="profile.loyalty_share"
+                    fallback="Compartir programa de lealtad"
+                  />
+                ) : (
+                  <TranslatedText
+                    tid="profile.loyalty_download"
+                    fallback="Descargar programa de lealtad"
+                  />
+                )}
               </button>
             </div>
           </div>
@@ -1098,9 +1178,14 @@ export default function UserProfile() {
             <p className="text-xs text-red-600 dark:text-red-400">{loyaltyPanelActionError}</p>
           )}
           <div className="rounded-2xl border border-white/30 bg-white/70 p-4 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-gray-900/60">
-            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Personalízalos</h4>
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+              <TranslatedText tid="profile.personalize_favorites" fallback="Personalízalos" />
+            </h4>
             <p className="text-xs text-gray-600 dark:text-gray-400">
-              Selecciona tus bebidas y alimentos favoritos del menú.
+              <TranslatedText
+                tid="profile.favorites_desc"
+                fallback="Selecciona tus bebidas y alimentos favoritos del menú."
+              />
             </p>
             {clientFavoritesError && (
               <p className="mt-2 text-xs text-red-500 dark:text-red-400">{clientFavoritesError}</p>
@@ -1121,31 +1206,28 @@ export default function UserProfile() {
           </div>
         </motion.section>
 
-        <motion.section
-          className={sectionCardClass}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.2 }}
-          variants={sectionVariants}
+        <CollapsibleSection
+          titleId="profile.favorites_stats"
+          titleFallback="Estadísticas de favoritos"
         >
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-            Consumo de favoritos
-          </h3>
           <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-            Visualiza tu consumo histórico y mantente al tanto de tus hábitos en Xoco Café.
+            <TranslatedText
+              tid="profile.consumption_desc"
+              fallback="Visualiza tu consumo histórico y mantente al tanto de tus hábitos en Xoco Café."
+            />
           </p>
           <ConsumptionChart />
-          <div className="mt-8 border-t border-white/20 pt-6">
-            <h4 className="mb-2 text-base font-semibold text-gray-900 dark:text-white">
-              Mis comentarios
-            </h4>
-            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-              Tu opinión nos ayuda a mejorar. Comparte sugerencias o cualquier detalle de tu
-              experiencia.
-            </p>
-            <ShareExperienceForm />
-          </div>
-        </motion.section>
+        </CollapsibleSection>
+
+        <CollapsibleSection titleId="profile.comments_title" titleFallback="Mis comentarios">
+          <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+            <TranslatedText
+              tid="profile.comments_desc"
+              fallback="Tu opinión nos ayuda a mejorar. Comparte sugerencias o cualquier detalle de tu experiencia."
+            />
+          </p>
+          <ShareExperienceForm />
+        </CollapsibleSection>
 
         <motion.section
           ref={addressesSectionRef}
@@ -1156,7 +1238,9 @@ export default function UserProfile() {
           variants={sectionVariants}
         >
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Mis direcciones</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+              <TranslatedText tid="profile.addresses" fallback="Mis direcciones" />
+            </h3>
             <button
               type="button"
               onClick={() => {
@@ -1165,11 +1249,14 @@ export default function UserProfile() {
               }}
               className="text-sm font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400"
             >
-              Administrar
+              <TranslatedText tid="profile.manage" fallback="Administrar" />
             </button>
           </div>
           <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-            Administra tus domicilios guardados y asígnales un nombre para pedir más rápido.
+            <TranslatedText
+              tid="profile.addresses_desc"
+              fallback="Administra tus domicilios guardados y asígnales un nombre para pedir más rápido."
+            />
           </p>
 
           <div className="space-y-3">
@@ -1189,13 +1276,19 @@ export default function UserProfile() {
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-gray-200 p-4 text-center text-sm text-gray-500 dark:border-gray-700">
-                No tienes direcciones guardadas.
+                <TranslatedText
+                  tid="profile.no_addresses"
+                  fallback="No tienes direcciones guardadas."
+                />
               </div>
             )}
 
             <div className="mt-2 flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800">
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Puedes guardar hasta 3 direcciones activas.
+                <TranslatedText
+                  tid="profile.addresses_max_notice"
+                  fallback="Puedes guardar hasta 3 direcciones activas."
+                />
               </p>
               <button
                 type="button"
@@ -1205,156 +1298,210 @@ export default function UserProfile() {
                 }}
                 className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
               >
-                {user.addresses && user.addresses.length > 0
-                  ? 'Editar direcciones'
-                  : 'Agregar dirección'}
+                {user.addresses && user.addresses.length > 0 ? (
+                  <TranslatedText tid="profile.edit_addresses" fallback="Editar direcciones" />
+                ) : (
+                  <TranslatedText tid="profile.add_address" fallback="Agregar dirección" />
+                )}
               </button>
             </div>
           </div>
         </motion.section>
 
-        <motion.section
-          className={sectionCardClass}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.2 }}
-          variants={sectionVariants}
+        <CollapsibleSection
+          titleId="profile.advanced_settings"
+          titleFallback="Configuración avanzada"
         >
-          <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
-            Seguridad de la cuenta
-          </h3>
-          <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-            Mantén tu contraseña al día para proteger tus pedidos y recompensas.
-          </p>
-          {passwordAlert && (
-            <div
-              className={`mb-4 rounded-md px-4 py-3 text-sm ${
-                passwordAlert.type === 'success'
-                  ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-200'
-                  : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200'
-              }`}
-            >
-              {passwordAlert.message}
-            </div>
-          )}
-          {isGoogleOnly ? (
-            <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
-              Esta cuenta se administra con Google. Usa &ldquo;Continuar con Google&rdquo; para
-              gestionar tu acceso.
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Usa una contraseña segura con mayúsculas, minúsculas y caracteres especiales.
+          <div className="space-y-8 divide-y divide-gray-100 dark:divide-white/10">
+            {/* Security Section */}
+            <div className="pt-2 first:pt-0">
+              <h4 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">
+                <TranslatedText tid="profile.security_title" fallback="Seguridad de la cuenta" />
+              </h4>
+              <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+                <TranslatedText
+                  tid="profile.security_desc"
+                  fallback="Mantén tu contraseña al día para proteger tus pedidos y recompensas."
+                />
               </p>
-              <button
-                type="button"
-                onClick={() => setIsPasswordModalOpen(true)}
-                className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 dark:bg-slate-700 dark:hover:bg-slate-600"
-              >
-                Actualizar contraseña
-              </button>
+              {passwordAlert && (
+                <div
+                  className={`mb-4 rounded-md px-4 py-3 text-sm ${
+                    passwordAlert.type === 'success'
+                      ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-200'
+                      : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200'
+                  }`}
+                >
+                  {passwordAlert.message}
+                </div>
+              )}
+              {isGoogleOnly ? (
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+                  <TranslatedText
+                    tid="profile.google_notice"
+                    fallback="Esta cuenta se administra con Google. Usa &ldquo;Continuar con Google&rdquo; para gestionar tu acceso."
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <TranslatedText
+                      tid="profile.security_advice"
+                      fallback="Usa una contraseña segura con mayúsculas, minúsculas y caracteres especiales."
+                    />
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsPasswordModalOpen(true)}
+                    className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 dark:bg-slate-700 dark:hover:bg-slate-600"
+                  >
+                    <TranslatedText
+                      tid="profile.update_password_btn"
+                      fallback="Actualizar contraseña"
+                    />
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </motion.section>
 
-        <motion.section
-          className={sectionCardClass}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.2 }}
-          variants={sectionVariants}
-        >
-          <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
-            Preferencias de Marketing
-          </h3>
+            {/* Marketing Section */}
+            <div className="pt-6">
+              <h4 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
+                <TranslatedText
+                  tid="profile.marketing_title"
+                  fallback="Preferencias de Marketing"
+                />
+              </h4>
+              <div className="space-y-3">
+                <div className="flex items-center">
+                  <input
+                    {...registerConsent('marketingEmail')}
+                    type="checkbox"
+                    id="marketingEmail"
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    disabled
+                    checked={marketingEmailValue}
+                    readOnly
+                  />
+                  <label
+                    htmlFor="marketingEmail"
+                    className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
+                  >
+                    <TranslatedText
+                      tid="profile.marketing_email"
+                      fallback="Recibir ofertas por email (administrado por Xoco Café)"
+                    />
+                  </label>
+                </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center">
-              <input
-                {...registerConsent('marketingEmail')}
-                type="checkbox"
-                id="marketingEmail"
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                disabled
-                checked={marketingEmailValue}
-                readOnly
-              />
-              <label
-                htmlFor="marketingEmail"
-                className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
-              >
-                Recibir ofertas por email (administrado por Xoco Café)
-              </label>
+                <div className="flex items-center">
+                  <input
+                    {...registerConsent('marketingPush')}
+                    type="checkbox"
+                    id="marketingPush"
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={marketingPushValue}
+                    onChange={(event) => handlePushToggle(event.target.checked)}
+                    disabled={isUpdatingConsent}
+                  />
+                  <label
+                    htmlFor="marketingPush"
+                    className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
+                  >
+                    <TranslatedText
+                      tid="profile.marketing_push"
+                      fallback="Recibir notificaciones push de pedidos y recompensas"
+                    />
+                  </label>
+                </div>
+                {pushPermissionInfo && (
+                  <p className="text-xs text-gray-600 dark:text-gray-400">{pushPermissionInfo}</p>
+                )}
+              </div>
             </div>
 
-            <div className="flex items-center">
-              <input
-                {...registerConsent('marketingPush')}
-                type="checkbox"
-                id="marketingPush"
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                checked={marketingPushValue}
-                onChange={(event) => handlePushToggle(event.target.checked)}
-                disabled={isUpdatingConsent}
-              />
-              <label
-                htmlFor="marketingPush"
-                className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
-              >
-                Recibir notificaciones push de pedidos y recompensas
-              </label>
+            {/* GDPR Section */}
+            <div className="pt-6">
+              <h4 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">
+                <TranslatedText tid="profile.gdpr_title" fallback="Gestión de Datos (GDPR)" />
+              </h4>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <TranslatedText
+                    tid="profile.gdpr_desc"
+                    fallback="Descarga una copia de todos tus datos personales en formato CSV."
+                  />
+                </p>
+                <button
+                  onClick={exportData}
+                  className="shrink-0 rounded-md bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700"
+                >
+                  <TranslatedText tid="profile.export_data" fallback="Exportar Datos" />
+                </button>
+              </div>
             </div>
-            {pushPermissionInfo && (
-              <p className="text-xs text-gray-600 dark:text-gray-400">{pushPermissionInfo}</p>
-            )}
+
+            {/* Delete Account Section */}
+            <div className="pt-6">
+              <div className="rounded-xl border border-red-200/60 bg-red-50/50 p-4 dark:border-red-500/30 dark:bg-red-900/20">
+                <h4 className="text-sm font-semibold text-red-800 dark:text-red-200">
+                  <TranslatedText tid="profile.delete_title" fallback="Eliminar cuenta" />
+                </h4>
+                <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <p className="text-xs text-red-600/80 dark:text-red-300/80">
+                    <TranslatedText
+                      tid="profile.delete_desc"
+                      fallback="Esta acción eliminará permanentemente tu cuenta y todos tus datos. No se puede deshacer."
+                    />
+                  </p>
+                  <button
+                    type="button"
+                    onClick={deleteAccount}
+                    className="shrink-0 rounded-lg bg-red-600/10 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-600/20 dark:bg-red-900/40 dark:text-red-200 dark:hover:bg-red-900/60"
+                  >
+                    <TranslatedText tid="profile.delete_account" fallback="Eliminar Cuenta" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Social Media Links */}
+            <div className="pt-6 border-t border-gray-100 dark:border-white/10">
+              <h4 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
+                Siguenos en redes
+              </h4>
+              <div className="flex items-center gap-4">
+                <a
+                  href="https://wa.me/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-green-500 hover:opacity-80 transition-opacity"
+                  aria-label="WhatsApp"
+                >
+                  <FaWhatsapp size={24} />
+                </a>
+                <a
+                  href="https://instagram.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-pink-500 hover:opacity-80 transition-opacity"
+                  aria-label="Instagram"
+                >
+                  <FaInstagram size={24} />
+                </a>
+                <a
+                  href="https://tiktok.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-black dark:text-white hover:opacity-80 transition-opacity"
+                  aria-label="TikTok"
+                >
+                  <FaTiktok size={24} />
+                </a>
+              </div>
+            </div>
           </div>
-        </motion.section>
-
-        <motion.section
-          className={sectionCardClass}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.2 }}
-          variants={sectionVariants}
-        >
-          <h3 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
-            Gestión de Datos (GDPR)
-          </h3>
-
-          <div>
-            <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
-              Descarga una copia de todos tus datos personales en formato CSV.
-            </p>
-            <button
-              onClick={exportData}
-              className="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700"
-            >
-              Exportar Datos
-            </button>
-          </div>
-        </motion.section>
-
-        <motion.section
-          className={`${sectionCardClass} border-red-200/60 bg-red-50/80 dark:border-red-500/40 dark:bg-red-900/40`}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.2 }}
-          variants={sectionVariants}
-        >
-          <h3 className="mb-2 text-lg font-semibold text-red-900 dark:text-red-100">
-            Eliminar cuenta
-          </h3>
-          <p className="mb-4 text-sm text-red-900/80 dark:text-red-100/80">
-            Esta acción eliminará permanentemente tu cuenta y todos tus datos. No se puede deshacer.
-          </p>
-          <button
-            onClick={deleteAccount}
-            className="rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-700"
-          >
-            Eliminar Cuenta
-          </button>
-        </motion.section>
+        </CollapsibleSection>
       </div>
 
       <ProfileModal
@@ -1378,7 +1525,7 @@ export default function UserProfile() {
               htmlFor="current-password"
               className="block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
-              Contraseña actual
+              <TranslatedText tid="profile.current_password" fallback="Contraseña actual" />
             </label>
             <input
               id="current-password"
@@ -1397,7 +1544,7 @@ export default function UserProfile() {
               htmlFor="new-password"
               className="block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
-              Nueva contraseña
+              <TranslatedText tid="profile.new_password" fallback="Nueva contraseña" />
             </label>
             <input
               id="new-password"
@@ -1416,7 +1563,10 @@ export default function UserProfile() {
               htmlFor="confirm-password"
               className="block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
-              Confirmar nueva contraseña
+              <TranslatedText
+                tid="profile.confirm_password"
+                fallback="Confirmar nueva contraseña"
+              />
             </label>
             <input
               id="confirm-password"
@@ -1431,8 +1581,10 @@ export default function UserProfile() {
           </div>
 
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Debe contener al menos 8 caracteres, incluir mayúsculas, minúsculas, un número y un
-            caracter especial.
+            <TranslatedText
+              tid="profile.password_complexity"
+              fallback="Debe contener al menos 8 caracteres, incluir mayúsculas, minúsculas, un número y un caracter especial."
+            />
           </p>
 
           <button
@@ -1440,13 +1592,93 @@ export default function UserProfile() {
             disabled={isChangingPassword}
             className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isChangingPassword ? 'Actualizando...' : 'Actualizar contraseña'}
+            {isChangingPassword ? (
+              <TranslatedText tid="profile.updating" fallback="Actualizando..." />
+            ) : (
+              <TranslatedText tid="profile.update_password_btn" fallback="Actualizar contraseña" />
+            )}
           </button>
         </form>
       </ProfileModal>
 
       <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
     </>
+  );
+}
+
+// Helper Component for Collapsible Sections
+function CollapsibleSection({
+  titleId,
+  titleFallback,
+  children,
+  defaultOpen = false,
+}: {
+  titleId: string;
+  titleFallback: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <motion.section
+      className="relative overflow-hidden rounded-3xl border border-gray-100 bg-white/80 p-6 shadow-sm backdrop-blur-md transition-all dark:border-white/5 dark:bg-gray-900/40"
+      initial={false}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center justify-between focus:outline-none"
+      >
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+          <TranslatedText tid={titleId} fallback={titleFallback} />
+        </h3>
+        <motion.div
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          transition={{ duration: 0.3 }}
+          className="text-gray-500 dark:text-gray-400"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </motion.div>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial="collapsed"
+            animate="open"
+            exit="collapsed"
+            variants={{
+              open: { opacity: 1, height: 'auto', marginTop: 16 },
+              collapsed: { opacity: 0, height: 0, marginTop: 0 },
+            }}
+            transition={{ duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] }}
+          >
+            {children}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {!isOpen && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="mt-2 w-full text-center text-xs text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+        >
+          <span className="border-b border-gray-300 dark:border-gray-600 pb-0.5">
+            <span className="hidden sm:inline">Click</span>
+            <span className="sm:hidden">Tap</span> para ver más info
+          </span>
+        </button>
+      )}
+    </motion.section>
   );
 }
 

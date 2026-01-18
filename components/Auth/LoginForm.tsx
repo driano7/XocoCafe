@@ -34,6 +34,7 @@ import { loginSchema, type LoginInput } from '@/lib/validations/auth';
 import { useConversionTracking } from '@/components/Analytics/AnalyticsProvider';
 import type { AuthSuccessHandler } from '@/components/Auth/types';
 import { motion, type Variants } from 'framer-motion';
+import { useLanguage } from '@/components/Language/LanguageProvider';
 
 interface LoginFormProps {
   onSuccess: AuthSuccessHandler;
@@ -50,6 +51,7 @@ export default function LoginForm({
   shouldAnimateFields = false,
   animationDelay = 0,
 }: LoginFormProps) {
+  const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { trackLogin, trackFormSubmit } = useConversionTracking();
@@ -110,7 +112,7 @@ export default function LoginForm({
         onError(result.message);
       }
     } catch (error) {
-      onError('Error de conexión. Inténtalo de nuevo.');
+      onError(t('auth.errors.connection') || 'Error de conexión. Inténtalo de nuevo.');
     } finally {
       setIsLoading(false);
     }
@@ -123,14 +125,14 @@ export default function LoginForm({
           htmlFor="email"
           className="block text-sm font-semibold tracking-wide text-primary-900 dark:text-primary-100"
         >
-          Email
+          {t('auth.email') || 'Email'}
         </label>
         <input
           {...register('email')}
           type="email"
           id="email"
           className={inputClasses}
-          placeholder="tu@email.com"
+          placeholder={t('auth.email_placeholder') || 'tu@email.com'}
         />
         {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
       </motion.div>
@@ -140,7 +142,7 @@ export default function LoginForm({
           htmlFor="password"
           className="block text-sm font-semibold tracking-wide text-primary-900 dark:text-primary-100"
         >
-          Contraseña
+          {t('auth.password') || 'Contraseña'}
         </label>
         <div className="relative">
           <input
@@ -148,15 +150,15 @@ export default function LoginForm({
             type={showPassword ? 'text' : 'password'}
             id="password"
             className={inputClasses}
-            placeholder="Tu contraseña"
+            placeholder={t('auth.password_placeholder') || 'Tu contraseña'}
           />
           <button
             type="button"
             onClick={() => setShowPassword((value) => !value)}
             className="absolute inset-y-0 right-3 flex items-center text-xs font-semibold uppercase tracking-[0.2em] text-primary-600 hover:text-primary-500 dark:text-primary-200"
-            aria-label="Mostrar u ocultar contraseña"
+            aria-label={t('profile.password_visibility_label') || 'Mostrar u ocultar contraseña'}
           >
-            {showPassword ? 'Ocultar' : 'Ver'}
+            {showPassword ? t('profile.hide') || 'Ocultar' : t('profile.view') || 'Ver'}
           </button>
         </div>
         {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
@@ -171,7 +173,9 @@ export default function LoginForm({
         animate={animationState}
         custom={2}
       >
-        {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+        {isLoading
+          ? t('auth.logging_in') || 'Iniciando sesión...'
+          : t('auth.login_btn') || 'Iniciar sesión'}
       </motion.button>
     </motion.form>
   );

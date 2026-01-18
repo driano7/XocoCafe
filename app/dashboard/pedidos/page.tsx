@@ -73,12 +73,12 @@ const resolveOrderStatus = (order?: Partial<Order> | null): Order['status'] => {
   return (order.prepStatus as Order['status']) ?? order.status ?? 'pending';
 };
 
-const formatOrderCustomer = (order: Order) => {
+const formatOrderCustomer = (order: Order, t: (key: string) => string) => {
   const preferred = (order.customerName ?? '').trim();
   if (preferred.length > 0) return preferred;
   const fallback = (order.userEmail ?? '').trim();
   if (fallback.length > 0) return fallback;
-  return 'Público general';
+  return t('orders.public_general') || 'Público general';
 };
 const normalizeQuantity = (value: unknown) => {
   const numberValue = Number(value);
@@ -109,7 +109,8 @@ const useOrderStatusTracker = (
     message: string,
     tone?: SnackbarTone,
     options?: { deviceNotification?: { title: string; body?: string } | null }
-  ) => void
+  ) => void,
+  t: (key: string) => string
 ) => {
   const hasSnapshotRef = useRef(false);
   const statusMapRef = useRef(new Map<string, Order['status']>());
@@ -144,9 +145,13 @@ const useOrderStatusTracker = (
             sessionOrdersRef.current.add(orderId);
             notices.push({
               tone: 'ticket',
-              message: `Pedido ${displayCode} registrado correctamente.`,
-              title: 'Nuevo pedido creado',
-              body: `Ticket ${displayCode} está en cola.`,
+              message:
+                t('orders.order_registered')?.replace('{code}', displayCode) ||
+                `Pedido ${displayCode} registrado correctamente.`,
+              title: t('orders.new_order_title') || 'Nuevo pedido creado',
+              body:
+                t('orders.ticket_queued')?.replace('{code}', displayCode) ||
+                `Ticket ${displayCode} está en cola.`,
             });
           }
         } else if (prevStatus !== nextStatus) {
@@ -161,16 +166,20 @@ const useOrderStatusTracker = (
           if (nextStatus === 'in_progress') {
             notices.push({
               tone: 'info',
-              message: `Tu pedido ${displayCode} está en preparación.`,
-              title: 'Pedido en preparación',
-              body: 'Tu orden ya está siendo atendida.',
+              message:
+                t('orders.order_in_prep')?.replace('{code}', displayCode) ||
+                `Tu pedido ${displayCode} está en preparación.`,
+              title: t('orders.order_in_prep_title') || 'Pedido en preparación',
+              body: t('orders.order_being_served') || 'Tu orden ya está siendo atendida.',
             });
           } else if (nextStatus === 'completed') {
             notices.push({
               tone: 'success',
-              message: `Pedido ${displayCode} completado. Puedes recogerlo.`,
-              title: 'Pedido completado',
-              body: 'Tu orden está lista para entrega.',
+              message:
+                t('orders.order_completed_msg')?.replace('{code}', displayCode) ||
+                `Pedido ${displayCode} completado. Puedes recogerlo.`,
+              title: t('orders.order_completed_title') || 'Pedido completado',
+              body: t('orders.order_ready_msg') || 'Tu orden está lista para entrega.',
             });
           }
         }
@@ -203,7 +212,7 @@ const useOrderStatusTracker = (
         });
       }
     },
-    [showSnackbar]
+    [showSnackbar, t]
   );
 };
 
@@ -276,13 +285,13 @@ const isClientTicket = (order: Order) => {
   return true;
 };
 
-const formatOrderChannelLabel = (order: Order) => {
+const formatOrderChannelLabel = (order: Order, t: (key: string) => string) => {
   const code = (order.ticketId ?? order.orderNumber ?? '').toUpperCase();
   if (code.startsWith('C-')) {
-    return 'Cliente';
+    return t('orders.client') || 'Cliente';
   }
   if (code.startsWith('XL-')) {
-    return 'Xoco';
+    return t('orders.xoco') || 'Xoco';
   }
   return (order.type ?? 'Web').toUpperCase();
 };
@@ -292,7 +301,7 @@ const OrderCard = ({ order, onSelect }: { order: Order; onSelect: (order: Order)
   const STATUS_LABELS = getStatusLabels(t);
   const effectiveStatusKey = (order.prepStatus as Order['status']) ?? order.status ?? 'pending';
   const status = STATUS_LABELS[effectiveStatusKey] ?? STATUS_LABELS.pending;
-  const channelLabel = formatOrderChannelLabel(order);
+  const channelLabel = formatOrderChannelLabel(order, t);
   return (
     <button
       type="button"
@@ -305,21 +314,28 @@ const OrderCard = ({ order, onSelect }: { order: Order; onSelect: (order: Order)
             {getOrderDisplayCode(order)}
           </p>
           <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {channelLabel === 'CLIENTE' ? 'Pedido cliente' : `Pedido ${channelLabel}`}
+            {channelLabel === (t('orders.client') || 'Cliente').toUpperCase() ? (
+              <TranslatedText tid="orders.client_order" fallback="Pedido cliente" />
+            ) : (
+              t('orders.order_label')?.replace('{label}', channelLabel) || `Pedido ${channelLabel}`
+            )}
             <span className="text-primary-600 dark:text-primary-100"> · {status}</span>
           </p>
         </div>
         <div className="text-right text-xs uppercase tracking-[0.35em] text-gray-400 dark:text-gray-100">
           {order.createdAt
-            ? new Date(order.createdAt).toLocaleTimeString('es-MX', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })
+            ? new Date(order.createdAt).toLocaleTimeString(
+                t('common.locale') === 'en' ? 'en-US' : 'es-MX',
+                {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }
+              )
             : '--:--'}
         </div>
       </div>
       <p className="mt-1 text-sm text-gray-600 dark:text-gray-200">
-        Cliente: {formatOrderCustomer(order)} ·{' '}
+        <TranslatedText tid="orders.client" fallback="Cliente" />: {formatOrderCustomer(order, t)} ·{' '}
         <TranslatedText tid="orders.pos_ticket" fallback="Ticket POS" />:{' '}
         {order.ticketId ?? <TranslatedText tid="orders.no_ticket" fallback="Sin ticket" />}
       </p>
@@ -332,7 +348,9 @@ const OrderCard = ({ order, onSelect }: { order: Order; onSelect: (order: Order)
         </span>
       </div>
       <div className="mt-3 grid gap-1 text-xs text-gray-500 dark:text-gray-300">
-        <p>Selecciona para ver detalle.</p>
+        <p>
+          <TranslatedText tid="orders.select_view_detail" fallback="Selecciona para ver detalle." />
+        </p>
       </div>
     </button>
   );
@@ -446,7 +464,7 @@ const HistoricalModal = ({
   onClose: () => void;
   orders: Order[];
 }) => {
-  const { t } = useLanguage();
+  const { t, currentLanguage } = useLanguage();
   const headerHeight = useHeaderHeight();
   const modalVars = useMemo(() => {
     const safeHeaderHeight = Number.isFinite(headerHeight) ? headerHeight : 96;
@@ -529,7 +547,7 @@ const HistoricalModal = ({
                   <TranslatedText tid="orders.historical" fallback="Histórico" />
                 </p>
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Pedidos vencidos
+                  <TranslatedText tid="orders.historical_title" fallback="Pedidos vencidos" />
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-white/60">
                   <TranslatedText
@@ -555,7 +573,7 @@ const HistoricalModal = ({
               ref={listRef}
               onScroll={updateScrollProgress}
               role="region"
-              aria-label="Registros históricos"
+              aria-label={t('orders.historical_records') || 'Registros históricos'}
               style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
               onWheelCapture={(event) => event.stopPropagation()}
               onTouchMoveCapture={(event) => event.stopPropagation()}
@@ -577,15 +595,20 @@ const HistoricalModal = ({
                         <span>{getOrderDisplayCode(order)}</span>
                         <span>
                           {order.createdAt
-                            ? new Date(order.createdAt).toLocaleString('es-MX')
+                            ? new Date(order.createdAt).toLocaleString(
+                                currentLanguage === 'es' ? 'es-MX' : 'en-US'
+                              )
                             : '--:--'}
                         </span>
                       </div>
                       <p className="mt-2 text-lg font-semibold text-white dark:text-gray-100">
-                        {formatOrderChannelLabel(order)} · {labels.past}
+                        {formatOrderChannelLabel(order, t)} · {labels.past}
                       </p>
                       <div className="mt-2 grid gap-1 text-xs text-gray-200 dark:text-gray-300">
-                        <p>Cliente: {formatOrderCustomer(order)}</p>
+                        <p>
+                          <TranslatedText tid="orders.client" fallback="Cliente" />:{' '}
+                          {formatOrderCustomer(order, t)}
+                        </p>
                         <p className="font-semibold text-primary-200 dark:text-gray-50">
                           Total: {formatCurrency(order.total)}
                         </p>
@@ -598,7 +621,7 @@ const HistoricalModal = ({
             <div className="border-t border-gray-100 px-5 py-3">
               <div className="flex items-center gap-3">
                 <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400 dark:text-white/50">
-                  Recorridos
+                  <TranslatedText tid="orders.scrolled" fallback="Recorridos" />
                 </span>
                 <input
                   type="range"
@@ -608,7 +631,10 @@ const HistoricalModal = ({
                   value={scrollProgress}
                   onChange={handleSliderChange}
                   className="h-2 flex-1 cursor-pointer appearance-none rounded-full bg-gray-200 accent-primary-500 dark:bg-white/10"
-                  aria-label="Desliza para recorrer los registros históricos"
+                  aria-label={
+                    t('orders.scroll_historical_desc') ||
+                    'Desliza para recorrer los registros históricos'
+                  }
                 />
               </div>
             </div>
@@ -619,15 +645,15 @@ const HistoricalModal = ({
   );
 };
 
-function formatCurrency(value?: number | null) {
-  return new Intl.NumberFormat('es-MX', {
+function formatCurrency(value?: number | null, locale: string = 'es-MX') {
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: 'MXN',
   }).format(value ?? 0);
 }
 
 export default function OrdersDashboardPage() {
-  useLanguage();
+  const { t } = useLanguage();
   const { user, token, isLoading: isAuthLoading } = useAuth();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showHistoricalModal, setShowHistoricalModal] = useState(false);
@@ -684,10 +710,13 @@ export default function OrdersDashboardPage() {
     notificationSupported,
   } = useSnackbarNotifications();
   const handleWhatsappSnackbar = useCallback(() => {
-    showSnackbar('Abriendo chat de WhatsApp con Xoco Café…', 'whatsapp');
-  }, [showSnackbar]);
+    showSnackbar(
+      t('orders.whatsapp_opening') || 'Abriendo chat de WhatsApp con Xoco Café…',
+      'whatsapp'
+    );
+  }, [showSnackbar, t]);
   const [pushPermissionInfo, setPushPermissionInfo] = useState<string | null>(null);
-  const trackOrderStatuses = useOrderStatusTracker(showSnackbar);
+  const trackOrderStatuses = useOrderStatusTracker(showSnackbar, t);
   const { orders, isLoading, error, refresh } = useOrders<Order>({
     token,
     enabled: Boolean(token) && !isAuthLoading,
@@ -886,26 +915,26 @@ export default function OrdersDashboardPage() {
       columns: [
         {
           key: 'pending' as const,
-          label: 'Pendientes',
-          description: 'Pedidos que aún no entran a barra',
+          label: t('orders.status_pending') || 'Pendientes',
+          description: t('orders.empty_pending') || 'Pedidos que aún no entran a barra',
           orders: pendingBucket,
         },
         {
           key: 'in_progress' as const,
-          label: 'En preparación',
-          description: 'Baristas trabajando en el pedido',
+          label: t('orders.status_in_progress') || 'En preparación',
+          description: t('orders.empty_production') || 'Baristas trabajando en el pedido',
           orders: prepBucket,
         },
         {
           key: 'completed' as const,
-          label: 'Completados',
-          description: 'Listos para entregar o ya recolectados',
+          label: t('orders.status_completed') || 'Completados',
+          description: t('orders.empty_completed') || 'Listos para entregar o ya recolectados',
           orders: completedBucket,
         },
       ],
       pastBucket,
     };
-  }, [getEffectiveStatus, orders]);
+  }, [getEffectiveStatus, orders, t]);
 
   const pendingOrders =
     boardColumns.columns.find((column) => column.key === 'pending')?.orders ?? [];
@@ -957,10 +986,12 @@ export default function OrdersDashboardPage() {
       message:
         result.message ??
         (result.success
-          ? 'Activamos tu programa de lealtad. Ya puedes acumular sellos.'
-          : 'No pudimos activar tu programa de lealtad. Intenta más tarde.'),
+          ? t('orders.loyalty_success') ||
+            'Activamos tu programa de lealtad. Ya puedes acumular sellos.'
+          : t('orders.loyalty_error') ||
+            'No pudimos activar tu programa de lealtad. Intenta más tarde.'),
     });
-  }, [activateLoyaltyProgram]);
+  }, [activateLoyaltyProgram, t]);
 
   const [isProcessingTicket, setIsProcessingTicket] = useState(false);
   const [ticketActionError, setTicketActionError] = useState<string | null>(null);
@@ -1151,8 +1182,8 @@ export default function OrdersDashboardPage() {
       try {
         await navigator.share({
           files: [file],
-          title: 'Ticket digital Xoco Café',
-          text: 'Guardaremos tu ticket en tu galería.',
+          title: t('orders.digital_ticket') || 'Ticket digital Xoco Café',
+          text: t('orders.save_gallery_text') || 'Guardaremos tu ticket en tu galería.',
         });
       } catch (error) {
         console.error('Error guardando ticket en galería:', error);
@@ -1168,7 +1199,7 @@ export default function OrdersDashboardPage() {
         throw new Error('gallery_share_failed');
       }
     },
-    [deviceInfo.isAndroid, isShareCapableDevice]
+    [deviceInfo.isAndroid, isShareCapableDevice, t]
   );
 
   const handleDownloadTicket = useCallback(async () => {
@@ -1192,10 +1223,11 @@ export default function OrdersDashboardPage() {
             'Fallo guardando ticket en galería, aplicando descarga estándar:',
             mobileError
           );
-          triggerDownload(blob, filename);
           setTicketActionError(
-            'No pudimos guardar tu ticket en la galería, pero lo enviamos a tu carpeta de descargas.'
+            t('orders.gallery_save_failed_fallback') ||
+              'No pudimos guardar tu ticket en la galería, pero lo enviamos a tu carpeta de descargas.'
           );
+          triggerDownload(blob, filename);
         }
         return;
       }
@@ -1203,17 +1235,23 @@ export default function OrdersDashboardPage() {
     } catch (error) {
       console.error('Error descargando ticket:', error);
       if (error instanceof DOMException && error.name === 'AbortError') {
-        setTicketActionError('Cancelaste la acción antes de guardar el ticket.');
+        setTicketActionError(
+          t('orders.download_aborted') || 'Cancelaste la acción antes de guardar el ticket.'
+        );
       } else if (error instanceof Error && error.message === 'gallery_permission_denied') {
         setTicketActionError(
-          'Necesitamos permiso para guardar el ticket en tu galería. Intenta aceptarlo o usa el botón Compartir.'
+          t('orders.gallery_permission_denied') ||
+            'Necesitamos permiso para guardar el ticket en tu galería. Intenta aceptarlo o usa el botón Compartir.'
         );
       } else if (error instanceof Error && error.message?.startsWith('gallery_')) {
         setTicketActionError(
-          'No pudimos guardar tu ticket en la galería. Revisa los permisos o usa Compartir.'
+          t('orders.gallery_generic_error') ||
+            'No pudimos guardar tu ticket en la galería. Revisa los permisos o usa Compartir.'
         );
       } else {
-        setTicketActionError('No pudimos descargar el ticket. Intenta de nuevo.');
+        setTicketActionError(
+          t('orders.download_error') || 'No pudimos descargar el ticket. Intenta de nuevo.'
+        );
       }
     } finally {
       setIsProcessingTicket(false);
@@ -1225,6 +1263,7 @@ export default function OrdersDashboardPage() {
     deviceInfo.isMobile,
     saveTicketToGallery,
     selectedOrder,
+    t,
     triggerDownload,
   ]);
 
@@ -1237,7 +1276,10 @@ export default function OrdersDashboardPage() {
       typeof navigator === 'undefined' ||
       typeof navigator.share !== 'function'
     ) {
-      setTicketActionError('Tu navegador no permite compartir directamente este archivo.');
+      setTicketActionError(
+        t('orders.share_not_supported') ||
+          'Tu navegador no permite compartir directamente este archivo.'
+      );
       return;
     }
     setTicketActionError(null);
@@ -1260,27 +1302,35 @@ export default function OrdersDashboardPage() {
         supportsFiles || forceFileShare
           ? {
               files: [file],
-              title: 'Ticket digital Xoco Café',
-              text: 'Comparte tu ticket con otra persona o guárdalo en tu galería.',
+              title: t('orders.digital_ticket') || 'Ticket digital Xoco Café',
+              text:
+                t('orders.share_ticket_text') ||
+                'Comparte tu ticket con otra persona o guárdalo en tu galería.',
             }
           : (() => {
               const objectUrl = URL.createObjectURL(blob);
               setTimeout(() => URL.revokeObjectURL(objectUrl), 6_000);
               return {
                 url: objectUrl,
-                title: 'Ticket digital Xoco Café',
-                text: 'Comparte este enlace para descargar tu ticket.',
+                title: t('orders.digital_ticket') || 'Ticket digital Xoco Café',
+                text:
+                  t('orders.share_link_text') || 'Comparte este enlace para descargar tu ticket.',
               };
             })();
       await navigator.share(sharePayload);
     } catch (error) {
       console.error('Error compartiendo ticket:', error);
       if (error instanceof DOMException && error.name === 'AbortError') {
-        setTicketActionError('Cancelaste la acción de compartir.');
+        setTicketActionError(t('orders.share_aborted') || 'Cancelaste la acción de compartir.');
       } else if (error instanceof Error && error.message === 'ticket_unavailable') {
-        setTicketActionError('No pudimos preparar el ticket para compartir. Intenta descargarlo.');
+        setTicketActionError(
+          t('orders.ticket_unavailable') ||
+            'No pudimos preparar el ticket para compartir. Intenta descargarlo.'
+        );
       } else {
-        setTicketActionError('No pudimos compartir el ticket en este dispositivo.');
+        setTicketActionError(
+          t('orders.share_error') || 'No pudimos compartir el ticket en este dispositivo.'
+        );
       }
     } finally {
       setIsProcessingTicket(false);
@@ -1291,6 +1341,7 @@ export default function OrdersDashboardPage() {
     isShareCapableDevice,
     refreshTicketShareBlob,
     selectedOrder,
+    t,
     ticketShareBlob,
   ]);
 
@@ -1344,7 +1395,10 @@ export default function OrdersDashboardPage() {
     return (
       <CoffeeBackground className="py-10">
         <div className="mx-auto max-w-4xl rounded-[32px] bg-white/90 px-4 py-12 text-center text-gray-600 shadow-2xl shadow-black/20 dark:bg-gray-900/80 dark:text-gray-200">
-          Cargando información de tu cuenta...
+          <TranslatedText
+            tid="orders.loading_account"
+            fallback="Cargando información de tu cuenta..."
+          />
         </div>
       </CoffeeBackground>
     );
@@ -1354,15 +1408,20 @@ export default function OrdersDashboardPage() {
     return (
       <CoffeeBackground className="py-10">
         <div className="mx-auto max-w-4xl rounded-[32px] bg-white/95 px-4 py-12 text-center shadow-2xl shadow-black/20 dark:bg-gray-950/80">
-          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Mis pedidos</h1>
+          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">
+            <TranslatedText tid="orders.title" fallback="Mis pedidos" />
+          </h1>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-            Inicia sesión para revisar el historial de pedidos y crear nuevos.
+            <TranslatedText
+              tid="orders.login_to_view"
+              fallback="Inicia sesión para revisar el historial de pedidos y crear nuevos."
+            />
           </p>
           <Link
             href="/login"
             className="mt-6 inline-flex min-w-[220px] items-center justify-center rounded-full bg-primary-600 px-8 py-4 text-xl font-bold uppercase tracking-[0.25em] text-white shadow-xl transition hover:bg-primary-700"
           >
-            Iniciar sesión
+            <TranslatedText tid="orders.login" fallback="Iniciar sesión" />
           </Link>
         </div>
       </CoffeeBackground>
@@ -1375,9 +1434,14 @@ export default function OrdersDashboardPage() {
         <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-[0.35em] text-primary-500">Panel</p>
-            <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Mis pedidos</h1>
+            <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">
+              <TranslatedText tid="orders.my_orders" fallback="Mis pedidos" />
+            </h1>
             <p className="text-sm text-gray-500">
-              Visualiza el estado de tus pedidos o los que realicemos por ti en tiempo real.
+              <TranslatedText
+                tid="orders.dashboard_description"
+                fallback="Visualiza el estado de tus pedidos o los que realicemos por ti en tiempo real."
+              />
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -1402,18 +1466,23 @@ export default function OrdersDashboardPage() {
         {showMobileNotificationPrompt && (
           <div className="mb-6 rounded-3xl border border-primary-200 bg-white/70 p-4 text-sm text-gray-800 shadow dark:border-primary-500/30 dark:bg-primary-900/20 dark:text-primary-50">
             <p className="mb-3 font-semibold">
-              Activa las notificaciones push para enterarte cuando cambiemos el estado de tus
-              pedidos.
+              <TranslatedText
+                tid="orders.push_notif_prompt"
+                fallback="Activa las notificaciones push para enterarte cuando cambiemos el estado de tus pedidos."
+              />
             </p>
             <button
               type="button"
               onClick={handleRequestPushPermission}
               className="w-full rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             >
-              Permitir notificaciones
+              <TranslatedText tid="orders.allow_notifications" fallback="Permitir notificaciones" />
             </button>
             <p className="mt-2 text-xs text-gray-500 dark:text-primary-100/70">
-              iOS requiere que aceptes manualmente para poder enviarte avisos.
+              <TranslatedText
+                tid="orders.ios_notif_notice"
+                fallback="iOS requiere que aceptes manualmente para poder enviarte avisos."
+              />
             </p>
             {pushPermissionInfo && (
               <p className="mt-1 text-xs font-semibold text-primary-600 dark:text-primary-200">
@@ -1441,7 +1510,12 @@ export default function OrdersDashboardPage() {
           />
         )}
         <div className="mb-6 flex flex-wrap items-center justify-center gap-2 rounded-3xl bg-primary-600 px-4 py-3 text-sm text-white shadow-lg dark:bg-primary-900/20 dark:text-primary-200">
-          <span>Si necesitas ayuda, mándanos un</span>
+          <span>
+            <TranslatedText
+              tid="orders.whatsapp_help_prompt"
+              fallback="Si necesitas ayuda, mándanos un"
+            />
+          </span>
           <a
             href={siteMetadata.whats}
             target="_blank"
@@ -1452,18 +1526,26 @@ export default function OrdersDashboardPage() {
           >
             <FaWhatsapp />
           </a>
-          <span>y con todo gusto te ayudamos.</span>
+          <span>
+            <TranslatedText
+              tid="profile.whatsapp_help_end"
+              fallback="y con todo gusto te ayudamos."
+            />
+          </span>
         </div>
         {hasReachedOrderLimit && (
           <div className="mb-6 rounded-xl bg-amber-100 px-4 py-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">
-            Solo puedes tener 3 pedidos pendientes creados desde la app. Finaliza o cancela un
-            ticket que empiece con C- para generar otro.
+            <TranslatedText
+              tid="orders.active_order_limit"
+              fallback="Solo puedes tener 3 pedidos pendientes creados desde la app. Finaliza o cancela un ticket que empiece con C- para generar otro."
+            />
           </div>
         )}
         <div className="mb-6 rounded-xl bg-orange-50 px-4 py-3 text-sm text-orange-900 dark:bg-orange-900/30 dark:text-orange-100">
-          Si no acudiste antes del corte (23:59), movemos el ticket a seguimiento en color naranja,
-          eliminamos su QR y conservamos el registro únicamente durante 48 horas para referencias
-          internas.
+          <TranslatedText
+            tid="orders.cutoff_notice"
+            fallback="Si no acudiste antes del corte (23:59), movemos el ticket a seguimiento en color naranja, eliminamos su QR y conservamos el registro únicamente durante 48 horas para referencias internas."
+          />
         </div>
         <div className="mb-6 flex justify-end">
           <button
@@ -1472,7 +1554,11 @@ export default function OrdersDashboardPage() {
             disabled={isLoading}
             className="inline-flex items-center justify-center rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-white/5"
           >
-            {isLoading ? 'Actualizando...' : 'Actualizar lista'}
+            {isLoading ? (
+              <TranslatedText tid="orders.updating" fallback="Actualizando..." />
+            ) : (
+              <TranslatedText tid="orders.update_list" fallback="Actualizar lista" />
+            )}
           </button>
         </div>
 
@@ -1513,30 +1599,34 @@ export default function OrdersDashboardPage() {
                 aria-label="Tablero de pedidos"
               >
                 <OrdersBoardColumn
-                  title="Pendientes"
-                  description="Pedidos que aún no entran a barra"
+                  title={t('orders.status_pending') || 'Pendientes'}
+                  description={t('orders.empty_pending') || 'Pedidos que aún no entran a barra'}
                   orders={pendingOrders}
-                  emptyLabel="No hay pedidos en pendientes."
+                  emptyLabel={t('orders.no_orders_pending') || 'No hay pedidos en pendientes.'}
                   onSelect={(value) => {
                     scrollModalIntoView();
                     setSelectedOrder(value);
                   }}
                 />
                 <OrdersBoardColumn
-                  title="En producción"
-                  description="Baristas trabajando en el pedido"
+                  title={t('orders.status_in_progress') || 'En producción'}
+                  description={t('orders.empty_production') || 'Baristas trabajando en el pedido'}
                   orders={prepOrders}
-                  emptyLabel="No hay pedidos en producción."
+                  emptyLabel={t('orders.no_orders_production') || 'No hay pedidos en producción.'}
                   onSelect={(value) => {
                     scrollModalIntoView();
                     setSelectedOrder(value);
                   }}
                 />
                 <OrdersBoardColumn
-                  title="Completados"
-                  description="Listos para entregar o ya recolectados"
+                  title={t('orders.status_completed') || 'Completados'}
+                  description={
+                    t('orders.empty_completed') || 'Listos para entregar o ya recolectados'
+                  }
                   orders={completedOrdersList}
-                  emptyLabel="No hay pedidos completados recientes."
+                  emptyLabel={
+                    t('orders.no_recent_orders') || 'No hay pedidos completados recientes.'
+                  }
                   onSelect={(value) => {
                     scrollModalIntoView();
                     setSelectedOrder(value);
@@ -1549,8 +1639,11 @@ export default function OrdersDashboardPage() {
                   onClick={() => setShowHistoricalModal(true)}
                   className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-5 py-2 text-sm font-semibold text-white shadow transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 >
-                  Histórico ({boardColumns.pastBucket.length})
-                  <span className="text-xs text-white/80 dark:text-white/70">Abrir registros</span>
+                  <TranslatedText tid="orders.historical" fallback="Histórico" /> (
+                  {boardColumns.pastBucket.length})
+                  <span className="text-xs text-white/80 dark:text-white/70">
+                    <TranslatedText tid="orders.open_records" fallback="Abrir registros" />
+                  </span>
                 </button>
               </div>
             </>
@@ -1653,7 +1746,14 @@ export default function OrdersDashboardPage() {
                       disabled={isProcessingTicket}
                       className="w-full rounded-full bg-primary-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-70"
                     >
-                      {isProcessingTicket ? 'Generando ticket…' : 'Descargar Ticket'}
+                      {isProcessingTicket ? (
+                        <TranslatedText
+                          tid="orders.generating_ticket"
+                          fallback="Generando ticket…"
+                        />
+                      ) : (
+                        <TranslatedText tid="orders.download_ticket" fallback="Descargar Ticket" />
+                      )}
                     </button>
                     {shouldShowShareButton && (
                       <button
@@ -1673,11 +1773,24 @@ export default function OrdersDashboardPage() {
                     )}
                     {shouldShowShareButton && (!isShareCapableDevice || !isTicketShareReady) && (
                       <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                        {isShareCapableDevice
-                          ? isPreparingShareBlob
-                            ? 'Generando una vista previa del ticket para compartir…'
-                            : 'No pudimos preparar el ticket para compartir. Usa la descarga para guardarlo.'
-                          : 'Tu navegador no soporta compartir archivos. Usa la descarga para guardar tu ticket.'}
+                        {isShareCapableDevice ? (
+                          isPreparingShareBlob ? (
+                            <TranslatedText
+                              tid="orders.generating_preview"
+                              fallback="Generando una vista previa del ticket para compartir…"
+                            />
+                          ) : (
+                            <TranslatedText
+                              tid="orders.share_prepare_error"
+                              fallback="No pudimos preparar el ticket para compartir. Usa la descarga para guardarlo."
+                            />
+                          )
+                        ) : (
+                          <TranslatedText
+                            tid="orders.share_not_supported"
+                            fallback="Tu navegador no soporta compartir archivos. Usa la descarga para guardar tu ticket."
+                          />
+                        )}
                       </p>
                     )}
                     {ticketActionError && (

@@ -61,7 +61,7 @@ import { useHeaderHeight } from '@/hooks/useHeaderHeight';
 import CoffeeBackground from '@/components/CoffeeBackground';
 import { useLanguage } from '@/components/Language/LanguageProvider';
 import TranslatedText from '@/components/Language/TranslatedText';
-import { es as esLocale } from 'date-fns/locale';
+import { es, enUS } from 'date-fns/locale';
 
 const MAX_PEOPLE = 15;
 const BRANCH_ID = DEFAULT_BRANCH_ID;
@@ -125,14 +125,14 @@ const getReservationVisuals = (
   },
 });
 
-const getDayPickerWeekdays = (): Record<number, string> => ({
-  0: 'Do',
-  1: 'Lu',
-  2: 'Ma',
-  3: 'Mi',
-  4: 'Ju',
-  5: 'Vi',
-  6: 'Sá',
+const getDayPickerWeekdays = (t: (key: string) => string): Record<number, string> => ({
+  0: t('common.domingo_short') || 'Do',
+  1: t('common.lunes_short') || 'Lu',
+  2: t('common.martes_short') || 'Ma',
+  3: t('common.miercoles_short') || 'Mi',
+  4: t('common.jueves_short') || 'Ju',
+  5: t('common.viernes_short') || 'Vi',
+  6: t('common.sabado_short') || 'Sá',
 });
 
 const getStatusVisuals = (status: string, t: (key: string) => string, fallback?: string) => {
@@ -184,12 +184,12 @@ const parseReservationDate = (reservation: ReservationRecord) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-const formatReservationDateTime = (reservation: ReservationRecord) => {
+const formatReservationDateTime = (reservation: ReservationRecord, t: (key: string) => string) => {
   const parsed = parseReservationDate(reservation);
   if (!parsed) {
     return `${reservation.reservationDate} · ${reservation.reservationTime ?? '--:--'} hrs`;
   }
-  return parsed.toLocaleString('es-MX', {
+  return parsed.toLocaleString(t('common.locale')?.includes('en') ? 'en-US' : 'es-MX', {
     weekday: 'short',
     day: '2-digit',
     month: 'short',
@@ -271,8 +271,9 @@ const clampDateToRange = (date: Date, min: Date, max: Date) => {
   return date;
 };
 export default function ReservePage() {
-  const { t } = useLanguage();
-  const DAY_PICKER_WEEKDAYS = getDayPickerWeekdays();
+  const { t, currentLanguage } = useLanguage();
+  const dateLocale = currentLanguage === 'es' ? es : enUS;
+  const DAY_PICKER_WEEKDAYS = getDayPickerWeekdays(t);
   const dayPickerFormatters: Partial<Formatters> = useMemo(
     () => ({
       formatWeekdayName: (day) => DAY_PICKER_WEEKDAYS[day.getDay()] ?? '',
@@ -441,14 +442,19 @@ export default function ReservePage() {
     token,
   });
   const handleWhatsappSnackbar = useCallback(() => {
-    showSnackbar('Abriendo chat de WhatsApp con Xoco Café…', 'whatsapp');
-  }, [showSnackbar]);
+    showSnackbar(
+      t('orders.whatsapp_opening') || 'Abriendo chat de WhatsApp con Xoco Café…',
+      'whatsapp'
+    );
+  }, [showSnackbar, t]);
 
   const handleActivateLoyaltyReminder = useCallback(async () => {
     const result = await loyaltyReminder.activate();
     const fallback = result.success
-      ? 'Activamos tu programa de lealtad. Ya puedes acumular sellos.'
-      : 'No pudimos activar tu programa de lealtad. Intenta más tarde.';
+      ? t('orders.loyalty_success') ||
+        'Activamos tu programa de lealtad. Ya puedes acumular sellos.'
+      : t('orders.loyalty_error') ||
+        'No pudimos activar tu programa de lealtad. Intenta más tarde.';
     const message = result.message ?? fallback;
     showSnackbar(
       result.success ? message : `⚠️ ${message}`,
@@ -471,7 +477,7 @@ export default function ReservePage() {
       setSelectedDate(normalized);
       setDisplayMonth(new Date(normalized.getFullYear(), normalized.getMonth(), 1));
     },
-    [maxReservationDate, setDisplayMonth, setSelectedDate, today]
+    [maxReservationDate, setDisplayMonth, setSelectedDate, today, t]
   );
 
   const loadReservations = useCallback(async () => {
@@ -805,17 +811,21 @@ export default function ReservePage() {
     }
   }, [availableTimeSlots, selectedTime]);
 
-  const buildReservationShareText = useCallback((reservation: ReservationRecord) => {
-    const branchLabel = reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
-    return [
-      `Reserva ${reservation.reservationCode}`,
-      formatReservationDateTime(reservation),
-      `Personas: ${reservation.peopleCount}`,
-      `Sucursal: ${branchLabel}${
-        reservation.branchNumber ? ` (#${reservation.branchNumber})` : ''
-      }`,
-    ].join(' · ');
-  }, []);
+  const buildReservationShareText = useCallback(
+    (reservation: ReservationRecord) => {
+      const branchLabel = reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
+      return [
+        t('reservations.share_text_res')?.replace('{code}', reservation.reservationCode) ||
+          `Reserva ${reservation.reservationCode}`,
+        formatReservationDateTime(reservation, t),
+        `${t('reservations.people_selected') || 'Personas'}: ${reservation.peopleCount}`,
+        `${t('reservations.branch') || 'Sucursal'}: ${branchLabel}${
+          reservation.branchNumber ? ` (#${reservation.branchNumber})` : ''
+        }`,
+      ].join(' · ');
+    },
+    [t]
+  );
 
   const waitForReservationAssets = useCallback(async () => {
     if (!reservationTicketRef.current) return;
@@ -854,7 +864,11 @@ export default function ReservePage() {
       canvas.toBlob(
         (blob) => {
           if (!blob) {
-            reject(new Error('No pudimos generar la imagen de la reserva.'));
+            reject(
+              new Error(
+                t('reservations.capture_failed') || 'No pudimos generar la imagen de la reserva.'
+              )
+            );
             return;
           }
           resolve(blob);
@@ -863,7 +877,7 @@ export default function ReservePage() {
         1
       );
     });
-  }, [waitForReservationAssets]);
+  }, [waitForReservationAssets, t]);
 
   const buildReservationTicketFileName = useCallback(
     (reservation: ReservationRecord) =>
@@ -917,8 +931,9 @@ export default function ReservePage() {
       try {
         await navigator.share({
           files: [file],
-          title: 'Reserva Xoco Café',
-          text: 'Guardaremos tu confirmación en tu galería.',
+          title: t('reservations.reserva_galeria') || 'Reserva Xoco Café',
+          text:
+            t('reservations.reserva_galeria_text') || 'Guardaremos tu confirmación en tu galería.',
         });
       } catch (error) {
         if (
@@ -933,7 +948,7 @@ export default function ReservePage() {
         throw new Error('reservation_gallery_failed');
       }
     },
-    [canShareReservation, reservationDeviceInfo.isAndroid]
+    [canShareReservation, reservationDeviceInfo.isAndroid, t]
   );
 
   const handleDownloadReservationTicket = useCallback(
@@ -952,7 +967,10 @@ export default function ReservePage() {
             return;
           } catch (mobileError) {
             if (mobileError instanceof DOMException && mobileError.name === 'AbortError') {
-              setReservationTicketActionError('Cancelaste la acción antes de guardar la reserva.');
+              setReservationTicketActionError(
+                t('reservations.action_cancelled') ||
+                  'Cancelaste la acción antes de guardar la reserva.'
+              );
               return;
             }
             if (
@@ -960,7 +978,8 @@ export default function ReservePage() {
               mobileError.message === 'reservation_gallery_permission'
             ) {
               setReservationTicketActionError(
-                'Necesitamos permiso para guardar la reserva en tu galería.'
+                t('reservations.permission_denied') ||
+                  'Necesitamos permiso para guardar la reserva en tu galería.'
               );
               return;
             }
@@ -969,7 +988,8 @@ export default function ReservePage() {
               mobileError.message === 'reservation_gallery_failed'
             ) {
               setReservationTicketActionError(
-                'No pudimos guardar en galería, enviamos la imagen a tus descargas.'
+                t('reservations.gallery_failed_download') ||
+                  'No pudimos guardar en galería, enviamos la imagen a tus descargas.'
               );
             }
           }
@@ -978,9 +998,13 @@ export default function ReservePage() {
       } catch (error) {
         console.error('Error descargando confirmación de reserva:', error);
         if (error instanceof Error && error.message === 'reservation_capture_failed') {
-          setReservationTicketActionError('No pudimos generar la imagen de la reserva.');
+          setReservationTicketActionError(
+            t('reservations.capture_failed') || 'No pudimos generar la imagen de la reserva.'
+          );
         } else {
-          setReservationTicketActionError('No pudimos descargar la reserva. Intenta de nuevo.');
+          setReservationTicketActionError(
+            t('reservations.download_error') || 'No pudimos descargar la reserva. Intenta de nuevo.'
+          );
         }
       } finally {
         setIsProcessingReservationTicket(false);
@@ -993,6 +1017,7 @@ export default function ReservePage() {
       reservationDeviceInfo.isMobile,
       saveReservationToGallery,
       triggerReservationDownload,
+      t,
     ]
   );
 
@@ -1006,10 +1031,15 @@ export default function ReservePage() {
           typeof navigator.share !== 'function' ||
           !canShareReservation
         ) {
-          const fallback = `${buildReservationShareText(reservation)}\nTe espero en Xoco Café.`;
+          const fallback = `${buildReservationShareText(reservation)}\n${
+            t('reservations.share_te_espero') || 'Te espero en Xoco Café.'
+          }`;
           if (typeof navigator !== 'undefined' && navigator.clipboard) {
             await navigator.clipboard.writeText(fallback);
-            setReservationTicketActionError('Copiamos los detalles de la reserva al portapapeles.');
+            setReservationTicketActionError(
+              t('reservations.copied_to_clipboard') ||
+                'Copiamos los detalles de la reserva al portapapeles.'
+            );
             return;
           }
           window.alert('Comparte manualmente: ' + fallback);
@@ -1029,8 +1059,10 @@ export default function ReservePage() {
         }
         await navigator.share({
           files: [file],
-          title: 'Reserva Xoco Café',
-          text: `${buildReservationShareText(reservation)}\nTe espero en Xoco Café.`,
+          title: t('reservations.reserva_galeria') || 'Reserva Xoco Café',
+          text: `${buildReservationShareText(reservation)}\n${
+            t('reservations.share_te_espero') || 'Te espero en Xoco Café.'
+          }`,
         });
       } catch (error) {
         console.error('Error compartiendo reserva:', error);
@@ -1053,6 +1085,7 @@ export default function ReservePage() {
       canShareReservation,
       captureReservationTicket,
       reservationDeviceInfo.isAndroid,
+      t,
     ]
   );
 
@@ -1064,7 +1097,11 @@ export default function ReservePage() {
       apiCall: (token: string, reservationId: string) => Promise<void>
     ) => {
       if (!token) {
-        showSnackbar('Inicia sesión de nuevo para administrar la reservación.', 'error');
+        showSnackbar(
+          t('reservations.confirm_action_login') ||
+            'Inicia sesión de nuevo para administrar la reservación.',
+          'error'
+        );
         return;
       }
       try {
@@ -1081,11 +1118,11 @@ export default function ReservePage() {
         const message =
           error instanceof Error
             ? error.message
-            : 'No pudimos actualizar la reservación. Intenta de nuevo.';
+            : t('common.error') || 'No pudimos actualizar la reservación. Intenta de nuevo.';
         showSnackbar(message, 'error');
       }
     },
-    [loadReservations, showSnackbar, token]
+    [loadReservations, showSnackbar, token, t]
   );
 
   const handleCancelReservation = useCallback(
@@ -1093,30 +1130,39 @@ export default function ReservePage() {
       await handleReservationAction(
         reservation,
         'cancel',
-        'Reservación cancelada',
+        t('reservations.cancelled_success') || 'Reservación cancelada',
         cancelReservation
       );
     },
-    [handleReservationAction]
+    [handleReservationAction, t]
   );
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAlert(null);
 
     if (!token) {
-      setAlert({ type: 'error', text: 'Necesitas iniciar sesión para crear una reserva.' });
+      setAlert({
+        type: 'error',
+        text:
+          t('reservations.login_to_create') || 'Necesitas iniciar sesión para crear una reserva.',
+      });
       return;
     }
 
     if (!selectedDate || !selectedTime) {
-      setAlert({ type: 'error', text: 'Selecciona una fecha y hora válidas.' });
+      setAlert({
+        type: 'error',
+        text: t('reservations.select_valid_date_time') || 'Selecciona una fecha y hora válidas.',
+      });
       return;
     }
 
     if (hasReachedReservationLimit) {
       setAlert({
         type: 'error',
-        text: 'Solo puedes tener 3 reservas activas. Cancela una o espera a que termine.',
+        text:
+          t('reservations.res_limit_error') ||
+          'Solo puedes tener 3 reservas activas. Cancela una o espera a que termine.',
       });
       return;
     }
@@ -1150,14 +1196,22 @@ export default function ReservePage() {
       const reservationCode = payload.data?.reservationCode || '---';
       setAlert({
         type: 'success',
-        text: `¡Reserva confirmada! Tu código es: ${reservationCode}`,
+        text:
+          t('reservations.res_confirmada_msg')?.replace('{code}', reservationCode) ||
+          `¡Reserva confirmada! Tu código es: ${reservationCode}`,
       });
-      showSnackbar(`Reserva ${reservationCode} creada correctamente.`, 'success', {
-        deviceNotification: {
-          title: 'Reserva creada',
-          body: `Código ${reservationCode}`,
-        },
-      });
+      showSnackbar(
+        (
+          t('reservations.res_confirmada_msg') || '¡Reserva confirmada! Tu código es: {code}'
+        ).replace('{code}', reservationCode),
+        'success',
+        {
+          deviceNotification: {
+            title: 'Reserva creada',
+            body: `Código ${reservationCode}`,
+          },
+        }
+      );
       setMessage('');
       setPreOrderItems('');
       if (timeJustBooked) {
@@ -1250,10 +1304,13 @@ export default function ReservePage() {
                       ←
                     </button>
                     <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                      {displayMonth.toLocaleDateString('es-MX', {
-                        month: 'long',
-                        year: 'numeric',
-                      })}
+                      {displayMonth.toLocaleDateString(
+                        currentLanguage === 'es' ? 'es-MX' : 'en-US',
+                        {
+                          month: 'long',
+                          year: 'numeric',
+                        }
+                      )}
                     </p>
                     <button
                       type="button"
@@ -1299,7 +1356,7 @@ export default function ReservePage() {
                     toMonth={maxMonth}
                     disableNavigation
                     showOutsideDays={false}
-                    locale={esLocale}
+                    locale={dateLocale}
                     formatters={dayPickerFormatters}
                     modifiersClassNames={{
                       selected: 'bg-primary-600 text-white',
@@ -1317,13 +1374,17 @@ export default function ReservePage() {
               )}
               <p className="px-1 pb-1 text-xs text-gray-500 dark:text-gray-400">
                 <span className="font-semibold underline decoration-primary-400/60 underline-offset-4">
-                  Fechas disponibles desde hoy hasta{' '}
-                  {maxReservationDate.toLocaleDateString('es-MX', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  })}
-                  .
+                  {t('reservations.dates_available_until').replace(
+                    '{date}',
+                    maxReservationDate.toLocaleDateString(
+                      currentLanguage === 'es' ? 'es-MX' : 'en-US',
+                      {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      }
+                    )
+                  )}
                 </span>
               </p>
             </div>
@@ -1406,7 +1467,10 @@ export default function ReservePage() {
             onChange={(event) => setMessage(event.target.value)}
             rows={4}
             className="mt-2 block w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-            placeholder="Cuéntanos si celebras algo especial o si tienes alguna preferencia."
+            placeholder={
+              t('reservations.message_placeholder') ||
+              'Cuéntanos si celebras algo especial o si tienes alguna preferencia.'
+            }
           />
         </div>
         <div className="grid gap-6 md:grid-cols-2">
@@ -1435,29 +1499,57 @@ export default function ReservePage() {
 
       <div className="space-y-6 rounded-2xl border border-primary-100 bg-primary-50/60 p-5 shadow-inner dark:border-primary-700/40 dark:bg-primary-900/20">
         <div>
-          <h2 className="text-lg font-semibold text-primary-900 dark:text-primary-100">Resumen</h2>
+          <h2 className="text-lg font-semibold text-primary-900 dark:text-primary-100">
+            <TranslatedText tid="reservations.summary" fallback="Resumen" />
+          </h2>
           <p className="mt-1 text-sm text-primary-700 dark:text-primary-200">
-            Confirma que los datos sean correctos antes de enviar.
+            <TranslatedText
+              tid="reservations.confirm_resumen"
+              fallback="Confirma que los datos sean correctos antes de enviar."
+            />
           </p>
         </div>
 
         <ul className="space-y-3 text-sm text-primary-900 dark:text-primary-100">
           <li>
-            <span className="font-medium">Personas:</span> {selectedPeople}
+            <span className="font-medium">
+              <TranslatedText tid="reservations.people_selected" fallback="Personas" />:
+            </span>{' '}
+            {t('reservations.num_people')
+              ?.replace('{count}', String(selectedPeople))
+              ?.replace(
+                '{label}',
+                selectedPeople === 1
+                  ? t('reservations.person') || 'persona'
+                  : t('reservations.people_label') || 'personas'
+              ) || `${selectedPeople} ${selectedPeople === 1 ? 'persona' : 'personas'}`}
           </li>
           <li>
-            <span className="font-medium">Fecha seleccionada:</span>{' '}
-            {selectedDate ? selectedDate.toLocaleDateString('es-MX') : 'Pendiente'}
+            <span className="font-medium">
+              <TranslatedText tid="reservations.date_selected" fallback="Fecha seleccionada" />:
+            </span>{' '}
+            {selectedDate
+              ? selectedDate.toLocaleDateString(currentLanguage === 'es' ? 'es-MX' : 'en-US')
+              : t('common.pending') || 'Pendiente'}
           </li>
           <li>
-            <span className="font-medium">Hora:</span> {selectedTime ?? 'Pendiente'}
+            <span className="font-medium">
+              <TranslatedText tid="reservations.time_selected" fallback="Hora reservada" />:
+            </span>{' '}
+            {selectedTime ?? (t('common.pending') || 'Pendiente')}
           </li>
           <li>
-            <span className="font-medium">Sucursal:</span> {BRANCH_LABEL} (#{BRANCH_NUMBER})
+            <span className="font-medium">
+              <TranslatedText tid="reservations.branch" fallback="Sucursal" />:
+            </span>{' '}
+            {BRANCH_LABEL} (#{BRANCH_NUMBER})
           </li>
           {preOrderItems.trim() && (
             <li>
-              <span className="font-medium">Pre-orden:</span> {preOrderItems.trim()}
+              <span className="font-medium">
+                <TranslatedText tid="reservations.pre_order" fallback="Pre-orden" />:
+              </span>{' '}
+              {preOrderItems.trim()}
             </li>
           )}
         </ul>
@@ -1479,7 +1571,11 @@ export default function ReservePage() {
           disabled={isSubmitting || hasReachedReservationLimit}
           className="w-full rounded-full bg-primary-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isSubmitting ? 'Creando reserva...' : 'Confirmar reserva'}
+          {isSubmitting ? (
+            <TranslatedText tid="reservations.creating_reservation" fallback="Creando reserva..." />
+          ) : (
+            <TranslatedText tid="reservations.confirm_reservation" fallback="Confirmar reserva" />
+          )}
         </button>
         {hasReachedReservationLimit && (
           <p className="text-xs text-red-600 dark:text-red-400">
@@ -1499,12 +1595,17 @@ export default function ReservePage() {
       <div className="mx-auto max-w-4xl px-4 py-10 lg:px-0">
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="text-center md:text-left">
-            <p className="text-xs uppercase tracking-[0.35em] text-primary-500">Reservaciones</p>
+            <p className="text-xs uppercase tracking-[0.35em] text-primary-500">
+              <TranslatedText tid="nav.reservas" fallback="Reservaciones" />
+            </p>
             <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">
-              Reserva tu mesa en Xoco Café
+              <TranslatedText tid="reservations.title" fallback="Reserva tu mesa en Xoco Café" />
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Selecciona fecha, hora y asistentes; te daremos un código QR único para tu llegada.
+              <TranslatedText
+                tid="reservations.subtitle"
+                fallback="Selecciona fecha, hora y asistentes; te daremos un código QR único para tu llegada."
+              />
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -1516,14 +1617,18 @@ export default function ReservePage() {
                   className="rounded-full bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-primary-700"
                   aria-expanded={showReservationForm}
                 >
-                  {showReservationForm ? 'Ocultar formulario' : 'Nueva reservación'}
+                  {showReservationForm ? (
+                    <TranslatedText tid="reservations.hide_form" fallback="Ocultar formulario" />
+                  ) : (
+                    <TranslatedText tid="reservations.create_btn" fallback="Nueva reservación" />
+                  )}
                 </button>
                 <button
                   type="button"
                   onClick={handleRefreshReservations}
                   className="rounded-full border border-primary-600 px-5 py-2.5 text-sm font-semibold text-primary-600 hover:bg-primary-50 dark:border-primary-400 dark:text-primary-200"
                 >
-                  Actualizar lista
+                  <TranslatedText tid="reservations.refresh_btn" fallback="Actualizar lista" />
                 </button>
               </>
             ) : (
@@ -1531,7 +1636,7 @@ export default function ReservePage() {
                 href="/login"
                 className="rounded-full bg-primary-600 px-5 py-2 text-center text-xs font-semibold tracking-[0.25em] uppercase text-white shadow hover:bg-primary-700"
               >
-                Iniciar sesión
+                <TranslatedText tid="orders.login" fallback="Iniciar sesión" />
               </Link>
             )}
           </div>
@@ -1545,10 +1650,18 @@ export default function ReservePage() {
           />
         )}
         <div className="mb-8 rounded-3xl border border-primary-100 bg-white p-5 text-sm text-gray-700 shadow-sm dark:border-primary-900/40 dark:bg-gray-900 dark:text-gray-200">
-          Recibirás un código único para presentarlo a los anfitriones al llegar.
+          <TranslatedText
+            tid="reservations.qr_notice"
+            fallback="Recibirás un código único para presentarlo a los anfitriones al llegar."
+          />
         </div>
         <div className="mb-8 flex flex-wrap items-center justify-center gap-2 rounded-3xl bg-primary-600 px-4 py-3 text-sm text-white shadow-lg dark:bg-primary-900/30 dark:text-primary-100">
-          <span>Si necesitas ayuda, mándanos un</span>
+          <span>
+            <TranslatedText
+              tid="orders.whatsapp_help_prompt"
+              fallback="Si necesitas ayuda, mándanos un"
+            />
+          </span>
           <a
             href={siteMetadata.whats}
             target="_blank"
@@ -1559,7 +1672,12 @@ export default function ReservePage() {
           >
             <FaWhatsapp />
           </a>
-          <span>y con todo gusto te ayudamos.</span>
+          <span>
+            <TranslatedText
+              tid="profile.whatsapp_help_end"
+              fallback="y con todo gusto te ayudamos."
+            />
+          </span>
         </div>
         {isAuthenticated ? (
           <>
@@ -1577,14 +1695,22 @@ export default function ReservePage() {
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <p className="text-xs uppercase tracking-[0.35em] text-primary-500">
-                        Crear reservación
+                        <TranslatedText
+                          tid="reservations.new_reservation"
+                          fallback="Crear reservación"
+                        />
                       </p>
                       <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-                        Completa los datos de tu visita
+                        <TranslatedText
+                          tid="reservations.form_title"
+                          fallback="Completa los datos de tu visita"
+                        />
                       </h2>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Selecciona fecha, hora, asistentes, agrega mensaje y revisa el resumen antes
-                        de confirmar.
+                        <TranslatedText
+                          tid="reservations.form_desc"
+                          fallback="Selecciona fecha, hora, asistentes, agrega mensaje y revisa el resumen antes de confirmar."
+                        />
                       </p>
                     </div>
                     <button
@@ -1592,7 +1718,7 @@ export default function ReservePage() {
                       onClick={handleOpenReservationForm}
                       className="rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                     >
-                      Cerrar formulario
+                      <TranslatedText tid="reservations.close_form" fallback="Cerrar formulario" />
                     </button>
                   </div>
                   <ReservationFormContent />
@@ -1607,12 +1733,19 @@ export default function ReservePage() {
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-[0.35em] text-primary-500">
-                    Reservas compartidas
+                    <TranslatedText
+                      tid="reservations.reservations_panel"
+                      fallback="Panel de reservaciones"
+                    />
                   </p>
-                  <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Panel</h2>
+                  <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                    <TranslatedText tid="reservations.panel_title" fallback="Panel" />
+                  </h2>
                   <p className="text-sm text-gray-600 dark:text-gray-300">
-                    Organiza tus reservaciones en columnas pendientes/completadas, accede al
-                    historial y cancela desde el mismo panel.
+                    <TranslatedText
+                      tid="reservations.panel_subtitle"
+                      fallback="Organiza tus reservaciones en columnas pendientes/completadas, accede al historial y cancela desde el mismo panel."
+                    />
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -1627,7 +1760,14 @@ export default function ReservePage() {
                     }`}
                     aria-expanded={showReservationForm}
                   >
-                    {showReservationForm ? 'Ocultar formulario' : 'Crear nueva reserva'}
+                    {showReservationForm ? (
+                      <TranslatedText tid="reservations.hide_form" fallback="Ocultar formulario" />
+                    ) : (
+                      <TranslatedText
+                        tid="reservations.create_new_btn"
+                        fallback="Crear nueva reserva"
+                      />
+                    )}
                   </button>
                   <button
                     type="button"
@@ -1635,14 +1775,21 @@ export default function ReservePage() {
                     disabled={isLoadingReservations}
                     className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {isLoadingReservations ? 'Actualizando...' : 'Actualizar lista'}
+                    {isLoadingReservations ? (
+                      <TranslatedText tid="common.loading" fallback="Actualizando..." />
+                    ) : (
+                      <TranslatedText tid="reservations.refresh_btn" fallback="Actualizar lista" />
+                    )}
                   </button>
                 </div>
               </div>
 
               {hasReachedReservationLimit && (
                 <div className="rounded-xl bg-amber-100 px-4 py-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">
-                  Tienes 3 reservas activas. Debes esperar a que alguna finalice para crear otra.
+                  <TranslatedText
+                    tid="reservations.res_limit_error"
+                    fallback="Solo puedes tener 3 reservas activas. Debes esperar a que alguna finalice para crear otra."
+                  />
                 </div>
               )}
 
@@ -1679,18 +1826,24 @@ export default function ReservePage() {
                 <div
                   className="grid gap-6 lg:grid-cols-2"
                   aria-live="polite"
-                  aria-label="Tablero de reservas"
+                  aria-label={t('reservations.panel_title') || 'Tablero de reservas'}
                 >
                   <ReservationColumn
-                    title="Pendientes"
+                    title={t('reservations.status_pending') || 'Pendientes'}
                     reservations={pendingReservations}
-                    emptyLabel="No tienes reservas pendientes. Agenda una para asegurar tu lugar."
+                    emptyLabel={
+                      t('reservations.no_pending') ||
+                      'No tienes reservas pendientes. Agenda una para asegurar tu lugar.'
+                    }
                     onSelect={(reservation) => setSelectedReservation(reservation)}
                   />
                   <ReservationColumn
-                    title="Completadas"
+                    title={t('reservations.status_completed') || 'Completadas'}
                     reservations={completedReservations}
-                    emptyLabel="Aún no completas reservaciones recientes."
+                    emptyLabel={
+                      t('reservations.no_completed_reservations') ||
+                      'Aún no completas reservaciones recientes.'
+                    }
                     onSelect={(reservation) => setSelectedReservation(reservation)}
                   />
                 </div>
@@ -1701,16 +1854,24 @@ export default function ReservePage() {
               <section className="mt-6 space-y-6 rounded-3xl border border-gray-200 bg-white p-6 text-gray-900 shadow-lg dark:border-white/10 dark:bg-[#070d1a] dark:text-white">
                 <div>
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    Reservas no completadas
+                    <TranslatedText
+                      tid="reservations.uncompleted_title"
+                      fallback="Reservas no completadas"
+                    />
                   </h2>
                   <p className="text-sm text-gray-700 dark:text-white">
-                    Si no acudiste antes del corte (23:59), movemos la reserva aquí en color naranja
-                    y eliminamos su QR. El registro se conserva por 7 días.
+                    <TranslatedText
+                      tid="reservations.uncompleted_desc"
+                      fallback="Si no acudiste antes del corte (23:59), movemos la reserva aquí en color naranja y eliminamos su QR. El registro se conserva por 7 días."
+                    />
                   </p>
                 </div>
                 {failedReservations.length === 0 ? (
                   <p className="text-sm text-gray-600 dark:text-white">
-                    No tienes reservas pendientes de seguimiento. ¡Todo al corriente!
+                    <TranslatedText
+                      tid="reservations.no_uncompleted"
+                      fallback="No tienes reservas pendientes de seguimiento. ¡Todo al corriente!"
+                    />
                   </p>
                 ) : (
                   <ul className="space-y-4">
@@ -1719,7 +1880,7 @@ export default function ReservePage() {
                         reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
                       const statusVisuals = getStatusVisuals('failed', t, 'failed');
                       const cleanupDate = new Date(reservation.cleanupAt).toLocaleDateString(
-                        'es-MX',
+                        currentLanguage === 'es' ? 'es-MX' : 'en-US',
                         {
                           weekday: 'long',
                           day: 'numeric',
@@ -1728,7 +1889,7 @@ export default function ReservePage() {
                       );
                       const formattedDate = formatReservationDate(
                         reservation.reservationDate,
-                        'es-MX',
+                        t('common.locale') === 'en' ? 'en-US' : 'es-MX',
                         {
                           weekday: 'long',
                           day: 'numeric',
@@ -1745,7 +1906,9 @@ export default function ReservePage() {
                               className={`h-2.5 w-2.5 rounded-full ${statusVisuals.dotClass}`}
                               aria-hidden="true"
                             />
-                            <span>Código</span>
+                            <span>
+                              <TranslatedText tid="reservations.code" fallback="Código" />
+                            </span>
                             <span className="rounded-full bg-gray-200 px-2 py-0.5 font-semibold text-gray-800 dark:bg-gray-700 dark:text-gray-100">
                               {reservation.reservationCode}
                             </span>
@@ -1756,14 +1919,17 @@ export default function ReservePage() {
                             </p>
                             <p>
                               {reservation.peopleCount}{' '}
-                              {reservation.peopleCount === 1 ? 'persona' : 'personas'} ·{' '}
-                              {branchLabel}
+                              {reservation.peopleCount === 1
+                                ? t('reservations.person') || 'persona'
+                                : t('reservations.people_label') || 'personas'}{' '}
+                              · {branchLabel}
                               {reservation.branchNumber ? ` (#${reservation.branchNumber})` : ''}
                             </p>
                             {reservation.message && <p>Mensaje: {reservation.message}</p>}
                             {reservation.preOrderItems && (
                               <p className="text-primary-700 dark:text-primary-200">
-                                Pre-orden: {reservation.preOrderItems}
+                                <TranslatedText tid="reservations.pre_order" fallback="Pre-orden" />
+                                : {reservation.preOrderItems}
                               </p>
                             )}
                             <span
@@ -1772,7 +1938,8 @@ export default function ReservePage() {
                               {statusVisuals.label}
                             </span>
                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                              Registro disponible hasta {cleanupDate}.
+                              {t('reservations.cleanup_notice')?.replace('{time}', cleanupDate) ||
+                                `Registro disponible hasta ${cleanupDate}.`}
                             </p>
                           </div>
                         </li>
@@ -1799,7 +1966,7 @@ export default function ReservePage() {
             {showReservationHistory && (
               <DetailModal onClose={() => setShowReservationHistory(false)}>
                 <ReservationHistoryContent
-                  title="Reservas pasadas"
+                  title={t('reservations.past_history_title') || 'Reservas pasadas'}
                   reservations={basePastReservations}
                   onClose={() => setShowReservationHistory(false)}
                   hasFilter={Boolean(reservationFilter.trim())}
@@ -1813,7 +1980,7 @@ export default function ReservePage() {
             {showReservationCompletedHistory && (
               <DetailModal onClose={() => setShowReservationCompletedHistory(false)}>
                 <ReservationHistoryContent
-                  title="Reservas completadas"
+                  title={t('reservations.completed_history_title') || 'Reservas completadas'}
                   reservations={completedReservationsLastWeek}
                   onClose={() => setShowReservationCompletedHistory(false)}
                   hasFilter={Boolean(reservationFilter.trim())}
@@ -1828,13 +1995,16 @@ export default function ReservePage() {
         ) : (
           <div className="rounded-3xl border border-dashed border-gray-300 bg-white px-6 py-10 text-center text-sm text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
             <p className="mb-4">
-              Necesitas iniciar sesión para crear o consultar tus reservaciones.
+              <TranslatedText
+                tid="reservations.login_to_reserve"
+                fallback="Necesitas iniciar sesión para crear o consultar tus reservaciones."
+              />
             </p>
             <Link
               href="/login"
               className="inline-flex items-center justify-center rounded-full bg-primary-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-primary-700"
             >
-              Ir a iniciar sesión
+              <TranslatedText tid="orders.login_btn" fallback="Ir a iniciar sesión" />
             </Link>
           </div>
         )}
@@ -1857,6 +2027,7 @@ const ReservationColumn = ({
   emptyLabel: string;
   onSelect: (reservation: ReservationRecord) => void;
 }) => {
+  const { t } = useLanguage();
   const pagination = usePagination(reservations, 3);
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-5 text-gray-900 shadow-lg dark:border-white/10 dark:bg-[#070d1a] dark:text-white">
@@ -1865,11 +2036,17 @@ const ReservationColumn = ({
           <p className="text-xs uppercase tracking-[0.35em] text-gray-500 dark:text-primary-200">
             {title}
           </p>
-          <p className={`text-lg font-semibold ${highlight}`}>{reservations.length} reservas</p>
+          <p className={`text-lg font-semibold ${highlight}`}>
+            {t('reservations.num_reservations')?.replace('{count}', String(reservations.length)) ||
+              `${reservations.length} reservas`}
+          </p>
         </div>
         <span className="text-xs text-gray-500 dark:text-white/60">
           {pagination.totalItems > 3
-            ? `Mostrando ${pagination.items.length} de ${pagination.totalItems}`
+            ? t('orders.page_of')
+                ?.replace('{page}', String(pagination.items.length))
+                ?.replace('{total}', String(pagination.totalItems)) ||
+              `Mostrando ${pagination.items.length} de ${pagination.totalItems}`
             : null}
         </span>
       </div>
@@ -1909,29 +2086,36 @@ const ColumnPager = ({
   totalItems: number;
   onPrev: () => void;
   onNext: () => void;
-}) => (
-  <div className="mt-4 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-    <button
-      type="button"
-      onClick={onPrev}
-      className="rounded-full border border-gray-200 px-3 py-1 font-semibold hover:border-primary-400 hover:text-primary-600 dark:border-gray-700"
-      disabled={page === 0}
-    >
-      Anterior
-    </button>
-    <span>
-      Página {page + 1} de {totalPages} · {totalItems} registros
-    </span>
-    <button
-      type="button"
-      onClick={onNext}
-      className="rounded-full border border-gray-200 px-3 py-1 font-semibold hover:border-primary-400 hover:text-primary-600 dark:border-gray-700"
-      disabled={page >= totalPages - 1}
-    >
-      Siguiente
-    </button>
-  </div>
-);
+}) => {
+  const { t } = useLanguage();
+  return (
+    <div className="mt-4 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+      <button
+        type="button"
+        onClick={onPrev}
+        className="rounded-full border border-gray-200 px-3 py-1 font-semibold hover:border-primary-400 hover:text-primary-600 dark:border-gray-700"
+        disabled={page === 0}
+      >
+        <TranslatedText tid="orders.prev" fallback="Anterior" />
+      </button>
+      <span>
+        {t('orders.pager_text')
+          ?.replace('{page}', String(page + 1))
+          ?.replace('{total}', String(totalPages))
+          ?.replace('{count}', String(totalItems)) ||
+          `Página ${page + 1} de ${totalPages} · ${totalItems} registros`}
+      </span>
+      <button
+        type="button"
+        onClick={onNext}
+        className="rounded-full border border-gray-200 px-3 py-1 font-semibold hover:border-primary-400 hover:text-primary-600 dark:border-gray-700"
+        disabled={page >= totalPages - 1}
+      >
+        <TranslatedText tid="orders.next" fallback="Siguiente" />
+      </button>
+    </div>
+  );
+};
 
 const ReservationCard = ({
   reservation,
@@ -1940,7 +2124,7 @@ const ReservationCard = ({
   reservation: ReservationRecord;
   onSelect: (reservation: ReservationRecord) => void;
 }) => {
-  const { t } = useLanguage();
+  const { t, currentLanguage } = useLanguage();
   const visuals = getStatusVisuals(reservation.status, t);
   const parsedDate = parseReservationDate(reservation);
   return (
@@ -1970,7 +2154,7 @@ const ReservationCard = ({
         <div className="space-y-1">
           <p className="text-lg font-bold text-gray-900 dark:text-gray-100 line-clamp-1">
             {parsedDate
-              ? parsedDate.toLocaleString('es-MX', {
+              ? parsedDate.toLocaleString(currentLanguage === 'es' ? 'es-MX' : 'en-US', {
                   weekday: 'short',
                   day: '2-digit',
                   month: 'short',
@@ -1989,7 +2173,7 @@ const ReservationCard = ({
 
         <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
           <span className="text-[11px] text-primary-600 dark:text-primary-400 font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-            Ver detalle →
+            <TranslatedText tid="reservations.view_detail" fallback="Ver detalle" /> →
           </span>
           <div className="w-8 h-8 rounded-full bg-gray-50 dark:bg-white/5 flex items-center justify-center">
             <FiCalendar className="text-gray-400 dark:text-gray-500" />
@@ -2017,6 +2201,7 @@ const ReservationsSearchBar = ({
   showCompletedButton?: boolean;
   disablePastButton?: boolean;
 }) => {
+  const { t } = useLanguage();
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -2024,7 +2209,7 @@ const ReservationsSearchBar = ({
     const trimmed = value.trim();
     const looksLikeEmail = /\S+@\S+\.\S+/.test(trimmed);
     if (looksLikeEmail) {
-      setError('Ingresa código o fecha (evita correos).');
+      setError(t('reservations.search_error_email') || 'Ingresa código o fecha (evita correos).');
       return;
     }
     setError(null);
@@ -2057,7 +2242,7 @@ const ReservationsSearchBar = ({
                 setError(null);
               }
             }}
-            placeholder="Código o fecha (ej. 2024-05-12)"
+            placeholder={t('reservations.search_placeholder') || 'Código o fecha (ej. 2024-05-12)'}
             className="mt-1 rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />
         </label>
@@ -2115,6 +2300,7 @@ const ReservationsSearchBar = ({
 
 const DetailModal = ({ children, onClose }: { children: ReactNode; onClose: () => void }) => {
   const headerHeight = useHeaderHeight();
+  const { t } = useLanguage();
   const modalVars = useMemo(() => {
     const safeHeaderHeight = Number.isFinite(headerHeight) ? headerHeight : 96;
     const mobileTopOffset = Math.round(Math.max(safeHeaderHeight * 0.45, 48));
@@ -2174,7 +2360,7 @@ const DetailModal = ({ children, onClose }: { children: ReactNode; onClose: () =
           type="button"
           onClick={onClose}
           className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
-          aria-label="Cerrar detalle"
+          aria-label={t('orders.close') || 'Cerrar detalle'}
         >
           ×
         </button>
@@ -2203,7 +2389,7 @@ const ReservationDetailContent = ({
   shareState?: { error: string | null; isProcessing: boolean };
   isMobile?: boolean;
 }) => {
-  const { t } = useLanguage();
+  const { t, currentLanguage } = useLanguage();
   const visuals = getStatusVisuals(reservation.status, t);
   const isExpired =
     reservation.status === 'past' ||
@@ -2216,7 +2402,7 @@ const ReservationDetailContent = ({
   const qrIsActive = Date.now() < qrExpiresAt.getTime();
   const branchLabel = reservation.branchId === BRANCH_ID ? BRANCH_LABEL : reservation.branchId;
   const resolvedCustomerName =
-    currentUserName || user?.firstName || user?.email || 'Cliente Xoco Café';
+    currentUserName || user?.firstName || user?.email || t('orders.client') || 'Cliente Xoco Café';
 
   const qrPayload = {
     type: 'reservation',
@@ -2243,7 +2429,7 @@ const ReservationDetailContent = ({
     JSON.stringify(qrPayload)
   )}`;
 
-  const displayDateTime = formatReservationDateTime(reservation);
+  const displayDateTime = formatReservationDateTime(reservation, t);
   const showCancelButton =
     onCancelReservation && (reservation.status === 'active' || reservation.status === 'pending');
 
@@ -2262,7 +2448,7 @@ const ReservationDetailContent = ({
             </span>
           </div>
           <p className="text-xs font-medium uppercase tracking-[0.4em] text-gray-400">
-            {reservation.reservationCode}
+            {t('reservations.code') || 'Código'}: {reservation.reservationCode}
           </p>
         </div>
 
@@ -2289,12 +2475,18 @@ const ReservationDetailContent = ({
             <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">
               {t('reservations.valid_until')?.replace(
                 '{time}',
-                qrExpiresAt.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
-              ) ||
-                `QR válido hasta las ${qrExpiresAt.toLocaleTimeString('es-MX', {
+                qrExpiresAt.toLocaleTimeString(currentLanguage === 'es' ? 'es-MX' : 'en-US', {
                   hour: '2-digit',
                   minute: '2-digit',
-                })}`}
+                })
+              ) ||
+                `QR válido hasta las ${qrExpiresAt.toLocaleTimeString(
+                  currentLanguage === 'es' ? 'es-MX' : 'en-US',
+                  {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  }
+                )}`}
             </p>
             <p className="mt-1 text-[9px] font-medium text-gray-400 max-w-[200px] leading-relaxed">
               {t('reservations.expiration_notice')?.replace(
@@ -2307,7 +2499,10 @@ const ReservationDetailContent = ({
 
         <div className="w-full space-y-4 pt-6 border-t border-gray-100 dark:border-white/5">
           <DetailRow label={t('reservations.state') || 'Estado'} value={visuals.label} />
-          <DetailRow label="Fecha y Hora" value={displayDateTime} />
+          <DetailRow
+            label={t('reservations.date_time') || 'Fecha y Hora'}
+            value={displayDateTime}
+          />
           <DetailRow
             label={t('reservations.people') || 'Personas'}
             value={reservation.peopleCount.toString()}
@@ -2366,13 +2561,17 @@ const ReservationDetailContent = ({
         <div className="flex flex-col gap-4">
           {reservation.preOrderItems && (
             <div className="rounded-3xl border border-white/10 bg-[#161d30] px-4 py-3 text-sm text-white">
-              <p className="text-xs uppercase tracking-[0.35em] text-white/70">Pre-orden</p>
+              <p className="text-xs uppercase tracking-[0.35em] text-white/70">
+                <TranslatedText tid="reservations.pre_order" fallback="Pre-orden" />
+              </p>
               <p className="mt-1 whitespace-pre-line">{reservation.preOrderItems}</p>
             </div>
           )}
           {reservation.message && (
             <div className="rounded-3xl border border-white/10 bg-[#161d30] px-4 py-3 text-sm text-white">
-              <p className="text-xs uppercase tracking-[0.35em] text-white/70">Mensaje</p>
+              <p className="text-xs uppercase tracking-[0.35em] text-white/70">
+                <TranslatedText tid="common.message" fallback="Mensaje" />
+              </p>
               <p className="mt-1">{reservation.message}</p>
             </div>
           )}
@@ -2437,6 +2636,7 @@ const ReservationHistoryContent = ({
   hasFilter: boolean;
   onSelect: (reservation: ReservationRecord) => void;
 }) => {
+  const { t } = useLanguage();
   const [query, setQuery] = useState('');
   const filtered = useMemo(() => {
     if (!query.trim()) {
@@ -2455,8 +2655,10 @@ const ReservationHistoryContent = ({
           <p className="text-xs uppercase tracking-[0.35em] text-primary-500">{title}</p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {hasFilter
-              ? 'Los filtros se aplican a estos resultados.'
-              : 'Incluye registros de los últimos días.'}
+              ? t('reservations.history_filter_notice') ||
+                'Los filtros se aplican a estos resultados.'
+              : t('reservations.history_no_filter_notice') ||
+                'Incluye registros de los últimos días.'}
           </p>
         </div>
         <button
@@ -2464,25 +2666,29 @@ const ReservationHistoryContent = ({
           onClick={onClose}
           className="text-xs font-semibold uppercase tracking-[0.3em] text-gray-400 hover:text-gray-600"
         >
-          Cerrar
+          {t('common.close') || 'Cerrar'}
         </button>
       </div>
+      {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
       <label
         className="flex flex-col text-xs text-gray-500 dark:text-gray-400"
         htmlFor="history-search"
       >
-        Buscar en historial
+        <TranslatedText tid="reservations.search_history" fallback="Buscar en historial" />
         <input
           id="history-search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Código, fecha o sucursal"
+          placeholder={t('reservations.history_search_placeholder') || 'Código, fecha o sucursal'}
           className="mt-1 rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
         />
       </label>
       {filtered.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900">
-          No encontramos reservaciones con ese criterio.
+          <TranslatedText
+            tid="reservations.no_results_history"
+            fallback="No encontramos reservaciones con ese criterio."
+          />
         </p>
       ) : (
         <div className="space-y-3">

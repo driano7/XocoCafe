@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState, type TouchEvent } from 'react
 import type { MenuItem } from '@/data/menuItems';
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 
+import { useLanguage } from '@/components/Language/LanguageProvider';
+
 type ReelCarouselProps = {
   items: MenuItem[];
   variant?: 'light' | 'dark';
@@ -15,6 +17,7 @@ const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=900&h=1100&fit=crop';
 
 export default function ReelCarousel({ items, variant = 'dark' }: ReelCarouselProps) {
+  const { currentLanguage } = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [showSwipeHint, setShowSwipeHint] = useState(true);
@@ -113,14 +116,18 @@ export default function ReelCarousel({ items, variant = 'dark' }: ReelCarouselPr
                 isDark ? 'bg-white/10' : 'bg-gray-200'
               }`}
             >
-              <img src={safeImage} alt={currentItem.name} className="h-full w-full object-cover" />
+              <img
+                src={safeImage}
+                alt={currentLanguage === 'en' ? currentItem.nameEn : currentItem.name}
+                className="h-full w-full object-cover"
+              />
 
               <span
                 className={`absolute left-4 top-4 rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-wide backdrop-blur ${
                   isDark ? 'bg-black/40 text-white' : 'bg-black/10 text-gray-900'
                 }`}
               >
-                {currentItem.category}
+                {currentLanguage === 'en' ? currentItem.categoryEn : currentItem.category}
               </span>
             </motion.div>
           </AnimatePresence>
@@ -170,7 +177,9 @@ export default function ReelCarousel({ items, variant = 'dark' }: ReelCarouselPr
                 <span className={isDark ? 'text-white/40' : 'text-gray-500'}>/</span>
                 <span>{items.length}</span>
               </div>
-              <h2 className="mt-4 text-4xl font-black">{currentItem.name}</h2>
+              <h2 className="mt-4 text-4xl font-black">
+                {currentLanguage === 'en' ? currentItem.nameEn : currentItem.name}
+              </h2>
               <p
                 className={`mt-2 text-lg font-semibold ${
                   isDark ? 'text-[#ffb4a2]' : 'text-primary-600'
@@ -180,7 +189,7 @@ export default function ReelCarousel({ items, variant = 'dark' }: ReelCarouselPr
                 {currentItem.priceGrande ? ` · ${currentItem.priceGrande}` : ''}
               </p>
               <p className={`mt-4 text-base ${isDark ? 'text-white/80' : 'text-gray-600'}`}>
-                {currentItem.description}
+                {currentLanguage === 'en' ? currentItem.descriptionEn : currentItem.description}
               </p>
               {currentItem.calories ? (
                 <span
@@ -223,7 +232,7 @@ export default function ReelCarousel({ items, variant = 'dark' }: ReelCarouselPr
                 ? 'w-4 bg-white/30'
                 : 'w-4 bg-gray-400'
             }`}
-            aria-label={`Ir a ${item.name}`}
+            aria-label={`Ir a ${currentLanguage === 'en' ? item.nameEn : item.name}`}
           />
         ))}
       </div>

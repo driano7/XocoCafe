@@ -37,6 +37,7 @@ import {
   verifyResetCodeSchema,
   type RequestPasswordResetInput,
 } from '@/lib/validations/auth';
+import { useLanguage } from '@/components/Language/LanguageProvider';
 
 interface ForgotPasswordFormProps {
   onBack: () => void;
@@ -54,6 +55,7 @@ const resetStepSchema = resetPasswordWithCodeSchema.pick({
 type ResetStepInput = z.infer<typeof resetStepSchema>;
 
 export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) {
+  const { t } = useLanguage();
   const [step, setStep] = useState<Step>('request');
   const [email, setEmail] = useState('');
   const [requestId, setRequestId] = useState<string | null>(null);
@@ -131,14 +133,21 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
         setEmail(data.email);
         setRequestId(result.requestId ?? null);
         setExpiresAt(result.expiresAt ?? null);
-        setInfoMessage('Ingresa el código de 6 caracteres que enviamos a tu correo.');
+        setInfoMessage(
+          t('forgot_password.email_sent') ||
+            'Ingresa el código de 6 caracteres que enviamos a tu correo.'
+        );
         codeForm.reset();
         setStep('verify');
       } else {
-        alert(result.message || 'No pudimos enviar el código de verificación.');
+        alert(
+          result.message ||
+            t('auth.errors.send_failed') ||
+            'No pudimos enviar el código de verificación.'
+        );
       }
     } catch (error) {
-      alert('Error de conexión. Inténtalo de nuevo.');
+      alert(t('auth.errors.connection') || 'Error de conexión. Inténtalo de nuevo.');
     } finally {
       setIsRequesting(false);
     }
@@ -146,7 +155,10 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
 
   const handleVerifyCode = codeForm.handleSubmit(async (data) => {
     if (!requestId) {
-      alert('La solicitud de recuperación no es válida. Vuelve a intentarlo.');
+      alert(
+        t('auth.errors.invalid_request') ||
+          'La solicitud de recuperación no es válida. Vuelve a intentarlo.'
+      );
       return;
     }
 
@@ -171,7 +183,10 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
 
       if (result.success) {
         setCode(normalizedCode);
-        setInfoMessage('Código verificado. Ahora crea una nueva contraseña.');
+        setInfoMessage(
+          t('forgot_password.code_verified') ||
+            'Código verificado. Ahora crea una nueva contraseña.'
+        );
         resetForm.reset();
         setShowNewPassword(false);
         setShowConfirmPassword(false);
@@ -179,11 +194,14 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
       } else {
         codeForm.setError('code', {
           type: 'server',
-          message: result.message || 'Código inválido. Revisa e inténtalo de nuevo.',
+          message:
+            result.message ||
+            t('auth.errors.invalid_code') ||
+            'Código inválido. Revisa e inténtalo de nuevo.',
         });
       }
     } catch (error) {
-      alert('Error de conexión. Inténtalo de nuevo.');
+      alert(t('auth.errors.connection') || 'Error de conexión. Inténtalo de nuevo.');
     } finally {
       setIsVerifying(false);
     }
@@ -208,13 +226,16 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
       if (result.success) {
         setRequestId(result.requestId ?? null);
         setExpiresAt(result.expiresAt ?? null);
-        setInfoMessage('Generamos un nuevo código. Revisa tu correo nuevamente.');
+        setInfoMessage(
+          t('forgot_password.new_code_generated') ||
+            'Generamos un nuevo código. Revisa tu correo nuevamente.'
+        );
         codeForm.reset();
       } else {
-        alert(result.message || 'No pudimos reenviar el código.');
+        alert(result.message || t('auth.errors.resend_failed') || 'No pudimos reenviar el código.');
       }
     } catch (error) {
-      alert('Error de conexión. Inténtalo de nuevo.');
+      alert(t('auth.errors.connection') || 'Error de conexión. Inténtalo de nuevo.');
     } finally {
       setIsResending(false);
     }
@@ -222,7 +243,10 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
 
   const handleResetPassword = resetForm.handleSubmit(async (data) => {
     if (!requestId || !code) {
-      alert('La solicitud de recuperación no es válida. Vuelve a intentarlo.');
+      alert(
+        t('auth.errors.invalid_request') ||
+          'La solicitud de recuperación no es válida. Vuelve a intentarlo.'
+      );
       return;
     }
 
@@ -250,10 +274,12 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
         setInfoMessage(null);
         setStep('success');
       } else {
-        alert(result.message || 'No pudimos actualizar tu contraseña.');
+        alert(
+          result.message || t('auth.errors.reset_failed') || 'No pudimos actualizar tu contraseña.'
+        );
       }
     } catch (error) {
-      alert('Error de conexión. Inténtalo de nuevo.');
+      alert(t('auth.errors.connection') || 'Error de conexión. Inténtalo de nuevo.');
     } finally {
       setIsResetting(false);
     }
@@ -275,11 +301,11 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
               </svg>
             </div>
             <h2 className="text-3xl font-black text-primary-900 dark:text-white">
-              Contraseña actualizada
+              {t('forgot_password.success_title') || 'Contraseña actualizada'}
             </h2>
             <p className="text-sm text-primary-800/80 dark:text-primary-100/80">
-              Tu contraseña se restableció correctamente. Ahora puedes iniciar sesión con tus nuevas
-              credenciales.
+              {t('forgot_password.success_desc') ||
+                'Tu contraseña se restableció correctamente. Ahora puedes iniciar sesión con tus nuevas credenciales.'}
             </p>
             <button
               onClick={() => {
@@ -288,7 +314,7 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
               }}
               className="brand-primary-btn"
             >
-              Volver al Login
+              {t('forgot_password.back_to_login') || 'Volver al Login'}
             </button>
           </div>
         </div>
@@ -301,12 +327,18 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
       <div className="mx-auto w-full max-w-2xl space-y-10">
         <div>
           <h2 className="mt-6 text-center text-4xl font-black text-primary-900 dark:text-white">
-            Recuperar Contraseña
+            {t('forgot_password.title') || 'Recuperar Contraseña'}
           </h2>
           <p className="mt-2 text-center text-sm text-primary-800/80 dark:text-primary-100/80">
-            {step === 'request' && 'Ingresa tu email para recibir un código de verificación.'}
-            {step === 'verify' && 'Ingresa el código que enviamos a tu correo electrónico.'}
-            {step === 'reset' && 'Crea una nueva contraseña segura para tu cuenta.'}
+            {step === 'request' &&
+              (t('forgot_password.request_desc') ||
+                'Ingresa tu email para recibir un código de verificación.')}
+            {step === 'verify' &&
+              (t('forgot_password.verify_desc') ||
+                'Ingresa el código que enviamos a tu correo electrónico.')}
+            {step === 'reset' &&
+              (t('forgot_password.reset_desc') ||
+                'Crea una nueva contraseña segura para tu cuenta.')}
           </p>
         </div>
 
@@ -321,14 +353,14 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
             <form onSubmit={handleRequestCode} className="space-y-6">
               <div>
                 <label htmlFor="reset-email" className={labelClasses}>
-                  Email
+                  {t('forgot_password.email_label') || 'Email'}
                 </label>
                 <input
                   {...emailForm.register('email')}
                   type="email"
                   id="reset-email"
                   className={inputClasses}
-                  placeholder="tu@email.com"
+                  placeholder={t('auth.email_placeholder') || 'tu@email.com'}
                 />
                 {emailForm.formState.errors.email && (
                   <p className="mt-1 text-sm text-red-600">
@@ -339,10 +371,12 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
 
               <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:space-x-3">
                 <button type="button" onClick={handleCancel} className="brand-secondary-btn flex-1">
-                  Cancelar
+                  {t('orders.cancel') || 'Cancelar'}
                 </button>
                 <button type="submit" disabled={isRequesting} className="brand-primary-btn flex-1">
-                  {isRequesting ? 'Enviando...' : 'Enviar Código'}
+                  {isRequesting
+                    ? t('forgot_password.sending') || 'Enviando...'
+                    : t('forgot_password.send_code_btn') || 'Enviar Código'}
                 </button>
               </div>
             </form>
@@ -352,11 +386,15 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
             <form onSubmit={handleVerifyCode} className="space-y-6">
               <div>
                 <p className="mb-2 text-sm text-primary-800/80 dark:text-primary-100/90">
-                  Enviamos un código a <span className="font-medium">{email}</span>.
-                  {formattedExpiry && ` El código expira a las ${formattedExpiry}.`}
+                  {t('forgot_password.sending_to_email') || 'Enviamos un código a'}{' '}
+                  <span className="font-medium">{email}</span>.
+                  {formattedExpiry &&
+                    ` ${(
+                      t('forgot_password.code_expiry') || 'El código expira a las {time}.'
+                    ).replace('{time}', formattedExpiry)}`}
                 </p>
                 <label htmlFor="reset-code" className={labelClasses}>
-                  Código de verificación
+                  {t('forgot_password.code_label') || 'Código de verificación'}
                 </label>
                 <input
                   {...codeForm.register('code')}
@@ -383,10 +421,12 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
                   }}
                   className="brand-secondary-btn flex-1"
                 >
-                  Cambiar email
+                  {t('forgot_password.change_email') || 'Cambiar email'}
                 </button>
                 <button type="submit" disabled={isVerifying} className="brand-primary-btn flex-1">
-                  {isVerifying ? 'Verificando...' : 'Verificar Código'}
+                  {isVerifying
+                    ? t('forgot_password.verifying') || 'Verificando...'
+                    : t('forgot_password.verify_code_btn') || 'Verificar Código'}
                 </button>
               </div>
 
@@ -396,7 +436,9 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
                 disabled={isResending}
                 className="brand-tertiary-btn w-full justify-center disabled:opacity-50"
               >
-                {isResending ? 'Reenviando código...' : 'Reenviar código'}
+                {isResending
+                  ? t('forgot_password.resending') || 'Reenviando código...'
+                  : t('forgot_password.resend_btn') || 'Reenviar código'}
               </button>
             </form>
           )}
@@ -404,12 +446,14 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
           {step === 'reset' && (
             <form onSubmit={handleResetPassword} className="space-y-6">
               <div className="rounded-2xl border border-primary-100/70 bg-primary-50/80 px-4 py-3 text-sm font-semibold text-primary-900 dark:border-primary-900/40 dark:bg-primary-900/20 dark:text-primary-100">
-                Restableciendo contraseña para <span className="font-semibold">{email}</span>
+                {(
+                  t('forgot_password.resetting_for') || 'Restableciendo contraseña para {email}'
+                ).replace('{email}', email)}
               </div>
 
               <div>
                 <label htmlFor="reset-password" className={labelClasses}>
-                  Nueva contraseña
+                  {t('forgot_password.new_password_label') || 'Nueva contraseña'}
                 </label>
                 <div className="relative">
                   <input
@@ -417,14 +461,17 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
                     id="reset-password"
                     type={showNewPassword ? 'text' : 'password'}
                     className={inputClasses}
-                    placeholder="Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número"
+                    placeholder={
+                      t('auth.password_register_placeholder') ||
+                      'Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número'
+                    }
                   />
                   <button
                     type="button"
                     onClick={() => setShowNewPassword((prev) => !prev)}
                     className="absolute inset-y-0 right-3 flex items-center text-xs font-semibold uppercase tracking-[0.2em] text-primary-600 hover:text-primary-500 dark:text-primary-200"
                   >
-                    {showNewPassword ? 'Ocultar' : 'Ver'}
+                    {showNewPassword ? t('profile.hide') || 'Ocultar' : t('profile.view') || 'Ver'}
                   </button>
                 </div>
                 {resetForm.formState.errors.newPassword && (
@@ -436,7 +483,7 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
 
               <div>
                 <label htmlFor="reset-confirm-password" className={labelClasses}>
-                  Confirmar contraseña
+                  {t('forgot_password.confirm_password_label') || 'Confirmar contraseña'}
                 </label>
                 <div className="relative">
                   <input
@@ -444,14 +491,18 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
                     id="reset-confirm-password"
                     type={showConfirmPassword ? 'text' : 'password'}
                     className={inputClasses}
-                    placeholder="Repite tu nueva contraseña"
+                    placeholder={
+                      t('auth.confirm_password_placeholder') || 'Repite tu nueva contraseña'
+                    }
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword((prev) => !prev)}
                     className="absolute inset-y-0 right-3 flex items-center text-xs font-semibold uppercase tracking-[0.2em] text-primary-600 hover:text-primary-500 dark:text-primary-200"
                   >
-                    {showConfirmPassword ? 'Ocultar' : 'Ver'}
+                    {showConfirmPassword
+                      ? t('profile.hide') || 'Ocultar'
+                      : t('profile.view') || 'Ver'}
                   </button>
                 </div>
                 {resetForm.formState.errors.confirmPassword && (
@@ -466,14 +517,19 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
                   type="button"
                   onClick={() => {
                     setStep('verify');
-                    setInfoMessage('Ingresa el código de 6 caracteres que enviamos a tu correo.');
+                    setInfoMessage(
+                      t('forgot_password.email_sent') ||
+                        'Ingresa el código de 6 caracteres que enviamos a tu correo.'
+                    );
                   }}
                   className="brand-secondary-btn flex-1"
                 >
-                  Cambiar código
+                  {t('forgot_password.change_code') || 'Cambiar código'}
                 </button>
                 <button type="submit" disabled={isResetting} className="brand-primary-btn flex-1">
-                  {isResetting ? 'Guardando...' : 'Actualizar contraseña'}
+                  {isResetting
+                    ? t('forgot_password.sending') || 'Guardando...'
+                    : t('forgot_password.update_password_btn') || 'Actualizar contraseña'}
                 </button>
               </div>
             </form>

@@ -71,7 +71,7 @@ export default function LoginPage() {
       description:
         t('auth.gratis_desc') ||
         'Sin cuotas de suscripción. Acceso vitalicio a tu perfil digital y beneficios.',
-      accent: t('auth.gratis') || 'Gratis',
+      accent: t('nav.gratis') || 'Gratis',
     },
     {
       title: t('auth.pedidos_title') || 'Pedidos inteligentes',
@@ -85,7 +85,7 @@ export default function LoginPage() {
       description:
         t('auth.rewards_desc') ||
         'Consultas tus métricas del programa de lealtad. ¡Más compras, más ganas!',
-      accent: t('auth.rewards') || 'Rewards',
+      accent: t('nav.rewards') || 'Rewards',
     },
   ];
 
@@ -173,7 +173,8 @@ export default function LoginPage() {
 
     triggerSnackbar(
       <span>
-        Ya existe una cuenta asociada a <strong>{email}</strong>.{' '}
+        {t('auth.existing_account_msg') || 'Ya existe una cuenta asociada a'}{' '}
+        <strong>{email}</strong>.{' '}
         <button
           type="button"
           onClick={() => {
@@ -181,7 +182,7 @@ export default function LoginPage() {
           }}
           className="underline decoration-dotted underline-offset-4 text-blue-600 hover:text-blue-500 dark:text-blue-400"
         >
-          ¿Olvidaste tu contraseña?
+          {t('auth.forgot_password_btn') || '¿Olvidaste tu contraseña?'}
         </button>
       </span>,
       'info'
@@ -230,7 +231,7 @@ export default function LoginPage() {
           onClick={() => setSnackbar(null)}
           className="text-sm font-semibold underline underline-offset-4"
         >
-          Cerrar
+          {t('common.close') || 'Cerrar'}
         </button>
       </div>
     </div>
@@ -243,7 +244,7 @@ export default function LoginPage() {
         <div className={pageShellClasses}>
           <div className="relative z-10 flex min-h-[60vh] items-center justify-center">
             <p className="rounded-full border border-primary-200/60 bg-white/70 px-6 py-3 text-sm font-semibold text-primary-700 shadow-lg shadow-primary-900/5 dark:border-primary-900/40 dark:bg-gray-900/70 dark:text-primary-100">
-              Cargando tu sesión...
+              {t('auth.loading_session') || 'Cargando tu sesión...'}
             </p>
           </div>
         </div>
@@ -315,7 +316,13 @@ export default function LoginPage() {
           transition={{ delay: 0.3 }}
           className="text-3xl font-black text-primary-900 dark:text-white"
         >
-          ¡Bienvenido de vuelta, {greetingName}!
+          {(() => {
+            const tid = 'auth.welcome_back_user';
+            const translation = t(tid);
+            const text =
+              translation && translation !== tid ? translation : '¡Bienvenido de vuelta, {name}!';
+            return text.replace('{name}', greetingName || '');
+          })()}
         </motion.h2>
         <motion.p
           initial={{ opacity: 0 }}
@@ -323,7 +330,10 @@ export default function LoginPage() {
           transition={{ delay: 0.6 }}
           className="mt-3 text-base font-medium text-primary-800/80 dark:text-primary-100/80"
         >
-          Tu sesión está activa. Te estamos redirigiendo...
+          <TranslatedText
+            tid="auth.active_session_msg"
+            fallback="Tu sesión está activa. Te estamos redirigiendo..."
+          />
         </motion.p>
       </div>
       <div className="flex justify-center px-8">
@@ -477,8 +487,9 @@ export default function LoginPage() {
                   </h2>
                   <p className="mt-2 text-sm text-primary-800/80 dark:text-primary-100/80">
                     {isLogin
-                      ? 'Accede al panel para continuar con tus pedidos.'
-                      : 'Prepara tus datos básicos para activar tu perfil POS.'}
+                      ? t('auth.login_prompt') || 'Accede al panel para continuar con tus pedidos.'
+                      : t('auth.register_prompt') ||
+                        'Prepara tus datos básicos para activar tu perfil POS.'}
                   </p>
                 </div>
 
@@ -503,7 +514,7 @@ export default function LoginPage() {
                         onClick={handleForgotPassword}
                         className="brand-tertiary-btn w-full justify-center"
                       >
-                        ¿Olvidaste tu contraseña?
+                        {t('auth.forgot_password_btn') || '¿Olvidaste tu contraseña?'}
                       </button>
                     </motion.div>
                   </>
@@ -535,10 +546,10 @@ export default function LoginPage() {
                     className="brand-tertiary-btn w-full justify-center"
                   >
                     {showForgotPassword
-                      ? 'Volver a iniciar sesión'
+                      ? t('auth.back_to_login') || 'Volver a iniciar sesión'
                       : isLogin
-                      ? '¿No tienes cuenta? Regístrate aquí'
-                      : '¿Ya tienes cuenta? Inicia sesión aquí'}
+                      ? t('auth.no_account') || '¿No tienes cuenta? Regístrate aquí'
+                      : t('auth.have_account') || '¿Ya tienes cuenta? Inicia sesión aquí'}
                   </button>
                 </motion.div>
 
@@ -550,21 +561,26 @@ export default function LoginPage() {
                   custom={5}
                 >
                   <p>
-                    Al {isLogin ? 'iniciar sesión' : 'registrarte'}, aceptas nuestros{' '}
+                    {(t('auth.terms_consent_prefix') || 'Al {action}, aceptas nuestros ').replace(
+                      '{action}',
+                      isLogin
+                        ? t('auth.login_action') || 'iniciar sesión'
+                        : t('auth.register_action') || 'registrarte'
+                    )}
                     <a
                       href="/terms"
                       className="font-semibold text-primary-600 underline decoration-dotted underline-offset-4 hover:text-primary-500"
                     >
-                      términos y condiciones
+                      {t('auth.terms_link') || 'términos y condiciones'}
                     </a>{' '}
-                    y{' '}
+                    {t('auth.and') || ' y '}{' '}
                     <a
                       href="/privacy"
                       className="font-semibold text-primary-600 underline decoration-dotted underline-offset-4 hover:text-primary-500"
                     >
-                      política de privacidad
+                      {t('auth.privacy_link') || 'política de privacidad'}
                     </a>
-                    .
+                    {t('auth.dot') || '.'}
                   </p>
                 </motion.div>
               </div>

@@ -25,7 +25,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export default function TranslatedText({ tid, fallback }: { tid: string; fallback?: string }) {
   const { t } = useLanguage();
-  const text = t(tid) || fallback || tid;
+  const translation = t(tid);
+  // t() returns the key if not found, so check if result equals key
+  const text = translation && translation !== tid ? translation : fallback || tid;
 
   return (
     <AnimatePresence mode="wait">

@@ -486,6 +486,10 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
       [items]
     );
     const shippingSummary = useMemo(() => {
+      // 1. First check: does the order actually require shipping?
+      // We check the root-level flag if available (some backends might provide it)
+      // or infer it from the presence of a valid address structure.
+
       const resolveShippingSource = () => {
         if (order.shipping && typeof order.shipping === 'object') {
           return order.shipping as Record<string, unknown>;
@@ -498,14 +502,20 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
         }
         return null;
       };
+
       const shippingRecord = resolveShippingSource();
       if (!shippingRecord) {
         return null;
       }
+
+      // If we have a generic "needsShipping" flag in root or shipping record, check it.
+      // (This depends on backend, but let's be safe: if address is empty, it's not shipping).
+
       const nestedAddress =
         shippingRecord.address && typeof shippingRecord.address === 'object'
           ? (shippingRecord.address as Record<string, unknown>)
           : null;
+
       const resolveField = (key: string) => {
         const nestedValue =
           nestedAddress && key in nestedAddress
@@ -516,12 +526,25 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
         }
         return toTrimmedString((shippingRecord[key] as string) ?? null);
       };
+
       const street = resolveField('street');
+      const country = resolveField('country');
+      const postalCode = resolveField('postalCode');
+
+      // CRITICAL CHECK: To consider it a valid shipping order to display,
+      // we must have at least a street or postal code.
+      // If it's just a stray object with empty strings, return null.
+      if (!street && !postalCode) {
+        // Also check if maybe ONLY delivery tip is present?
+        // Typically a delivery tip implies delivery, but if there's no address,
+        // it might be a data anomaly. We'll hide it to be safe effectively masking "Ghost" delivery info.
+        return null;
+      }
+
       const city = resolveField('city');
       const state = resolveField('state');
-      const postalCode = resolveField('postalCode');
-      const country = resolveField('country');
       const reference = resolveField('reference');
+
       const label =
         toTrimmedString(
           (shippingRecord.addressLabel as string | undefined) ??
@@ -529,24 +552,26 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
         ) ??
         resolveField('label') ??
         resolveField('nickname');
-      if (!street && !city && !state && !postalCode && !reference && !country && !label) {
-        return null;
-      }
+
       const lines = [
         street,
         [city, state, country].filter(Boolean).join(', ') || null,
         postalCode ? `CP ${postalCode}` : null,
       ].filter((line): line is string => Boolean(line && line.trim().length));
+
       const contactPhone = toTrimmedString(
         (shippingRecord.contactPhone as string | undefined) ?? order.shipping?.contactPhone ?? null
       );
+
       const contactName =
         toTrimmedString(shippingRecord.contactName as string | undefined) ??
         (nestedAddress ? toTrimmedString(nestedAddress.name as string | undefined) : null) ??
         null;
+
       const isWhatsapp = Boolean(
         (shippingRecord.isWhatsapp as boolean | undefined) ?? order.shipping?.isWhatsapp ?? false
       );
+
       return {
         label: label ?? null,
         lines,

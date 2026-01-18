@@ -54,15 +54,15 @@ export async function generateMetadata({
 
 export default function BlogPost({ params }: { params: { slug: string } }) {
   const slug = params.slug;
-  const sortedPosts = sortedBlogPost(allBlogs);
-
-  const post = sortedPosts.find((p) => p.slug === slug);
+  const post = allBlogs.find((p) => p.slug === slug);
   const author = post?.author || ['default'];
 
-  const postIndex = sortedPosts.findIndex((p) => p.slug === slug);
-  const prevContent = sortedPosts[postIndex + 1] || null;
+  // Filter posts by the same locale as the current post for navigation
+  const filteredPosts = sortedBlogPost(allBlogs.filter((p) => p.locale === post?.locale));
+  const postIndex = filteredPosts.findIndex((p) => p.slug === slug);
+  const prevContent = filteredPosts[postIndex + 1] || null;
   const prev = prevContent ? coreContent(prevContent) : null;
-  const nextContent = sortedPosts[postIndex - 1] || null;
+  const nextContent = filteredPosts[postIndex - 1] || null;
   const next = nextContent ? coreContent(nextContent) : null;
 
   return (
@@ -76,7 +76,7 @@ export default function BlogPost({ params }: { params: { slug: string } }) {
         ) : (
           <div className="mt-24 text-center">
             <PageTitle>
-              Under Construction{' '}
+              {post?.locale === 'en' ? 'Under Construction' : 'En construcción'}{' '}
               <span role="img" aria-label="roadwork sign">
                 🚧
               </span>

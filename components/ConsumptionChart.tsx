@@ -1,34 +1,8 @@
-/*
- * --------------------------------------------------------------------
- *  Xoco Café — Software Property
- *  Copyright (c) 2025 Xoco Café
- *  Principal Developer: Donovan Riaño
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at:
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- *
- *  --------------------------------------------------------------------
- *  PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
- *  Copyright (c) 2025 Xoco Café.
- *  Desarrollador Principal: Donovan Riaño.
- *
- *  Este archivo está licenciado bajo la Apache License 2.0.
- *  Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
- * --------------------------------------------------------------------
- */
-
 'use client';
 
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useAuth } from '@/components/Auth/AuthProvider';
+import { useLanguage } from '@/components/Language/LanguageProvider';
 
 interface ProductStat {
   name: string;
@@ -82,6 +56,7 @@ function buildBars(bucket: ConsumptionBucket) {
 
 export default function ConsumptionChart() {
   const { token } = useAuth();
+  const { t } = useLanguage();
   const [data, setData] = useState<ConsumptionPayload | null>(null);
   const [period, setPeriod] = useState<Period>('monthly');
   const [selectedKey, setSelectedKey] = useState<string>('');
@@ -111,7 +86,7 @@ export default function ConsumptionChart() {
         });
         const result = (await response.json()) as ConsumptionResponse;
         if (!result.success || !result.data) {
-          setError(result.message || 'No se pudo cargar el consumo.');
+          setError(result.message || t('chart.no_data') || 'No data available.');
           setData(null);
           return;
         }
@@ -122,7 +97,7 @@ export default function ConsumptionChart() {
         setError(null);
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return;
-        setError('Error cargando el consumo del usuario.');
+        setError(t('common.error') || 'Error loading data.');
         setData(null);
       } finally {
         setIsLoading(false);
@@ -131,7 +106,7 @@ export default function ConsumptionChart() {
 
     fetchData();
     return () => controller.abort();
-  }, [token]);
+  }, [token, t]);
 
   const buckets = useMemo(() => {
     if (!data) return [] as ConsumptionBucket[];
@@ -172,10 +147,10 @@ export default function ConsumptionChart() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Consumo de favoritos
+            {t('chart.title') || 'Consumo de favoritos'}
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Bebidas, alimentos y paquetes más pedidos según tu historial.
+            {t('chart.desc') || 'Bebidas, alimentos y paquetes más pedidos según tu historial.'}
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -189,7 +164,7 @@ export default function ConsumptionChart() {
               onChange={() => setPeriod('monthly')}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500"
             />
-            <label htmlFor={periodIds.monthly}>Mensual</label>
+            <label htmlFor={periodIds.monthly}>{t('chart.monthly') || 'Mensual'}</label>
           </div>
           <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
             <input
@@ -201,7 +176,7 @@ export default function ConsumptionChart() {
               onChange={() => setPeriod('yearly')}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500"
             />
-            <label htmlFor={periodIds.yearly}>Anual</label>
+            <label htmlFor={periodIds.yearly}>{t('chart.yearly') || 'Anual'}</label>
           </div>
         </div>
       </div>
@@ -223,31 +198,35 @@ export default function ConsumptionChart() {
       <div className="mt-4 flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400">
         <div className="flex items-center gap-2">
           <span className="h-3 w-3 rounded-full" style={{ backgroundColor: BEVERAGE_COLOR }} />
-          Bebidas
+          {t('chart.beverages') || 'Bebidas'}
         </div>
         <div className="flex items-center gap-2">
           <span className="h-3 w-3 rounded-full" style={{ backgroundColor: FOOD_COLOR }} />
-          Alimentos
+          {t('chart.foods') || 'Alimentos'}
         </div>
         <div className="flex items-center gap-2">
           <span className="h-3 w-3 rounded-full" style={{ backgroundColor: PACKAGE_COLOR }} />
-          Paquetes
+          {t('chart.packages') || 'Paquetes'}
         </div>
       </div>
       {isShowingSubset && (
         <p className="mt-2 text-xs font-semibold text-primary-700 dark:text-primary-300 sm:hidden">
-          Mostrando top {MAX_MOBILE_ITEMS} (en desktop se muestran {MAX_DESKTOP_ITEMS}).
+          {(t('chart.top_mobile') || 'Mostrando top {max} (en desktop se muestran {desktop}).')
+            .replace('{max}', String(MAX_MOBILE_ITEMS))
+            .replace('{desktop}', String(MAX_DESKTOP_ITEMS))}
         </p>
       )}
 
       <div className="mt-6 min-h-[220px]">
         {isLoading ? (
-          <p className="text-sm text-gray-600 dark:text-gray-400">Cargando gráfico…</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {t('chart.loading') || 'Cargando gráfico…'}
+          </p>
         ) : error ? (
           <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
         ) : !currentBucket || bars.length === 0 ? (
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Aún no tenemos suficientes compras para mostrar un gráfico.
+            {t('chart.no_data') || 'Aún no tenemos suficientes compras para mostrar un gráfico.'}
           </p>
         ) : (
           <div className="flex items-end gap-4 overflow-x-auto py-2">
@@ -285,10 +264,10 @@ export default function ConsumptionChart() {
                   </span>
                   <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
                     {bar.type === 'beverage'
-                      ? 'Bebida'
+                      ? t('chart.beverage') || 'Bebida'
                       : bar.type === 'food'
-                      ? 'Alimento'
-                      : 'Paquete'}
+                      ? t('chart.food') || 'Alimento'
+                      : t('chart.package') || 'Paquete'}
                   </span>
                 </div>
               );

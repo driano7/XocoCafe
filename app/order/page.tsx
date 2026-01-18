@@ -28,8 +28,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { AnimatePresence, motion } from 'framer-motion';
 import CheckoutForm from '@/components/Order/CheckoutForm';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import { useCartStore } from '@/hooks/useCartStore';
@@ -90,6 +91,25 @@ export default function OrderPage() {
   const { snackbar, showSnackbar, dismissSnackbar } = useSnackbarNotifications();
   const { items, addItem, increment, decrement, removeItem, subtotal, itemCount, clearCart } =
     useCartStore();
+
+  // Ref for auto-scrolling to cart
+  const cartContainerRef = useRef<HTMLElement>(null);
+  const previousItemCountRef = useRef(itemCount);
+
+  // Auto-scroll when items are added (count increases)
+  useEffect(() => {
+    if (itemCount > previousItemCountRef.current && itemCount > 0) {
+      // Small delay to allow react to render the new item
+      setTimeout(() => {
+        // Only auto-scroll on mobile devices
+        if (window.innerWidth < 768) {
+          cartContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    }
+    previousItemCountRef.current = itemCount;
+  }, [itemCount]);
+
   const [selectedBeverageId, setSelectedBeverageId] = useState('');
   const [selectedBeverageSize, setSelectedBeverageSize] = useState<string | null>(null);
   const [selectedFoodId, setSelectedFoodId] = useState('');
@@ -533,7 +553,10 @@ export default function OrderPage() {
               {quickAddSection}
             </section>
 
-            <aside className="rounded-2xl border border-gray-200 bg-white p-5 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+            <aside
+              ref={cartContainerRef}
+              className="rounded-2xl border border-gray-200 bg-white p-5 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+            >
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Tu pedido</h2>
                 {items.length > 0 && (
@@ -551,71 +574,78 @@ export default function OrderPage() {
                 <p className="text-sm text-gray-500">Aún no tienes productos en tu carrito.</p>
               ) : (
                 <div className="space-y-4">
-                  {items.map((item) => (
-                    <div
-                      key={item.lineId}
-                      className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700"
-                    >
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                          {item.name}{' '}
-                          {rewardLineId === item.lineId && (
-                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-800">
-                              Cortesía
-                            </span>
-                          )}
-                        </p>
-                        {item.size && (
-                          <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                            Tamaño: {item.size}
-                          </p>
-                        )}
-                        {item.category === 'package' && item.packageItems?.length ? (
-                          <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                            Incluye: {item.packageItems.join(', ')}
-                          </p>
-                        ) : null}
-                        <p className="text-xs text-gray-500">
-                          {rewardLineId === item.lineId ? 'Gratis' : formatCurrency(item.price)}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => decrement(item.lineId)}
-                          className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-100"
-                        >
-                          -
-                        </button>
-                        <span className="min-w-[24px] text-center text-sm font-medium text-gray-700 dark:text-gray-100">
-                          {item.quantity}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => increment(item.lineId)}
-                          className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-100"
-                        >
-                          +
-                        </button>
-                      </div>
-
-                      <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                        {rewardLineId === item.lineId
-                          ? 'Gratis'
-                          : formatCurrency(item.price * item.quantity)}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => removeItem(item.lineId)}
-                        className="text-sm text-red-500 hover:text-red-600"
-                        aria-label={`Eliminar ${item.name}`}
+                  <AnimatePresence initial={false} mode="popLayout">
+                    {items.map((item) => (
+                      <motion.div
+                        layout
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        transition={{ duration: 0.3 }}
+                        key={item.lineId}
+                        className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700"
                       >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                            {item.name}{' '}
+                            {rewardLineId === item.lineId && (
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-800">
+                                Cortesía
+                              </span>
+                            )}
+                          </p>
+                          {item.size && (
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                              Tamaño: {item.size}
+                            </p>
+                          )}
+                          {item.category === 'package' && item.packageItems?.length ? (
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                              Incluye: {item.packageItems.join(', ')}
+                            </p>
+                          ) : null}
+                          <p className="text-xs text-gray-500">
+                            {rewardLineId === item.lineId ? 'Gratis' : formatCurrency(item.price)}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => decrement(item.lineId)}
+                            className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+                          >
+                            -
+                          </button>
+                          <span className="min-w-[24px] text-center text-sm font-medium text-gray-700 dark:text-gray-100">
+                            {item.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => increment(item.lineId)}
+                            className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-100"
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                          {rewardLineId === item.lineId
+                            ? 'Gratis'
+                            : formatCurrency(item.price * item.quantity)}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeItem(item.lineId)}
+                          className="text-sm text-red-500 hover:text-red-600"
+                          aria-label={`Eliminar ${item.name}`}
+                        >
+                          ×
+                        </button>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
 
                   <div className="flex items-center justify-between border-t border-gray-200 pt-4 text-sm font-semibold text-gray-900 dark:border-gray-700 dark:text-gray-100">
                     <span>Artículos ({itemCount})</span>

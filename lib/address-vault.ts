@@ -69,38 +69,69 @@ export function encryptAddressPayload(email: string, data: AddressInput) {
 }
 
 export function decryptAddressRow(email: string, row: AddressRow): AddressPayload {
-  if (
-    'payload' in row &&
-    'payload_iv' in row &&
-    'payload_tag' in row &&
-    'payload_salt' in row &&
-    typeof row.payload === 'string' &&
-    typeof row.payload_iv === 'string' &&
-    typeof row.payload_tag === 'string' &&
-    typeof row.payload_salt === 'string'
-  ) {
-    const decrypted = decryptWithEmail(
-      email,
-      row.payload,
-      row.payload_iv,
-      row.payload_tag,
-      row.payload_salt
-    );
+  if ('payload' in row && typeof row.payload === 'string') {
+    let iv: string | undefined;
+    let tag: string | undefined;
+    let salt: string | undefined;
 
-    if (decrypted.success && decrypted.decryptedData) {
-      try {
-        const parsed = JSON.parse(decrypted.decryptedData) as AddressInput;
-        const normalized = {
-          ...parsed,
-          id: row.id,
-          createdAt: row.createdAt,
-          updatedAt: row.updatedAt,
-          contactPhone: parsed.contactPhone ?? '',
-          isWhatsapp: parsed.isWhatsapp ?? false,
-        };
-        return normalized;
-      } catch (error) {
-        console.error('Error parseando dirección cifrada:', error);
+    // Check snake_case (standard)
+    if (
+      'payload_iv' in row &&
+      typeof row.payload_iv === 'string' &&
+      'payload_tag' in row &&
+      typeof row.payload_tag === 'string' &&
+      'payload_salt' in row &&
+      typeof row.payload_salt === 'string'
+    ) {
+      iv = row.payload_iv;
+      tag = row.payload_tag;
+      salt = row.payload_salt;
+    }
+    // Check camelCase (fallback)
+    else if (
+      // @ts-ignore - Handle runtime properties not in interface
+      'payloadIv' in row &&
+      typeof row.payloadIv === 'string' &&
+      // @ts-ignore
+      'payloadTag' in row &&
+      typeof row.payloadTag === 'string' &&
+      // @ts-ignore
+      'payloadSalt' in row &&
+      typeof row.payloadSalt === 'string'
+    ) {
+      // @ts-ignore
+      iv = row.payloadIv;
+      // @ts-ignore
+      tag = row.payloadTag;
+      // @ts-ignore
+      salt = row.payloadSalt;
+    }
+
+    if (iv && tag && salt) {
+      const decrypted = decryptWithEmail(email, row.payload, iv, tag, salt);
+
+      if (decrypted.success && decrypted.decryptedData) {
+        try {
+          const parsed = JSON.parse(decrypted.decryptedData) as AddressInput;
+          const normalized = {
+            ...parsed,
+            id: row.id,
+            // Prioritize row.createdAt (camel) if present, else check for created_at (snake)
+            createdAt:
+              row.createdAt ||
+              (row as unknown as Record<string, string>).created_at ||
+              (row as unknown as Record<string, string>).createdAt,
+            updatedAt:
+              row.updatedAt ||
+              (row as unknown as Record<string, string>).updated_at ||
+              (row as unknown as Record<string, string>).updatedAt,
+            contactPhone: parsed.contactPhone ?? '',
+            isWhatsapp: parsed.isWhatsapp ?? false,
+          };
+          return normalized;
+        } catch (error) {
+          console.error('Error parseando dirección cifrada:', error);
+        }
       }
     }
   }

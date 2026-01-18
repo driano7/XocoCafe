@@ -41,7 +41,7 @@ import { useLanguage } from './Language/LanguageProvider';
 import TranslatedText from './Language/TranslatedText';
 
 export default function Header() {
-  useLanguage();
+  const { t } = useLanguage();
   const pathName = usePathname();
   const [isVisible, setIsVisible] = useState(false);
   const [forceVisible, setForceVisible] = useState(false);
@@ -122,11 +122,20 @@ export default function Header() {
           <nav className="hidden items-center gap-4 sm:flex lg:gap-6">
             {headerNavLinks.map(({ title, href }) => {
               const active = href === '/' ? pathName === '/' : pathName?.startsWith(href);
+              const tid = title
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/\s+/g, '_');
+              const localizedSlug = t(`blog.slug_${tid}`);
+              const localizedHref =
+                localizedSlug && href.startsWith('/blog/') ? `/blog/${localizedSlug}` : href;
+
               return (
                 <Link
                   prefetch
                   key={title}
-                  href={href}
+                  href={localizedHref}
                   className={classNames(
                     'group relative inline-flex flex-col items-center gap-1 text-base font-semibold tracking-wide text-gray-700 transition duration-300 dark:text-gray-200',
                     active ? 'text-primary-600 dark:text-primary-200' : ''
@@ -135,7 +144,11 @@ export default function Header() {
                 >
                   <span className="transition-transform duration-200 group-hover:-translate-y-0.5">
                     <TranslatedText
-                      tid={`nav.${title.toLowerCase().replace(' ', '_')}`}
+                      tid={`nav.${title
+                        .toLowerCase()
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/\s+/g, '_')}`}
                       fallback={title}
                     />
                   </span>

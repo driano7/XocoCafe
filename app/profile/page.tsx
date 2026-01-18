@@ -130,7 +130,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="py-8">
-          <UserProfile />
+          <UserProfile user={user} />
         </div>
       </motion.div>
     </CoffeeBackground>

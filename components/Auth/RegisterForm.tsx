@@ -35,6 +35,7 @@ import CountryDropdown from './CountryDropdown';
 import { useConversionTracking } from '@/components/Analytics/AnalyticsProvider';
 import { encryptWithUserId, generateLocalUserId } from '@/lib/clientEncryption';
 import type { AuthSuccessHandler } from '@/components/Auth/types';
+import { useLanguage } from '@/components/Language/LanguageProvider';
 
 interface RegisterFormProps {
   onSuccess: AuthSuccessHandler;
@@ -43,6 +44,7 @@ interface RegisterFormProps {
 }
 
 export default function RegisterForm({ onSuccess, onError, onExistingAccount }: RegisterFormProps) {
+  const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -68,17 +70,17 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
   const passwordCriteria = [
     {
       key: 'special',
-      label: 'Caracter permitido (!@#$%^&*)',
+      label: t('auth.password_criteria.special') || 'Caracter permitido (!@#$%^&*)',
       isMet: /[!@#$%^&*]/.test(passwordValue),
     },
     {
       key: 'uppercase',
-      label: 'Letra mayúscula',
+      label: t('auth.password_criteria.uppercase') || 'Letra mayúscula',
       isMet: /[A-Z]/.test(passwordValue),
     },
     {
       key: 'number',
-      label: 'Número',
+      label: t('auth.password_criteria.number') || 'Número',
       isMet: /\d/.test(passwordValue),
     },
   ];
@@ -88,10 +90,22 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
 
   const strengthMeta =
     metCriteriaCount === 3
-      ? { label: 'Strong', barClass: 'bg-green-500', textClass: 'text-green-600' }
+      ? {
+          label: t('auth.password_strength.strong') || 'Strong',
+          barClass: 'bg-green-500',
+          textClass: 'text-green-600',
+        }
       : metCriteriaCount === 2
-      ? { label: 'Medium', barClass: 'bg-yellow-400', textClass: 'text-yellow-600' }
-      : { label: 'Weak', barClass: 'bg-red-500', textClass: 'text-red-600' };
+      ? {
+          label: t('auth.password_strength.medium') || 'Medium',
+          barClass: 'bg-yellow-400',
+          textClass: 'text-yellow-600',
+        }
+      : {
+          label: t('auth.password_strength.weak') || 'Weak',
+          barClass: 'bg-red-500',
+          textClass: 'text-red-600',
+        };
 
   const passwordsMatch =
     passwordValue.length > 0 &&
@@ -102,7 +116,7 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
     ...passwordCriteria,
     {
       key: 'match',
-      label: 'Contraseñas iguales',
+      label: t('auth.password_criteria.match') || 'Contraseñas iguales',
       isMet: passwordsMatch,
       isPending: confirmPasswordValue.length === 0,
     },
@@ -210,13 +224,21 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
 
         if (response.status === 400 && result?.code === 'USER_EXISTS') {
           onExistingAccount(data.email);
-          onError(result.message || 'Ya existe una cuenta con este correo.');
+          onError(
+            result.message ||
+              t('auth.errors.user_exists') ||
+              'Ya existe una cuenta con este correo.'
+          );
         } else {
-          onError(result.message || 'No se pudo crear la cuenta. Inténtalo nuevamente.');
+          onError(
+            result.message ||
+              t('auth.errors.register_failed') ||
+              'No se pudo crear la cuenta. Inténtalo nuevamente.'
+          );
         }
       }
     } catch (error) {
-      onError('Error de conexión. Inténtalo de nuevo.');
+      onError(t('auth.errors.connection') || 'Error de conexión. Inténtalo de nuevo.');
     } finally {
       setIsLoading(false);
     }
@@ -228,14 +250,14 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="firstName" className={labelClasses}>
-            Nombre *
+            {t('auth.first_name') || 'Nombre *'}
           </label>
           <input
             {...register('firstName')}
             type="text"
             id="firstName"
             className={inputClasses}
-            placeholder="Tu nombre"
+            placeholder={t('auth.first_name_placeholder') || 'Tu nombre'}
           />
           {errors.firstName && (
             <p className="mt-1 text-sm text-red-600">{errors.firstName.message}</p>
@@ -244,14 +266,14 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
 
         <div>
           <label htmlFor="lastName" className={labelClasses}>
-            Apellido *
+            {t('auth.last_name') || 'Apellido *'}
           </label>
           <input
             {...register('lastName')}
             type="text"
             id="lastName"
             className={inputClasses}
-            placeholder="Tu apellido"
+            placeholder={t('auth.last_name_placeholder') || 'Tu apellido'}
           />
           {errors.lastName && (
             <p className="mt-1 text-sm text-red-600">{errors.lastName.message}</p>
@@ -261,14 +283,14 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
 
       <div>
         <label htmlFor="email" className={labelClasses}>
-          Email *
+          {t('auth.email') || 'Email *'}
         </label>
         <input
           {...register('email')}
           type="email"
           id="email"
           className={inputClasses}
-          placeholder="tu@email.com"
+          placeholder={t('auth.email_placeholder') || 'tu@email.com'}
         />
         {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
       </div>
@@ -276,7 +298,7 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="password" className={labelClasses}>
-            Contraseña *
+            {t('auth.password') || 'Contraseña *'}
           </label>
           <div className="relative">
             <input
@@ -284,15 +306,18 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
               type={showPassword ? 'text' : 'password'}
               id="password"
               className={inputClasses}
-              placeholder="Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número"
+              placeholder={
+                t('auth.password_register_placeholder') ||
+                'Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número'
+              }
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute inset-y-0 right-3 flex items-center text-xs font-semibold uppercase tracking-[0.2em] text-primary-600 hover:text-primary-500 dark:text-primary-200"
-              aria-label="Mostrar u ocultar contraseña"
+              aria-label={t('profile.password_visibility_label') || 'Mostrar u ocultar contraseña'}
             >
-              {showPassword ? 'Ocultar' : 'Ver'}
+              {showPassword ? t('profile.hide') || 'Ocultar' : t('profile.view') || 'Ver'}
             </button>
           </div>
           {errors.password && (
@@ -313,7 +338,7 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
             </div>
             <div className="mt-2 text-xs font-semibold">
               <span className={strengthMeta.textClass}>
-                Password strength: {strengthMeta.label}
+                {t('auth.password_strength.label') || 'Password strength'}: {strengthMeta.label}
               </span>
             </div>
             <ol
@@ -366,7 +391,7 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
 
         <div>
           <label htmlFor="confirmPassword" className={labelClasses}>
-            Confirmar Contraseña *
+            {t('auth.confirm_password') || 'Confirmar Contraseña *'}
           </label>
           <div className="relative">
             <input
@@ -374,15 +399,18 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
               type={showConfirmPassword ? 'text' : 'password'}
               id="confirmPassword"
               className={inputClasses}
-              placeholder="Repite tu contraseña"
+              placeholder={t('auth.confirm_password_placeholder') || 'Repite tu contraseña'}
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               className="absolute inset-y-0 right-3 flex items-center text-xs font-semibold uppercase tracking-[0.2em] text-primary-600 hover:text-primary-500 dark:text-primary-200"
-              aria-label="Mostrar u ocultar confirmación de contraseña"
+              aria-label={
+                t('profile.password_visibility_label') ||
+                'Mostrar u ocultar confirmación de contraseña'
+              }
             >
-              {showConfirmPassword ? 'Ocultar' : 'Ver'}
+              {showConfirmPassword ? t('profile.hide') || 'Ocultar' : t('profile.view') || 'Ver'}
             </button>
           </div>
           {errors.confirmPassword && (
@@ -398,10 +426,10 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
             }`}
           >
             {confirmPasswordValue.length === 0
-              ? 'Confirma tu contraseña'
+              ? t('auth.match_messages.confirm') || 'Confirma tu contraseña'
               : passwordsMatch
-              ? 'Las contraseñas son iguales'
-              : 'Las contraseñas no coinciden'}
+              ? t('auth.match_messages.equal') || 'Las contraseñas son iguales'
+              : t('auth.match_messages.not_equal') || 'Las contraseñas no coinciden'}
           </div>
         </div>
       </div>
@@ -410,7 +438,7 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="phone" className={labelClasses}>
-            Teléfono (opcional)
+            {t('auth.phone_optional') || 'Teléfono (opcional)'}
           </label>
           <input
             {...register('phone')}
@@ -423,7 +451,7 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
 
         <div>
           <label htmlFor="walletAddress" className={labelClasses}>
-            Wallet EVM (opcional)
+            {t('auth.wallet_optional') || 'Wallet EVM (opcional)'}
           </label>
           <input
             {...register('walletAddress')}
@@ -438,20 +466,20 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="city" className={labelClasses}>
-            Ciudad (opcional)
+            {t('auth.city_optional') || 'Ciudad (opcional)'}
           </label>
           <input
             {...register('city')}
             type="text"
             id="city"
             className={inputClasses}
-            placeholder="Tu ciudad"
+            placeholder={t('profile.city') || 'Tu ciudad'}
           />
         </div>
 
         <div>
           <label htmlFor="country" className={labelClasses}>
-            País (opcional)
+            {t('auth.country_optional') || 'País (opcional)'}
           </label>
           <CountryDropdown
             value={countryValue || ''}
@@ -465,7 +493,7 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
       {/* Consentimientos GDPR */}
       <div className="space-y-4 border-t pt-6">
         <h3 className="text-lg font-bold text-primary-900 dark:text-primary-100">
-          Términos y Condiciones
+          {t('forgot_password.terms_and_privacy') || 'Términos y Condiciones'}
         </h3>
 
         <div className="space-y-3">
@@ -480,21 +508,9 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
               htmlFor="termsAndPrivacyAccepted"
               className="ml-3 text-sm text-primary-900 dark:text-primary-100"
             >
-              Acepto los{' '}
-              <a
-                href="/terms"
-                className="text-primary-600 underline decoration-dotted underline-offset-4 hover:text-primary-500"
-              >
-                términos y condiciones
-              </a>{' '}
-              y la{' '}
-              <a
-                href="/privacy"
-                className="text-primary-600 underline decoration-dotted underline-offset-4 hover:text-primary-500"
-              >
-                política de privacidad
-              </a>{' '}
-              *
+              {(t('auth.terms_accepted') || 'Acepto los {terms} y la {privacy} *')
+                .replace('{terms}', t('auth.terms_link') || 'términos y condiciones')
+                .replace('{privacy}', t('auth.privacy_link') || 'política de privacidad')}
             </label>
           </div>
           {errors.termsAndPrivacyAccepted && (
@@ -504,7 +520,7 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
 
         <div className="space-y-3">
           <h4 className="text-sm font-semibold text-primary-900 dark:text-primary-100">
-            Preferencias de Marketing (opcional)
+            {t('auth.marketing_title') || 'Preferencias de Marketing (opcional)'}
           </h4>
 
           <div className="flex items-start">
@@ -518,7 +534,7 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
               htmlFor="marketingEmail"
               className="ml-3 text-sm text-primary-900 dark:text-primary-100"
             >
-              Recibir ofertas por email
+              {t('auth.marketing_email') || 'Recibir ofertas por email'}
             </label>
           </div>
 
@@ -533,14 +549,16 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
               htmlFor="marketingPush"
               className="ml-3 text-sm text-primary-900 dark:text-primary-100"
             >
-              Recibir notificaciones push
+              {t('auth.marketing_push') || 'Recibir notificaciones push'}
             </label>
           </div>
         </div>
       </div>
 
       <button type="submit" disabled={isLoading} className="brand-primary-btn">
-        {isLoading ? 'Creando cuenta...' : 'Crear Cuenta'}
+        {isLoading
+          ? t('auth.creating_account') || 'Creando cuenta...'
+          : t('auth.create_account_btn') || 'Crear Cuenta'}
       </button>
     </form>
   );

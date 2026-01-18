@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { MenuItem } from '@/data/menuItems';
+import { useLanguage } from '@/components/Language/LanguageProvider';
 
 type MenuGalleryGridProps = {
   items: MenuItem[];
@@ -11,22 +12,29 @@ const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=900&h=1100&fit=crop';
 
 export default function MenuGalleryGrid({ items }: MenuGalleryGridProps) {
-  const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
+  const { currentLanguage } = useLanguage();
+  const allLabel = currentLanguage === 'en' ? 'All' : 'Todos';
+  const [selectedCategory, setSelectedCategory] = useState<string>(allLabel);
 
-  const categories = useMemo(
-    () => ['Todos', ...new Set(items.map((item) => item.category))],
-    [items]
-  );
+  const categories = useMemo(() => {
+    const cats = new Set(
+      items.map((item) => (currentLanguage === 'en' ? item.categoryEn : item.category))
+    );
+    return [allLabel, ...Array.from(cats)];
+  }, [items, currentLanguage, allLabel]);
 
   const filteredItems =
-    selectedCategory === 'Todos'
+    selectedCategory === allLabel
       ? items
-      : items.filter((item) => item.category === selectedCategory);
+      : items.filter((item) => {
+          const cat = currentLanguage === 'en' ? item.categoryEn : item.category;
+          return cat === selectedCategory;
+        });
 
   return (
     <div className="min-h-[520px] rounded-3xl border border-primary-100/30 bg-white/70 px-4 py-10 shadow-lg backdrop-blur dark:bg-neutral-900/70">
       <div className="mx-auto mb-8 flex max-w-5xl flex-wrap items-center gap-3">
-        {categories.map((category) => (
+        {categories.map((category: string) => (
           <button
             type="button"
             key={category}
@@ -58,17 +66,21 @@ export default function MenuGalleryGrid({ items }: MenuGalleryGridProps) {
                  */}
                 <img
                   src={imageSrc}
-                  alt={item.name}
+                  alt={currentLanguage === 'en' ? item.nameEn : item.name}
                   className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
                 />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 transition group-hover:opacity-90" />
               </div>
               <div className="space-y-2 px-5 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary-500">
-                  {item.category}
+                  {currentLanguage === 'en' ? item.categoryEn : item.category}
                 </p>
-                <h3 className="text-xl font-black text-gray-900 dark:text-white">{item.name}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{item.description}</p>
+                <h3 className="text-xl font-black text-gray-900 dark:text-white">
+                  {currentLanguage === 'en' ? item.nameEn : item.name}
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {currentLanguage === 'en' ? item.descriptionEn : item.description}
+                </p>
                 <div className="flex items-center justify-between pt-2 text-gray-900 dark:text-white">
                   <div className="flex items-center gap-2 text-lg font-semibold">
                     <span>{item.price}</span>

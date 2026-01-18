@@ -31,6 +31,7 @@ import AnimatedHeading from '@/components/AnimatedHeading';
 import Pagination from '@/components/Pagination';
 import PostCard from '@/components/PostCard';
 import SupportBanner from '@/components/SupportBanner';
+import { useLanguage } from '@/components/Language/LanguageProvider';
 import { CoreContent } from '@/lib/utils/contentlayer';
 import type { Blog } from 'contentlayer/generated';
 import { ComponentProps, useState } from 'react';
@@ -43,28 +44,36 @@ interface Props {
 }
 
 export default function ListLayout({ posts, title, initialDisplayPosts = [], pagination }: Props) {
+  const { currentLanguage, t } = useLanguage();
   const [searchValue, setSearchValue] = useState('');
-  const filteredBlogPosts = posts.filter((post) => {
+
+  const localizedPosts = posts.filter((post) => (post as any).locale === currentLanguage);
+
+  const filteredBlogPosts = localizedPosts.filter((post) => {
     const searchContent = post.title + post.summary + post.tags?.join(' ');
     return searchContent.toLowerCase().includes(searchValue.toLowerCase());
   });
 
+  const localizedInitialPosts = initialDisplayPosts.filter(
+    (post) => (post as any).locale === currentLanguage
+  );
+
   // If initialDisplayPosts exist, display it if no searchValue is specified.
   const displayPosts =
-    initialDisplayPosts.length > 0 && !searchValue ? initialDisplayPosts : filteredBlogPosts;
+    localizedInitialPosts.length > 0 && !searchValue ? localizedInitialPosts : filteredBlogPosts;
 
   return (
     <>
       <div className="space-y-2 rounded-lg pt-8 pb-3 md:space-y-5">
         <h1 className="text-3xl font-extrabold leading-9 tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl sm:leading-10 md:text-5xl md:leading-14">
-          <AnimatedHeading text={title} />
+          <AnimatedHeading text={t('nav.blog') || title} />
         </h1>
         <div className="relative max-w-full">
           <input
-            aria-label="Search articles"
+            aria-label={t('blog.search_articles') || 'Search articles'}
             type="text"
             onChange={(e) => setSearchValue(e.target.value)}
-            placeholder="Search articles"
+            placeholder={t('blog.search_articles') || 'Search articles'}
             className="block w-full rounded-md border-0 bg-gray-200 bg-opacity-50 px-4 py-3 text-gray-900 focus:border-sky-500 focus:ring-sky-500 dark:border-gray-900 dark:bg-gray-800 dark:text-gray-100"
           />
           <svg

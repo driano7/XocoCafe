@@ -310,8 +310,7 @@ export function OrderDetailPanel({
       : null;
   const deliveryPercentLabel =
     typeof deliveryTipPercent === 'number' ? `${deliveryTipPercent}%` : null;
-  const showShippingCard =
-    shippingAddressLines.length > 0 || shippingContact || formattedDeliveryTip !== null;
+  const showShippingCard = shippingAddressLines.length > 0;
   const decryptedCustomerName = buildFullName(
     decryptedCustomer?.firstName,
     decryptedCustomer?.lastName

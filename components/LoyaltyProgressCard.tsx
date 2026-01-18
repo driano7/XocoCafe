@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import classNames from 'classnames';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLanguage } from '@/components/Language/LanguageProvider';
 
 interface LoyaltyProgressCardProps {
   coffees?: number | null;
@@ -30,6 +31,7 @@ export default function LoyaltyProgressCard({
   qrUrl,
   clientId,
 }: LoyaltyProgressCardProps) {
+  const { t } = useLanguage();
   const normalized = Math.max(0, Math.min(goal, Math.floor(coffees ?? 0)));
   const progressPercent = useMemo(
     () => Math.min(100, Math.round((normalized / goal) * 100)),
@@ -61,10 +63,14 @@ export default function LoyaltyProgressCard({
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-[11px] uppercase tracking-[0.35em] text-white/80">
-            Programa de lealtad
+            {t('loyalty.program_label') || 'Programa de lealtad'}
           </p>
-          <h3 className="text-2xl font-semibold">{customerName?.trim() || 'Cliente'}</h3>
-          <p className="text-xs text-white/75">Sello por cada bebida registrada</p>
+          <h3 className="text-2xl font-semibold">
+            {customerName?.trim() || t('orders.client') || 'Cliente'}
+          </h3>
+          <p className="text-xs text-white/75">
+            {t('loyalty.stamps_label') || 'Sello por cada bebida registrada'}
+          </p>
         </div>
         <div
           className={classNames(
@@ -105,16 +111,23 @@ export default function LoyaltyProgressCard({
       </div>
 
       <div className="mt-4 space-y-1 text-center text-xs uppercase tracking-[0.3em] text-white/80 sm:hidden">
-        <p className="text-[10px] text-white/60">Pedidos registrados / Interacciones totales</p>
+        <p className="text-[10px] text-white/60">
+          {t('loyalty.orders_registered') || 'Pedidos registrados'} /{' '}
+          {t('loyalty.total_interactions') || 'Interacciones totales'}
+        </p>
         <p className="text-lg font-semibold">{`${orders ?? '—'} / ${totalInteractions ?? '—'}`}</p>
       </div>
       <div className="mt-4 hidden gap-2 text-xs uppercase tracking-[0.2em] text-white/80 sm:grid sm:grid-cols-2">
         <div>
-          <p className="text-[10px] text-white/60">Pedidos registrados</p>
+          <p className="text-[10px] text-white/60">
+            {t('loyalty.orders_registered') || 'Pedidos registrados'}
+          </p>
           <p className="text-lg font-semibold">{orders ?? '—'}</p>
         </div>
         <div>
-          <p className="text-[10px] text-white/60">Interacciones totales</p>
+          <p className="text-[10px] text-white/60">
+            {t('loyalty.total_interactions') || 'Interacciones totales'}
+          </p>
           <p className="text-lg font-semibold">{totalInteractions ?? '—'}</p>
         </div>
       </div>
@@ -122,7 +135,8 @@ export default function LoyaltyProgressCard({
       {qrUrl && clientId && (
         <div className="mt-6 flex flex-col items-center gap-3 text-center text-white/85">
           <p className="text-[11px] font-semibold uppercase tracking-[0.25em]">
-            Escanea este código para identificar tu cuenta rápidamente en sucursal.
+            {t('loyalty.qr_scan_notice') ||
+              'Escanea este código para identificar tu cuenta rápidamente en sucursal.'}
           </p>
           <Image
             src={qrUrl}
@@ -132,19 +146,29 @@ export default function LoyaltyProgressCard({
             className="h-48 w-48 rounded-2xl border border-white/60 bg-white/95 p-2 shadow-lg"
           />
           <p className="text-xs font-semibold uppercase tracking-[0.35em]">
-            ID · <span className="underline decoration-white/70">{clientId}</span>
+            {t('loyalty.id_label') || 'ID'} ·{' '}
+            <span className="underline decoration-white/70">{clientId}</span>
           </p>
         </div>
       )}
 
       <p className="mt-4 text-[11px] text-white/70">
         {normalized >= goal ? (
+          t('loyalty.stamps_complete') ||
           '¡Llevas los sellos completos! Canjea tu bebida en barra para reiniciar tu cuenta.'
         ) : (
           <span className="underline decoration-white/80 underline-offset-4">
-            {`Te faltan ${goal - normalized} ${
-              goal - normalized === 1 ? 'sello' : 'sellos'
-            } para el Americano en cortesía.`}
+            {(
+              t('loyalty.stamps_missing') ||
+              'Te faltan {count} {label} para el Americano en cortesía.'
+            )
+              .replace('{count}', String(goal - normalized))
+              .replace(
+                '{label}',
+                goal - normalized === 1
+                  ? t('loyalty.stamp') || 'sello'
+                  : t('loyalty.stamps') || 'sellos'
+              )}
           </span>
         )}
       </p>
