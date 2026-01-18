@@ -25,6 +25,53 @@ import { dictionaries } from '@/lib/i18n/dictionaries';
 
 export type SupportedLanguage = 'es' | 'en';
 
+const LANGUAGE_ALIASES: Record<string, SupportedLanguage> = {
+  es: 'es',
+  'es-es': 'es',
+  'es-mx': 'es',
+  'es-419': 'es',
+  'es-ar': 'es',
+  'es-co': 'es',
+  'es-pe': 'es',
+  'es-ve': 'es',
+  'es-cl': 'es',
+  'es-uy': 'es',
+  'es-py': 'es',
+  'es-bo': 'es',
+  'es-ec': 'es',
+  'es-gt': 'es',
+  'es-cr': 'es',
+  'es-pa': 'es',
+  'es-hn': 'es',
+  'es-ni': 'es',
+  'es-sv': 'es',
+  'es-do': 'es',
+  'es-cu': 'es',
+  'es-pr': 'es',
+  en: 'en',
+  'en-us': 'en',
+  'en-gb': 'en',
+  'en-ca': 'en',
+  'en-au': 'en',
+  'en-nz': 'en',
+  'en-za': 'en',
+  'en-ie': 'en',
+};
+
+const normalizeLanguage = (value?: string | null): SupportedLanguage | null => {
+  if (!value) return null;
+  const normalized = value.toLowerCase();
+  if (normalized in LANGUAGE_ALIASES) {
+    return LANGUAGE_ALIASES[normalized];
+  }
+  const base = normalized.split('-')[0];
+  if (base === 'es') return 'es';
+  if (['en', 'zh', 'ja', 'de'].includes(base)) {
+    return 'en';
+  }
+  return null;
+};
+
 interface LanguageContextType {
   currentLanguage: SupportedLanguage;
   t: (path: string) => string;
@@ -47,16 +94,27 @@ export function LanguageProvider({
   const detectLanguage = useCallback((): SupportedLanguage => {
     if (typeof window === 'undefined') return fallbackLanguage;
 
-    // Check localStorage
-    const stored = localStorage.getItem('preferred_language') as SupportedLanguage;
-    if (stored && (stored === 'es' || stored === 'en')) return stored;
+    const storedPreference = normalizeLanguage(localStorage.getItem('preferred_language'));
+    if (storedPreference) {
+      return storedPreference;
+    }
 
-    // Check browser language
-    const browserLang = navigator.language.split('-')[0].toLowerCase();
-    // Requisito: Si es inglés, chino, japonés o alemán -> Inglés
-    if (['en', 'zh', 'ja', 'de'].includes(browserLang)) return 'en';
+    const htmlLang = normalizeLanguage(document.documentElement?.lang);
+    if (htmlLang) {
+      return htmlLang;
+    }
 
-    return 'es';
+    const browserLanguages = navigator.languages?.length
+      ? navigator.languages
+      : [navigator.language];
+    for (const lang of browserLanguages) {
+      const normalized = normalizeLanguage(lang);
+      if (normalized) {
+        return normalized;
+      }
+    }
+
+    return fallbackLanguage;
   }, [fallbackLanguage]);
 
   useEffect(() => {

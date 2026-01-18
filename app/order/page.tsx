@@ -98,15 +98,22 @@ export default function OrderPage() {
 
   // Auto-scroll when items are added (count increases)
   useEffect(() => {
-    if (itemCount > previousItemCountRef.current && itemCount > 0) {
-      // Small delay to allow react to render the new item
-      setTimeout(() => {
-        // Only auto-scroll on mobile devices
-        if (window.matchMedia('(max-width: 768px)').matches) {
+    if (
+      itemCount > previousItemCountRef.current &&
+      itemCount > 0 &&
+      typeof window !== 'undefined'
+    ) {
+      const isMobileViewport =
+        window.matchMedia('(pointer: coarse)').matches ||
+        window.matchMedia('(max-width: 768px)').matches;
+
+      if (isMobileViewport) {
+        setTimeout(() => {
           cartContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 100);
+        }, 100);
+      }
     }
+
     previousItemCountRef.current = itemCount;
   }, [itemCount]);
 

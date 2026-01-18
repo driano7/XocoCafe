@@ -218,7 +218,7 @@ export async function getUserByEmail(email: string) {
   const { data: user, error } = await supabase
     .from('users')
     .select(
-      'id,email,passwordHash,clientId,authProvider,firstNameEncrypted,firstNameIv,firstNameTag,firstNameSalt,lastNameEncrypted,lastNameIv,lastNameTag,lastNameSalt,phoneEncrypted,phoneIv,phoneTag,phoneSalt,walletAddress,city,country,favoriteColdDrink,favoriteHotDrink,favoriteFood,weeklyCoffeeCount,termsAccepted,privacyAccepted,marketingEmail,marketingSms,marketingPush,createdAt,lastLoginAt,avatarUrl'
+      'id,email,passwordHash,clientId,authProvider,firstNameEncrypted,firstNameIv,firstNameTag,firstNameSalt,lastNameEncrypted,lastNameIv,lastNameTag,lastNameSalt,phoneEncrypted,phoneIv,phoneTag,phoneSalt,walletAddress,city,country,favoriteColdDrink,favoriteHotDrink,favoriteFood,weeklyCoffeeCount,termsAccepted,privacyAccepted,marketingEmail,marketingSms,marketingPush,createdAt,lastLoginAt,avatarUrl,loyaltyActivatedAt'
     )
     .eq('email', email)
     .maybeSingle();
@@ -229,9 +229,11 @@ export async function getUserByEmail(email: string) {
 
   if (!user) return null;
 
+  const addressRows = await fetchAddressRows(user.id);
   const decryptedData = decryptUserData(email, user);
   const { passwordHash, ...userWithoutPassword } = user;
   const avatarSignedUrl = await getSignedAvatarUrl(user.avatarUrl as string | null);
+  const addresses = addressRows.map((row) => decryptAddressRow(email, row));
 
   return {
     ...userWithoutPassword,
@@ -245,6 +247,7 @@ export async function getUserByEmail(email: string) {
     weeklyCoffeeCount: user.weeklyCoffeeCount ?? 0,
     avatarUrl: avatarSignedUrl,
     avatarStoragePath: (user.avatarUrl as string | null) || null,
+    addresses,
     passwordHash,
   };
 }

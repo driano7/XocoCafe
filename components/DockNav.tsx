@@ -14,6 +14,7 @@ import {
   FiMoreHorizontal,
   FiShoppingBag,
 } from 'react-icons/fi';
+import { FaWhatsapp, FaInstagram, FaTiktok } from 'react-icons/fa';
 import { PiTrayBold } from 'react-icons/pi';
 import { useAuth } from '@/components/Auth/AuthProvider';
 
@@ -58,6 +59,9 @@ const EXTRA_LINKS_AUTH: DockLink[] = [
   },
   LOCATION_LINK,
   { href: '/blog', icon: FiCoffee, label: 'Blog', startsWith: '/blog' },
+  { href: 'https://wa.me/5215512345678', icon: FaWhatsapp, label: 'WhatsApp' },
+  { href: 'https://instagram.com/xococafe', icon: FaInstagram, label: 'Instagram' },
+  { href: 'https://tiktok.com/@xococafe', icon: FaTiktok, label: 'TikTok' },
 ];
 
 const EXTRA_LINKS_PUBLIC: DockLink[] = [
@@ -68,6 +72,9 @@ const EXTRA_LINKS_PUBLIC: DockLink[] = [
     startsWith: '/blog/facturacion',
   },
   { href: '/blog', icon: FiCoffee, label: 'Blog', startsWith: '/blog' },
+  { href: 'https://wa.me/5215512345678', icon: FaWhatsapp, label: 'WhatsApp' },
+  { href: 'https://instagram.com/xococafe', icon: FaInstagram, label: 'Instagram' },
+  { href: 'https://tiktok.com/@xococafe', icon: FaTiktok, label: 'TikTok' },
 ];
 
 const DOCK_BUTTON_BASE =

@@ -246,6 +246,8 @@ export const dictionaries = {
       update_error: 'Error actualizando el perfil.',
       export_error: 'Error exportando tus datos.',
       delete_error: 'Error eliminando tu cuenta.',
+      hide: 'Ocultar',
+      view: 'Ver',
     },
     loyalty: {
       program_label: 'Programa de lealtad',
@@ -750,6 +752,8 @@ export const dictionaries = {
       update_error: 'Error updating your profile.',
       export_error: 'Error exporting your data.',
       delete_error: 'Error deleting your account.',
+      hide: 'Hide',
+      view: 'View',
     },
     loyalty: {
       program_label: 'Loyalty Program',

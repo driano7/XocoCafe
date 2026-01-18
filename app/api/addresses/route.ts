@@ -73,7 +73,9 @@ export async function GET(request: NextRequest) {
     }
 
     const addresses = data?.map((row) => decryptAddressRow(decoded.email, row as AddressRow)) ?? [];
-
+    console.log(
+      `[GET /api/addresses] User: ${decoded.userId}, Found: ${data?.length}, Decrypted: ${addresses.length}`
+    );
     return NextResponse.json({ success: true, data: addresses });
   } catch (error: unknown) {
     console.error('Error obteniendo direcciones:', error);

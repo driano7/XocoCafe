@@ -26,6 +26,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { ZodError } from 'zod';
 import { loginSchema } from '@/lib/validations/auth';
 import {
   verifyPassword,
@@ -102,8 +103,10 @@ export async function POST(request: NextRequest) {
       message: 'Login exitoso',
       user: {
         id: user.id,
+        createdAt: user.createdAt,
         email: user.email,
         clientId: user.clientId,
+        authProvider: user.authProvider || undefined,
         firstName: decryptedData.firstName || undefined,
         lastName: decryptedData.lastName || undefined,
         phone: decryptedData.phone || undefined,
@@ -112,15 +115,27 @@ export async function POST(request: NextRequest) {
         walletAddress: user.walletAddress || undefined,
         avatarUrl: user.avatarUrl || undefined,
         avatarStoragePath: user.avatarStoragePath || undefined,
+        favoriteColdDrink: user.favoriteColdDrink || undefined,
+        favoriteHotDrink: user.favoriteHotDrink || undefined,
+        favoriteFood: user.favoriteFood || undefined,
+        weeklyCoffeeCount: user.weeklyCoffeeCount ?? 0,
+        loyaltyActivatedAt: user.loyaltyActivatedAt ?? null,
+        loyaltyEnrolled: Boolean(user.loyaltyActivatedAt),
+        termsAccepted: Boolean(user.termsAccepted),
+        privacyAccepted: Boolean(user.privacyAccepted),
+        marketingEmail: Boolean(user.marketingEmail),
+        marketingSms: Boolean(user.marketingSms),
+        marketingPush: Boolean(user.marketingPush),
+        addresses: user.addresses ?? [],
       },
       token,
       loginCount,
       showFeedbackPrompt,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error en login:', error);
 
-    if (error.name === 'ZodError') {
+    if (error instanceof ZodError) {
       return NextResponse.json(
         { success: false, message: 'Datos inválidos', errors: error.errors },
         { status: 400 }

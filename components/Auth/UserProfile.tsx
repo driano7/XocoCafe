@@ -32,7 +32,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { FaWhatsapp, FaInstagram, FaTiktok } from 'react-icons/fa';
+import { FaWhatsapp } from 'react-icons/fa';
 import siteMetadata from 'content/siteMetadata';
 import FavoritesSelect from '@/components/FavoritesSelect';
 import FavoriteItemsList from '@/components/FavoriteItemsList';
@@ -1462,42 +1462,6 @@ export default function UserProfile({ user }: { user: User }) {
                     <TranslatedText tid="profile.delete_account" fallback="Eliminar Cuenta" />
                   </button>
                 </div>
-              </div>
-            </div>
-
-            {/* Social Media Links */}
-            <div className="pt-6 border-t border-gray-100 dark:border-white/10">
-              <h4 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
-                Siguenos en redes
-              </h4>
-              <div className="flex items-center gap-4">
-                <a
-                  href="https://wa.me/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-green-500 hover:opacity-80 transition-opacity"
-                  aria-label="WhatsApp"
-                >
-                  <FaWhatsapp size={24} />
-                </a>
-                <a
-                  href="https://instagram.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-pink-500 hover:opacity-80 transition-opacity"
-                  aria-label="Instagram"
-                >
-                  <FaInstagram size={24} />
-                </a>
-                <a
-                  href="https://tiktok.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-black dark:text-white hover:opacity-80 transition-opacity"
-                  aria-label="TikTok"
-                >
-                  <FaTiktok size={24} />
-                </a>
               </div>
             </div>
           </div>
