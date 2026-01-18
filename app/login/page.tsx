@@ -317,11 +317,10 @@ export default function LoginPage() {
           className="text-3xl font-black text-primary-900 dark:text-white"
         >
           {(() => {
-            const tid = 'auth.welcome_back_user';
-            const translation = t(tid);
-            const text =
-              translation && translation !== tid ? translation : '¡Bienvenido de vuelta, {name}!';
-            return text.replace('{name}', greetingName || '');
+            const translation = t('auth.welcome_back_user');
+            return translation === 'auth.welcome_back_user'
+              ? `¡Bienvenido de vuelta, ${greetingName || ''}!`
+              : translation.replace('{name}', greetingName || '');
           })()}
         </motion.h2>
         <motion.p

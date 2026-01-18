@@ -102,7 +102,7 @@ export default function OrderPage() {
       // Small delay to allow react to render the new item
       setTimeout(() => {
         // Only auto-scroll on mobile devices
-        if (window.innerWidth < 768) {
+        if (window.matchMedia('(max-width: 768px)').matches) {
           cartContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }, 100);

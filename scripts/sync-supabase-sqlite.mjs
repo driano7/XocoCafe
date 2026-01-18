@@ -242,7 +242,7 @@ async function ensureSupabaseCronHeartbeat() {
     if (isMissingTable) {
       console.warn(
         `⚠️  Supabase cron heartbeat table "${cronHeartbeatConfig.table}" not found. ` +
-        'Set SUPABASE_CRON_HEARTBEAT_REQUIRED=false to bypass this check.'
+          'Set SUPABASE_CRON_HEARTBEAT_REQUIRED=false to bypass this check.'
       );
       if (cronHeartbeatConfig.required) {
         throw new Error('Supabase cron heartbeat table is required but missing.');
@@ -255,7 +255,7 @@ async function ensureSupabaseCronHeartbeat() {
   if (!data || !data[cronHeartbeatConfig.timestampColumn]) {
     throw new Error(
       `Supabase cron heartbeat "${cronHeartbeatConfig.jobName}" missing timestamp ` +
-      `(${cronHeartbeatConfig.timestampColumn}).`
+        `(${cronHeartbeatConfig.timestampColumn}).`
     );
   }
 
@@ -270,7 +270,7 @@ async function ensureSupabaseCronHeartbeat() {
   if (ageMinutes > cronHeartbeatConfig.maxAgeMinutes) {
     throw new Error(
       `Supabase cron heartbeat is too old (${ageMinutes.toFixed(1)} min). ` +
-      'Wait for the nightly import before pulling data into SQLite.'
+        'Wait for the nightly import before pulling data into SQLite.'
     );
   }
   console.log(
@@ -320,7 +320,7 @@ async function main() {
     } else {
       console.log(
         `⏸️  Skipping SQLite -> Supabase push for ${table.name} because Supabase ` +
-        'pull did not succeed in this run.'
+          'pull did not succeed in this run.'
       );
     }
 
@@ -330,7 +330,8 @@ async function main() {
     });
 
     console.log(
-      `✅ ${table.name} - pulled ${pullSucceeded ? pulledRows.length : 'skipped'}, pushed ${pushSucceeded && lastSqlitePush !== state.lastSqlitePush ? 'changes' : '0'
+      `✅ ${table.name} - pulled ${pullSucceeded ? pulledRows.length : 'skipped'}, pushed ${
+        pushSucceeded && lastSqlitePush !== state.lastSqlitePush ? 'changes' : '0'
       }`
     );
   }

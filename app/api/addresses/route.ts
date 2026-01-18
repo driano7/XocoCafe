@@ -55,9 +55,7 @@ async function requireUser(request: NextRequest) {
 async function fetchAddressRows(userId: string) {
   return supabase
     .from('addresses')
-    .select(
-      'id,userId,label,nickname,type,isDefault,payload,payload_iv,payload_tag,payload_salt,createdAt,updatedAt'
-    )
+    .select('*')
     .eq('userId', userId)
     .order('createdAt', { ascending: true });
 }
