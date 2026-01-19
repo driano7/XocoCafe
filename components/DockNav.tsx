@@ -17,6 +17,7 @@ import {
 import { FaWhatsapp, FaInstagram, FaTiktok } from 'react-icons/fa';
 import { PiTrayBold } from 'react-icons/pi';
 import { useAuth } from '@/components/Auth/AuthProvider';
+import siteMetadata from 'content/siteMetadata';
 
 type DockLink = {
   href: string;
@@ -50,50 +51,44 @@ const PUBLIC_LINKS: DockLink[] = [
   LOCATION_LINK,
 ];
 
-const EXTRA_LINKS_AUTH: DockLink[] = [
-  {
-    href: '/blog/facturacion',
-    icon: FiFileText,
-    label: 'Facturación',
-    startsWith: '/blog/facturacion',
-  },
-  LOCATION_LINK,
-  { href: '/blog', icon: FiCoffee, label: 'Blog', startsWith: '/blog' },
-];
+const FACTURACION_LINK: DockLink = {
+  href: '/blog/facturacion',
+  icon: FiFileText,
+  label: 'Facturación',
+  startsWith: '/blog/facturacion',
+};
 
-const EXTRA_LINKS_PUBLIC: DockLink[] = [
-  {
-    href: '/blog/facturacion',
-    icon: FiFileText,
-    label: 'Facturación',
-    startsWith: '/blog/facturacion',
-  },
-  { href: '/blog', icon: FiCoffee, label: 'Blog', startsWith: '/blog' },
-];
+const BLOG_LINK: DockLink = { href: '/blog', icon: FiCoffee, label: 'Blog', startsWith: '/blog' };
 
-const SOCIAL_LINKS: Array<
-  DockLink & {
-    accentClass: string;
-  }
-> = [
+type HiddenLink = DockLink & {
+  variant: 'social' | 'internal';
+  accentClass?: string;
+};
+
+const HIDDEN_DRAWER_LINKS: HiddenLink[] = [
   {
-    href: 'https://wa.me/5215512345678',
+    href: siteMetadata.whats,
     icon: FaWhatsapp,
     label: 'WhatsApp',
+    variant: 'social',
     accentClass: 'bg-[#25D366] text-white shadow-[#25D366]/40',
   },
   {
-    href: 'https://instagram.com/xococafe',
+    href: siteMetadata.instagram,
     icon: FaInstagram,
     label: 'Instagram',
+    variant: 'social',
     accentClass: 'bg-gradient-to-tr from-[#feda75] via-[#d62976] to-[#962fbf] text-white',
   },
   {
-    href: 'https://tiktok.com/@xococafe',
+    href: siteMetadata.tiktok,
     icon: FaTiktok,
     label: 'TikTok',
+    variant: 'social',
     accentClass: 'bg-black text-white shadow-lg shadow-black/20',
   },
+  { ...FACTURACION_LINK, variant: 'internal' },
+  { ...BLOG_LINK, variant: 'internal' },
 ];
 
 const DOCK_BUTTON_BASE =
@@ -119,7 +114,6 @@ export default function DockNav() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const links = useMemo(() => (user ? AUTH_LINKS : PUBLIC_LINKS), [user]);
-  const extraLinks = useMemo(() => (user ? EXTRA_LINKS_AUTH : EXTRA_LINKS_PUBLIC), [user]);
 
   const scheduleCollapse = useCallback(() => {
     if (collapseTimer.current) {
@@ -197,48 +191,31 @@ export default function DockNav() {
     <div className="fixed inset-x-0 bottom-4 z-50 px-4 sm:hidden">
       {!isCollapsed && showExtras && (
         <div className="absolute bottom-24 right-6 flex flex-col space-y-3 rounded-3xl border border-white/20 bg-white/80 p-4 text-gray-900 shadow-2xl backdrop-blur-lg dark:border-black/10 dark:bg-gray-900/80 dark:text-white">
-          {extraLinks.map((link) => {
-            const Icon = link.icon;
-            const active = isActiveRoute(pathname ?? '', link);
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={handleLinkClick}
-                className={classNames(
-                  DOCK_BUTTON_BASE,
-                  active ? DOCK_BUTTON_ACTIVE : DOCK_BUTTON_INACTIVE
-                )}
-                aria-label={link.label}
-              >
-                <Icon />
-              </Link>
-            );
-          })}
-          <div className="mt-1 border-t border-black/10 pt-3 dark:border-white/10">
-            <p className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Conéctate
-            </p>
-            <div className="flex items-center justify-between space-x-2">
-              {SOCIAL_LINKS.map((link) => {
-                const Icon = link.icon;
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    aria-label={link.label}
-                    onClick={handleLinkClick}
-                    className={classNames(
-                      DOCK_BUTTON_BASE,
-                      'flex-1 shadow-lg hover:scale-105 transition',
-                      link.accentClass
-                    )}
-                  >
-                    <Icon />
-                  </Link>
-                );
-              })}
-            </div>
+          <div className="flex flex-col items-center space-y-3">
+            {HIDDEN_DRAWER_LINKS.map((link) => {
+              const Icon = link.icon;
+              const active = link.variant === 'internal' && isActiveRoute(pathname ?? '', link);
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  aria-label={link.label}
+                  onClick={handleLinkClick}
+                  className={classNames(
+                    DOCK_BUTTON_BASE,
+                    'h-12',
+                    link.variant === 'social'
+                      ? classNames('w-12 shadow-lg hover:scale-105 transition', link.accentClass)
+                      : classNames(
+                          'w-full text-base',
+                          active ? DOCK_BUTTON_ACTIVE : DOCK_BUTTON_INACTIVE
+                        )
+                  )}
+                >
+                  <Icon />
+                </Link>
+              );
+            })}
           </div>
           <button
             type="button"

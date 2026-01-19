@@ -91,15 +91,6 @@ export default function Hero(): ReactElement {
                   startDelay={400}
                 />
               </h2>
-              <p
-                key={`antoja-${currentLanguage}`}
-                className="max-w-[18rem] text-xs font-semibold uppercase tracking-[0.25em] text-primary-600/60 dark:text-primary-400/40 sm:max-w-none sm:text-sm"
-              >
-                <TranslatedText
-                  tid="hero.antoja"
-                  fallback="¿A poco no se te antoja un buen Café ó Chocolate?"
-                />
-              </p>
               <motion.div
                 initial="hidden"
                 animate={['visible', 'pulse']}

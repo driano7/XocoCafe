@@ -1037,7 +1037,7 @@ export default function OrdersDashboardPage() {
   const dataUrlToBlob = (dataUrl: string): Blob => {
     const [metadata, content] = dataUrl.split(',');
     const mimeMatch = metadata.match(/:(.*?);/);
-    const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
     const byteString = atob(content);
     const length = byteString.length;
     const arrayBuffer = new ArrayBuffer(length);
@@ -1048,7 +1048,15 @@ export default function OrdersDashboardPage() {
     return new Blob([uintArray], { type: mime });
   };
 
-  const captureTicketAsBlob = useCallback(async () => {
+  type TicketSnapshot = {
+    blob: Blob;
+    displayWidth: number;
+    displayHeight: number;
+    imageWidth: number;
+    imageHeight: number;
+  };
+
+  const captureTicketSnapshot = useCallback(async (): Promise<TicketSnapshot | null> => {
     if (!ticketRef.current) return null;
     await waitForTicketAssets();
     const html2canvas = (await import('html2canvas')).default;
@@ -1057,29 +1065,123 @@ export default function OrdersDashboardPage() {
       backgroundColor: '#ffffff',
       useCORS: true,
     });
-    if (typeof canvas.toBlob !== 'function') {
-      try {
-        const dataUrl = canvas.toDataURL('image/png', 1);
-        return dataUrlToBlob(dataUrl);
-      } catch (error) {
-        console.error('No pudimos convertir el ticket en imagen (fallback).', error);
-        return null;
-      }
-    }
-    return new Promise<Blob | null>((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            reject(new Error('No pudimos generar la imagen del ticket.'));
+    const toBlob = () =>
+      new Promise<Blob | null>((resolve, reject) => {
+        if (typeof canvas.toBlob !== 'function') {
+          try {
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+            resolve(dataUrlToBlob(dataUrl));
+            return;
+          } catch (error) {
+            reject(error);
             return;
           }
-          resolve(blob);
-        },
-        'image/png',
-        1
-      );
-    });
-  }, [waitForTicketAssets]);
+        }
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error('No pudimos generar la imagen del ticket.'));
+              return;
+            }
+            resolve(blob);
+          },
+          'image/jpeg',
+          0.95
+        );
+      });
+
+    let blob: Blob | null = null;
+    try {
+      blob = await toBlob();
+    } catch (error) {
+      console.error('No pudimos convertir el ticket en imagen (fallback).', error);
+      blob = null;
+    }
+    if (!blob) return null;
+    const rect = ticketRef.current.getBoundingClientRect();
+    return {
+      blob,
+      displayWidth: Math.max(1, rect.width || canvas.width),
+      displayHeight: Math.max(1, rect.height || canvas.height),
+      imageWidth: Math.max(1, canvas.width),
+      imageHeight: Math.max(1, canvas.height),
+    };
+  }, [ticketRef, waitForTicketAssets]);
+
+  const createPdfFromSnapshot = useCallback(async (snapshot: TicketSnapshot) => {
+    const jpegBytes = new Uint8Array(await snapshot.blob.arrayBuffer());
+    const pxToPt = (px: number) => Math.max(1, Math.round((px * 72) / 96));
+    const widthPt = pxToPt(snapshot.displayWidth);
+    const heightPt = pxToPt(snapshot.displayHeight);
+    const imageWidth = Math.max(1, Math.round(snapshot.imageWidth));
+    const imageHeight = Math.max(1, Math.round(snapshot.imageHeight));
+    const textEncoder = new TextEncoder();
+    const pdfChunks: Uint8Array[] = [];
+    const offsets: number[] = [];
+    let position = 0;
+
+    const pushChunk = (chunk: string | Uint8Array) => {
+      const nextChunk = typeof chunk === 'string' ? textEncoder.encode(chunk) : chunk;
+      pdfChunks.push(nextChunk);
+      position += nextChunk.length;
+    };
+
+    const addObject = (id: number, body: string) => {
+      offsets[id] = position;
+      pushChunk(`${id} 0 obj\n${body}\nendobj\n`);
+    };
+
+    const addStreamObject = (id: number, dict: string, data: string | Uint8Array) => {
+      const payload = typeof data === 'string' ? textEncoder.encode(data) : data;
+      offsets[id] = position;
+      pushChunk(`${id} 0 obj\n${dict}\nstream\n`);
+      pushChunk(payload);
+      pushChunk('\nendstream\nendobj\n');
+    };
+
+    pushChunk('%PDF-1.4\n');
+
+    addObject(1, '<< /Type /Catalog /Pages 2 0 R >>');
+    addObject(2, '<< /Type /Pages /Count 1 /Kids [3 0 R] >>');
+    addObject(
+      3,
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${widthPt} ${heightPt}] /Resources << /ProcSet [/PDF /ImageC] /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`
+    );
+
+    addStreamObject(
+      4,
+      `<< /Type /XObject /Subtype /Image /Width ${imageWidth} /Height ${imageHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>`,
+      jpegBytes
+    );
+
+    const contentStream = `q\n${widthPt} 0 0 ${heightPt} 0 0 cm\n/Im0 Do\nQ\n`;
+    addStreamObject(5, `<< /Length ${textEncoder.encode(contentStream).length} >>`, contentStream);
+
+    const xrefStart = position;
+    pushChunk('xref\n0 6\n');
+    pushChunk('0000000000 65535 f \n');
+    for (let i = 1; i <= 5; i += 1) {
+      const offset = offsets[i] ?? 0;
+      pushChunk(`${offset.toString().padStart(10, '0')} 00000 n \n`);
+    }
+    pushChunk('trailer\n');
+    pushChunk('<< /Size 6 /Root 1 0 R >>\n');
+    pushChunk(`startxref\n${xrefStart}\n%%EOF`);
+    return new Blob(pdfChunks, { type: 'application/pdf' });
+  }, []);
+
+  const generateTicketPdf = useCallback(async () => {
+    const snapshot = await captureTicketSnapshot();
+    if (!snapshot) {
+      return null;
+    }
+    try {
+      return await createPdfFromSnapshot(snapshot);
+    } catch (error) {
+      console.error('No pudimos generar el PDF del ticket.', error);
+      return null;
+    }
+  }, [captureTicketSnapshot, createPdfFromSnapshot]);
 
   const buildTicketFileName = useCallback(() => {
     if (!selectedOrder) return 'ticket-xoco-cafe';
@@ -1102,7 +1204,7 @@ export default function OrdersDashboardPage() {
         setTicketShareBlob(null);
         return null;
       }
-      const blob = await captureTicketAsBlob();
+      const blob = await generateTicketPdf();
       setTicketShareBlob(blob);
       return blob;
     } catch (error) {
@@ -1112,7 +1214,7 @@ export default function OrdersDashboardPage() {
     } finally {
       setIsPreparingShareBlob(false);
     }
-  }, [captureTicketAsBlob, selectedOrder]);
+  }, [generateTicketPdf, selectedOrder]);
 
   useEffect(() => {
     if (!selectedOrder) {
@@ -1137,14 +1239,14 @@ export default function OrdersDashboardPage() {
   }, [deviceInfo.isMobile, selectedOrder]);
 
   const triggerDownload = useCallback(
-    (blob: Blob, filename: string) => {
+    (blob: Blob, filename: string, extension: string) => {
       const objectUrl = URL.createObjectURL(blob);
       if (deviceInfo.isMobile) {
         const newTab = window.open(objectUrl, '_blank');
         if (!newTab) {
           const mobileLink = document.createElement('a');
           mobileLink.href = objectUrl;
-          mobileLink.download = `${filename}.png`;
+          mobileLink.download = `${filename}.${extension}`;
           mobileLink.rel = 'noopener';
           document.body.appendChild(mobileLink);
           mobileLink.click();
@@ -1155,7 +1257,7 @@ export default function OrdersDashboardPage() {
       }
       const link = document.createElement('a');
       link.href = objectUrl;
-      link.download = `${filename}.png`;
+      link.download = `${filename}.${extension}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1164,7 +1266,7 @@ export default function OrdersDashboardPage() {
     [deviceInfo.isMobile]
   );
 
-  const saveTicketToGallery = useCallback(
+  const shareTicketFileDirectly = useCallback(
     async (blob: Blob, filename: string) => {
       if (
         !isShareCapableDevice ||
@@ -1173,7 +1275,7 @@ export default function OrdersDashboardPage() {
       ) {
         throw new Error('gallery_not_supported');
       }
-      const file = new File([blob], `${filename}.png`, { type: 'image/png' });
+      const file = new File([blob], `${filename}.pdf`, { type: 'application/pdf' });
       const supportsFiles =
         typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] });
       if (!supportsFiles && !deviceInfo.isAndroid) {
@@ -1183,10 +1285,10 @@ export default function OrdersDashboardPage() {
         await navigator.share({
           files: [file],
           title: t('orders.digital_ticket') || 'Ticket digital Xoco Café',
-          text: t('orders.save_gallery_text') || 'Guardaremos tu ticket en tu galería.',
+          text: t('orders.save_gallery_text') || 'Guardaremos tu ticket en PDF.',
         });
       } catch (error) {
-        console.error('Error guardando ticket en galería:', error);
+        console.error('Error al compartir ticket en PDF:', error);
         if (
           error instanceof DOMException &&
           (error.name === 'AbortError' || error.name === 'NotAllowedError')
@@ -1207,31 +1309,31 @@ export default function OrdersDashboardPage() {
     setTicketActionError(null);
     setIsProcessingTicket(true);
     try {
-      const blob = await captureTicketAsBlob();
-      if (!blob) {
+      const pdfBlob = await generateTicketPdf();
+      if (!pdfBlob) {
         throw new Error('No pudimos generar el ticket');
       }
       const filename = buildTicketFileName();
       if (deviceInfo.isMobile && isShareCapableDevice) {
         try {
-          await saveTicketToGallery(blob, filename);
+          await shareTicketFileDirectly(pdfBlob, filename);
         } catch (mobileError) {
           if (mobileError instanceof Error && mobileError.message === 'gallery_permission_denied') {
             throw mobileError;
           }
           console.warn(
-            'Fallo guardando ticket en galería, aplicando descarga estándar:',
+            'Fallo al compartir ticket como PDF, aplicando descarga estándar:',
             mobileError
           );
           setTicketActionError(
             t('orders.gallery_save_failed_fallback') ||
-              'No pudimos guardar tu ticket en la galería, pero lo enviamos a tu carpeta de descargas.'
+              'No pudimos guardar tu ticket como PDF en tus archivos, pero lo enviamos a tu carpeta de descargas.'
           );
-          triggerDownload(blob, filename);
+          triggerDownload(pdfBlob, filename, 'pdf');
         }
         return;
       }
-      triggerDownload(blob, filename);
+      triggerDownload(pdfBlob, filename, 'pdf');
     } catch (error) {
       console.error('Error descargando ticket:', error);
       if (error instanceof DOMException && error.name === 'AbortError') {
@@ -1241,12 +1343,12 @@ export default function OrdersDashboardPage() {
       } else if (error instanceof Error && error.message === 'gallery_permission_denied') {
         setTicketActionError(
           t('orders.gallery_permission_denied') ||
-            'Necesitamos permiso para guardar el ticket en tu galería. Intenta aceptarlo o usa el botón Compartir.'
+            'Necesitamos permiso para guardar el PDF de tu ticket. Intenta aceptarlo o usa el botón Compartir.'
         );
       } else if (error instanceof Error && error.message?.startsWith('gallery_')) {
         setTicketActionError(
           t('orders.gallery_generic_error') ||
-            'No pudimos guardar tu ticket en la galería. Revisa los permisos o usa Compartir.'
+            'No pudimos guardar tu ticket como PDF automáticamente. Revisa los permisos o usa Compartir.'
         );
       } else {
         setTicketActionError(
@@ -1259,9 +1361,9 @@ export default function OrdersDashboardPage() {
   }, [
     buildTicketFileName,
     isShareCapableDevice,
-    captureTicketAsBlob,
+    generateTicketPdf,
     deviceInfo.isMobile,
-    saveTicketToGallery,
+    shareTicketFileDirectly,
     selectedOrder,
     t,
     triggerDownload,
@@ -1292,8 +1394,8 @@ export default function OrdersDashboardPage() {
       if (!blob) {
         throw new Error('ticket_unavailable');
       }
-      const file = new File([blob], `${buildTicketFileName()}.png`, {
-        type: 'image/png',
+      const file = new File([blob], `${buildTicketFileName()}.pdf`, {
+        type: 'application/pdf',
       });
       const supportsFiles =
         typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] });
@@ -1305,7 +1407,7 @@ export default function OrdersDashboardPage() {
               title: t('orders.digital_ticket') || 'Ticket digital Xoco Café',
               text:
                 t('orders.share_ticket_text') ||
-                'Comparte tu ticket con otra persona o guárdalo en tu galería.',
+                'Comparte tu ticket con otra persona o guárdalo como PDF.',
             }
           : (() => {
               const objectUrl = URL.createObjectURL(blob);
