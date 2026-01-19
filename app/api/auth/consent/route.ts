@@ -26,9 +26,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { ZodError } from 'zod';
 import { verifyToken, logDataRetentionAction, getUserById } from '@/lib/auth';
 import { updateConsentSchema } from '@/lib/validations/auth';
 import { supabase } from '@/lib/supabase';
+import { sendMarketingOptInEmail } from '@/lib/mailer';
 
 export async function PUT(request: NextRequest) {
   try {
@@ -48,6 +50,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Token inválido' }, { status: 401 });
     }
 
+    const existingUser = await getUserById(decoded.userId);
     const body = await request.json();
     const validatedData = updateConsentSchema.parse(body);
 
@@ -81,17 +84,34 @@ export async function PUT(request: NextRequest) {
       },
     });
 
+    if (
+      existingUser &&
+      !existingUser.marketingEmail &&
+      updatedUser.marketingEmail &&
+      updatedUser.email
+    ) {
+      void sendMarketingOptInEmail({
+        to: updatedUser.email,
+        displayName: [updatedUser.firstName, updatedUser.lastName].filter(Boolean).join(' '),
+        channels: {
+          email: Boolean(updatedUser.marketingEmail),
+          sms: Boolean(updatedUser.marketingSms),
+          push: Boolean(updatedUser.marketingPush),
+        },
+      });
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Preferencias actualizadas exitosamente',
       user: updatedUser,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error actualizando consentimientos:', error);
 
-    if (error.name === 'ZodError') {
+    if (error instanceof ZodError) {
       return NextResponse.json(
-        { success: false, message: 'Datos inválidos', errors: error.errors },
+        { success: false, message: 'Datos inválidos', errors: error.issues },
         { status: 400 }
       );
     }

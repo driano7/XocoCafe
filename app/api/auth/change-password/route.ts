@@ -26,9 +26,17 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken, hashPassword, verifyPassword, logDataRetentionAction } from '@/lib/auth';
+import {
+  verifyToken,
+  hashPassword,
+  verifyPassword,
+  logDataRetentionAction,
+  getUserById,
+} from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { changePasswordSchema } from '@/lib/validations/auth';
+import { sendPasswordChangedEmail } from '@/lib/mailer';
+import { ZodError } from 'zod';
 
 export async function PUT(request: NextRequest) {
   try {
@@ -115,16 +123,34 @@ export async function PUT(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
 
+    const enrichedUser = await getUserById(user.id).catch(() => null);
+    if (enrichedUser?.email) {
+      void sendPasswordChangedEmail({
+        to: enrichedUser.email,
+        displayName: [enrichedUser.firstName, enrichedUser.lastName].filter(Boolean).join(' '),
+        changedAt: new Date().toISOString(),
+        ip: request.headers.get('x-forwarded-for'),
+        userAgent: request.headers.get('user-agent'),
+      });
+    } else {
+      void sendPasswordChangedEmail({
+        to: user.email,
+        changedAt: new Date().toISOString(),
+        ip: request.headers.get('x-forwarded-for'),
+        userAgent: request.headers.get('user-agent'),
+      });
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Contraseña actualizada correctamente',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error cambiando contraseña:', error);
 
-    if (error.name === 'ZodError') {
+    if (error instanceof ZodError) {
       return NextResponse.json(
-        { success: false, message: 'Datos inválidos', errors: error.errors },
+        { success: false, message: 'Datos inválidos', errors: error.issues },
         { status: 400 }
       );
     }

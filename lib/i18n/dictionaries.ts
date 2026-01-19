@@ -200,6 +200,21 @@ export const dictionaries = {
       loyalty_download: 'Descargar programa de lealtad',
       personalize_favorites: 'Personalízalos',
       favorites_desc: 'Selecciona tus bebidas y alimentos favoritos del menú.',
+      promotions_title: 'Promociones y códigos',
+      promotions_desc:
+        'Ingresa un código promocional para aplicarlo a tus pedidos o membresías premium.',
+      promotions_placeholder: 'XOCO-2025',
+      promotions_apply: 'Aplicar código',
+      promotions_redeeming: 'Aplicando...',
+      promotions_success: 'Código válido',
+      promotions_applies_to: 'Aplicable a',
+      promotions_target_orders: 'Pedidos',
+      promotions_target_membership: 'Membresías',
+      promotions_target_both: 'Pedidos y membresías',
+      promotions_discount: 'Descuento',
+      promotions_pos_reminder:
+        'El POS aplicará automáticamente el beneficio cuando finalices tu compra.',
+      promo_error_empty: 'Ingresa un código antes de aplicarlo.',
       consumption_title: 'Consumo de favoritos',
       consumption_desc:
         'Visualiza tu consumo histórico y mantente al tanto de tus hábitos en Xoco Café.',
@@ -708,6 +723,21 @@ export const dictionaries = {
       loyalty_download: 'Download loyalty program',
       personalize_favorites: 'Personalize them',
       favorites_desc: 'Select your favorite drinks and foods from the menu.',
+      promotions_title: 'Promotions & codes',
+      promotions_desc:
+        'Enter a promo code to apply discounts to your orders or premium memberships.',
+      promotions_placeholder: 'XOCO-2025',
+      promotions_apply: 'Apply code',
+      promotions_redeeming: 'Applying...',
+      promotions_success: 'Valid code',
+      promotions_applies_to: 'Applies to',
+      promotions_target_orders: 'Orders',
+      promotions_target_membership: 'Memberships',
+      promotions_target_both: 'Orders & memberships',
+      promotions_discount: 'Discount',
+      promotions_pos_reminder:
+        'Our POS will attach this benefit automatically when you pay at the store.',
+      promo_error_empty: 'Enter a code before applying it.',
       consumption_title: 'Favorite consumption',
       consumption_desc:
         'Visualize your historical consumption and stay aware of your habits at Xoco Café.',

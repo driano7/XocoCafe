@@ -27,6 +27,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { ZodError } from 'zod';
 import { registerSchema } from '@/lib/validations/auth';
 import {
   hashPassword,
@@ -171,12 +172,12 @@ export async function POST(request: NextRequest) {
       },
       token,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error en registro:', error);
 
-    if (error.name === 'ZodError') {
+    if (error instanceof ZodError) {
       return NextResponse.json(
-        { success: false, message: 'Datos inválidos', errors: error.errors },
+        { success: false, message: 'Datos inválidos', errors: error.issues },
         { status: 400 }
       );
     }

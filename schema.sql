@@ -786,6 +786,9 @@ CREATE TABLE IF NOT EXISTS public.staff_users (
   role TEXT NOT NULL CHECK (role IN ('barista','gerente','socio','super_admin')),
   "branchId" TEXT REFERENCES public.branches(id) ON DELETE SET NULL DEFAULT 'MATRIZ',
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  delivery_paused BOOLEAN NOT NULL DEFAULT FALSE,
+  delivery_paused_at TIMESTAMPTZ,
+  delivery_pause_note TEXT,
 
   -- Datos personales cifrados (con Salt por campo)
   "firstNameEncrypted" TEXT,
@@ -809,6 +812,11 @@ CREATE TABLE IF NOT EXISTS public.staff_users (
 
 CREATE INDEX IF NOT EXISTS staff_users_role_idx ON public.staff_users (role);
 CREATE INDEX IF NOT EXISTS staff_users_branch_idx ON public.staff_users ("branchId");
+
+ALTER TABLE public.staff_users
+  ADD COLUMN IF NOT EXISTS delivery_paused BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS delivery_paused_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS delivery_pause_note TEXT;
 
 DROP TRIGGER IF EXISTS trg_staff_users_touch_updated_at ON public.staff_users;
 CREATE TRIGGER trg_staff_users_touch_updated_at
@@ -938,10 +946,6 @@ END$$;
 CREATE INDEX IF NOT EXISTS ventas_turno_id_idx ON public.ventas (turno_id);
 
 DROP TRIGGER IF EXISTS trg_order_items_enqueue ON public.order_items;
-CREATE TRIGGER trg_order_items_enqueue
-  AFTER INSERT ON public.order_items
-  FOR EACH ROW
-  EXECUTE FUNCTION public.enqueue_order_item();
 
 CREATE TABLE IF NOT EXISTS public.inventory_categories (
   id TEXT PRIMARY KEY,
@@ -1543,7 +1547,8 @@ values
   ('socio-cots', 'cots.21d@gmail.com', 'socio', 'MATRIZ', 'Sergio', 'Cortés', true),
   ('socio-ale', 'aleisgales99@gmail.com', 'socio', 'MATRIZ', 'Alejandro', 'Galván', true),
   ('socio-jhon', 'garcia.aragon.jhon23@gmail.com', 'socio', 'MATRIZ', 'Juan', 'García', true),
-  ('socio-donovan', 'donovanriano@gmail.com', 'socio', 'MATRIZ', 'Donovan', 'Riaño', true)
+  ('socio-donovan', 'donovanriano@gmail.com', 'socio', 'MATRIZ', 'Donovan', 'Riaño', true), 
+  ('socio-rolop', 'rolop113095@gmail.com', 'socio', 'MATRIZ', 'Rolop', 'Socio', true)
 on conflict (email) do update set
   role = excluded.role,
   "branchId" = excluded."branchId",
@@ -1794,6 +1799,16 @@ SET shipping_contact_phone = items->'shipping'->>'contactPhone',
 WHERE items ? 'shipping'
   AND (shipping_contact_phone IS NULL OR shipping_contact_phone = '');
 
+-- Limpia direcciones huérfanas surgidas al recrear addresses
+UPDATE public.orders o
+SET shipping_address_id = NULL
+WHERE shipping_address_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.addresses a
+    WHERE a.id = o.shipping_address_id
+  );
+
 ALTER TABLE orders
   ADD COLUMN IF NOT EXISTS shipping_address_id text,
   ADD COLUMN IF NOT EXISTS delivery_tip_amount numeric(10,2),
@@ -1964,3 +1979,89 @@ CREATE TRIGGER trg_addresses_touch_updated_at
   BEFORE UPDATE ON public.addresses
   FOR EACH ROW
   EXECUTE FUNCTION public.touch_users_updated_at();
+
+ALTER TABLE public.products 
+ADD COLUMN IF NOT EXISTS metadata JSONB,
+ADD COLUMN IF NOT EXISTS items JSONB;
+
+-- 1. Bitácora de Higiene (Baños, Cocina, Área Común)
+CREATE TABLE IF NOT EXISTS public.hygiene_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "area" TEXT NOT NULL CHECK (area IN ('BAÑO', 'COCINA', 'BARRA', 'MESAS')),
+  "staffId" TEXT REFERENCES public.staff_users(id),
+  "is_clean" BOOLEAN DEFAULT TRUE,
+  "supplies_refilled" BOOLEAN DEFAULT TRUE, -- Papel, jabón, gel
+  "observations" TEXT,
+  "createdAt" TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. Control de Plagas (Documentación NOM-251)
+CREATE TABLE IF NOT EXISTS public.pest_control_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "service_date" DATE NOT NULL,
+  "provider_name" TEXT,
+  "certificate_number" TEXT, -- Folio del certificado de fumigación
+  "next_service_date" DATE,
+  "staffId" TEXT REFERENCES public.staff_users(id),
+  "observations" TEXT,
+  "createdAt" TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. Bitácora de residuos y limpieza profunda
+CREATE TABLE IF NOT EXISTS public.waste_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "organicBeveragesKg" NUMERIC(10,2) NOT NULL DEFAULT 0,
+  "organicFoodsKg" NUMERIC(10,2) NOT NULL DEFAULT 0,
+  "inorganicKg" NUMERIC(10,2) NOT NULL DEFAULT 0,
+  "trashRemoved" BOOLEAN NOT NULL DEFAULT FALSE,
+  "binsWashed" BOOLEAN NOT NULL DEFAULT FALSE,
+  "branchId" TEXT REFERENCES public.branches(id) ON DELETE SET NULL,
+  "staffId" TEXT REFERENCES public.staff_users(id) ON DELETE SET NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 4. Recetas (Unión Venta-Inventario)
+CREATE TABLE IF NOT EXISTS public.product_recipes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "productId" TEXT NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+  "inventoryItemId" TEXT NOT NULL REFERENCES public.inventory_items(id) ON DELETE CASCADE,
+  "quantityUsed" NUMERIC(12,3) NOT NULL, -- Gramos o ml
+  "createdAt" TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 4. Banderas de Stock para App de Clientes
+ALTER TABLE public.products 
+ADD COLUMN IF NOT EXISTS "is_low_stock" BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS "out_of_stock_reason" TEXT,
+ADD COLUMN IF NOT EXISTS "manualStockStatus" TEXT DEFAULT 'normal'
+  CHECK ("manualStockStatus" IN ('normal','low','out')),
+ADD COLUMN IF NOT EXISTS "manualStockReason" TEXT,
+ADD COLUMN IF NOT EXISTS "manualStatusUpdatedAt" TIMESTAMPTZ;
+
+
+CREATE TABLE public.promo_codes (
+  id TEXT PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,
+  description TEXT,
+  "appliesTo" TEXT NOT NULL DEFAULT 'product',
+  "discountType" TEXT NOT NULL DEFAULT 'percentage',
+  "discountValue" NUMERIC(10,2),
+  "durationDays" INTEGER,
+  "maxRedemptions" INTEGER,
+  "perUserLimit" INTEGER NOT NULL DEFAULT 1,
+  metadata JSONB,
+  "validFrom" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "expiresAt" TIMESTAMPTZ,
+  "isActive" BOOLEAN NOT NULL DEFAULT TRUE,
+  "createdBy" TEXT,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE public.promo_redemptions (
+  id TEXT PRIMARY KEY,
+  "promoCodeId" TEXT REFERENCES public.promo_codes(id) ON DELETE CASCADE,
+  "userId" TEXT REFERENCES public.users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'redeemed',
+  context JSONB,
+  "redeemedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

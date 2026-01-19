@@ -27,6 +27,7 @@
 
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { verifyToken, getUserById } from '@/lib/auth';
 import { ensureProductExists } from '@/lib/products';
 import { supabase } from '@/lib/supabase';
@@ -97,12 +98,12 @@ export async function POST(request: NextRequest) {
       success: true,
       message: '¡Gracias por tu comentario! Lo recibimos correctamente.',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error guardando comentario:', error);
 
-    if (error.name === 'ZodError') {
+    if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { success: false, message: 'Datos inválidos', errors: error.errors },
+        { success: false, message: 'Datos inválidos', errors: error.issues },
         { status: 400 }
       );
     }

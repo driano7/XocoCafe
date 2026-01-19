@@ -26,6 +26,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { ZodError } from 'zod';
 import { resetPasswordWithCodeSchema } from '@/lib/validations/auth';
 import { getUserByEmail, hashPassword } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -153,12 +154,12 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Tu contraseña fue actualizada correctamente. Ya puedes iniciar sesión.',
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error restableciendo contraseña:', error);
 
-    if (error.name === 'ZodError') {
+    if (error instanceof ZodError) {
       return NextResponse.json(
-        { success: false, message: 'Datos inválidos', errors: error.errors },
+        { success: false, message: 'Datos inválidos', errors: error.issues },
         { status: 400 }
       );
     }

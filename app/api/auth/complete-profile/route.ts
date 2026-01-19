@@ -26,6 +26,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { ZodError } from 'zod';
 import { completeProfileSchema } from '@/lib/validations/auth';
 import { auth } from '@/lib/auth-config';
 import { encryptUserData, mapEncryptedDataToColumnNames } from '@/lib/encryption';
@@ -80,9 +81,9 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error completando perfil:', error);
 
-    if (error.name === 'ZodError') {
+    if (error instanceof ZodError) {
       return NextResponse.json(
-        { success: false, message: 'Datos inválidos', errors: error.errors },
+        { success: false, message: 'Datos inválidos', errors: error.issues },
         { status: 400 }
       );
     }

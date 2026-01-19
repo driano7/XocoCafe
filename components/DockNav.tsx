@@ -59,9 +59,6 @@ const EXTRA_LINKS_AUTH: DockLink[] = [
   },
   LOCATION_LINK,
   { href: '/blog', icon: FiCoffee, label: 'Blog', startsWith: '/blog' },
-  { href: 'https://wa.me/5215512345678', icon: FaWhatsapp, label: 'WhatsApp' },
-  { href: 'https://instagram.com/xococafe', icon: FaInstagram, label: 'Instagram' },
-  { href: 'https://tiktok.com/@xococafe', icon: FaTiktok, label: 'TikTok' },
 ];
 
 const EXTRA_LINKS_PUBLIC: DockLink[] = [
@@ -72,9 +69,31 @@ const EXTRA_LINKS_PUBLIC: DockLink[] = [
     startsWith: '/blog/facturacion',
   },
   { href: '/blog', icon: FiCoffee, label: 'Blog', startsWith: '/blog' },
-  { href: 'https://wa.me/5215512345678', icon: FaWhatsapp, label: 'WhatsApp' },
-  { href: 'https://instagram.com/xococafe', icon: FaInstagram, label: 'Instagram' },
-  { href: 'https://tiktok.com/@xococafe', icon: FaTiktok, label: 'TikTok' },
+];
+
+const SOCIAL_LINKS: Array<
+  DockLink & {
+    accentClass: string;
+  }
+> = [
+  {
+    href: 'https://wa.me/5215512345678',
+    icon: FaWhatsapp,
+    label: 'WhatsApp',
+    accentClass: 'bg-[#25D366] text-white shadow-[#25D366]/40',
+  },
+  {
+    href: 'https://instagram.com/xococafe',
+    icon: FaInstagram,
+    label: 'Instagram',
+    accentClass: 'bg-gradient-to-tr from-[#feda75] via-[#d62976] to-[#962fbf] text-white',
+  },
+  {
+    href: 'https://tiktok.com/@xococafe',
+    icon: FaTiktok,
+    label: 'TikTok',
+    accentClass: 'bg-black text-white shadow-lg shadow-black/20',
+  },
 ];
 
 const DOCK_BUTTON_BASE =
@@ -196,6 +215,31 @@ export default function DockNav() {
               </Link>
             );
           })}
+          <div className="mt-1 border-t border-black/10 pt-3 dark:border-white/10">
+            <p className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Conéctate
+            </p>
+            <div className="flex items-center justify-between space-x-2">
+              {SOCIAL_LINKS.map((link) => {
+                const Icon = link.icon;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    aria-label={link.label}
+                    onClick={handleLinkClick}
+                    className={classNames(
+                      DOCK_BUTTON_BASE,
+                      'flex-1 shadow-lg hover:scale-105 transition',
+                      link.accentClass
+                    )}
+                  >
+                    <Icon />
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
           <button
             type="button"
             aria-label="Ocultar barra"

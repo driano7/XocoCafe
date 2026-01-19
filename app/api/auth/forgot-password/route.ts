@@ -27,6 +27,7 @@
 
 import { randomUUID, randomBytes } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { ZodError } from 'zod';
 import { requestPasswordResetSchema } from '@/lib/validations/auth';
 import { getUserByEmail } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -158,12 +159,12 @@ export async function POST(request: NextRequest) {
       requestId,
       expiresAt: expiresAt.toISOString(),
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error en recuperación de contraseña:', error);
 
-    if (error.name === 'ZodError') {
+    if (error instanceof ZodError) {
       return NextResponse.json(
-        { success: false, message: 'Email inválido', errors: error.errors },
+        { success: false, message: 'Email inválido', errors: error.issues },
         { status: 400 }
       );
     }

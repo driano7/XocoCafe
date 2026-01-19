@@ -132,6 +132,40 @@ CREATE TABLE IF NOT EXISTS loyalty_points (
   createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS promo_codes (
+  id TEXT PRIMARY KEY,
+  code TEXT NOT NULL UNIQUE,
+  description TEXT,
+  appliesTo TEXT NOT NULL DEFAULT 'product',
+  discountType TEXT NOT NULL DEFAULT 'percentage',
+  discountValue REAL,
+  durationDays INTEGER,
+  maxRedemptions INTEGER,
+  perUserLimit INTEGER NOT NULL DEFAULT 1,
+  metadata TEXT,
+  validFrom TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expiresAt TEXT,
+  isActive INTEGER NOT NULL DEFAULT 1,
+  createdBy TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS promo_codes_active_idx ON promo_codes (isActive);
+CREATE INDEX IF NOT EXISTS promo_codes_expires_idx ON promo_codes (expiresAt);
+
+CREATE TABLE IF NOT EXISTS promo_redemptions (
+  id TEXT PRIMARY KEY,
+  promoCodeId TEXT NOT NULL REFERENCES promo_codes(id) ON DELETE CASCADE,
+  userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'redeemed',
+  context TEXT,
+  redeemedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS promo_redemptions_code_idx ON promo_redemptions (promoCodeId);
+CREATE INDEX IF NOT EXISTS promo_redemptions_user_idx ON promo_redemptions (userId);
+
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
   userId TEXT REFERENCES users(id) ON DELETE SET NULL,

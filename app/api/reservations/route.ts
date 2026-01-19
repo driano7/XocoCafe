@@ -28,7 +28,7 @@
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { verifyToken } from '@/lib/auth';
+import { verifyToken, getUserById } from '@/lib/auth';
 import { normalizeDateOnly, isDateWithinRange, DEFAULT_BRANCH_ID } from '@/lib/reservations';
 import {
   archiveExpiredReservations,
@@ -36,6 +36,7 @@ import {
   isMissingReservationFailuresTableError,
 } from '@/lib/reservations-server';
 import { supabase } from '@/lib/supabase';
+import { sendReservationCreatedEmail } from '@/lib/mailer';
 
 class HttpError extends Error {
   status: number;
@@ -285,6 +286,22 @@ export async function POST(request: NextRequest) {
         { success: false, message: 'No pudimos crear tu reservación' },
         { status: 500 }
       );
+    }
+
+    const profile = await getUserById(decoded.userId).catch(() => null);
+    if (profile?.email) {
+      const displayName = [profile.firstName, profile.lastName].filter(Boolean).join(' ');
+      void sendReservationCreatedEmail({
+        to: profile.email,
+        displayName,
+        reservationCode: data.reservationCode,
+        reservationDate,
+        reservationTime: slotTime,
+        peopleCount: payload.numPeople,
+        branchLabel: normalizedBranchNumber || branchId,
+        message: payload.message ?? null,
+        preOrderItems: payload.preOrderItems ?? null,
+      });
     }
 
     return NextResponse.json({

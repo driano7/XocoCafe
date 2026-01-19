@@ -26,6 +26,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { ZodError } from 'zod';
 import { verifyResetCodeSchema } from '@/lib/validations/auth';
 import { getUserByEmail } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -140,12 +141,12 @@ export async function POST(request: NextRequest) {
       message: 'Código verificado correctamente.',
       requestId: resetRequest.id,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error verificando código de recuperación:', error);
 
-    if (error.name === 'ZodError') {
+    if (error instanceof ZodError) {
       return NextResponse.json(
-        { success: false, message: 'Datos inválidos', errors: error.errors },
+        { success: false, message: 'Datos inválidos', errors: error.issues },
         { status: 400 }
       );
     }
