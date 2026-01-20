@@ -1368,6 +1368,19 @@ export default function OrdersDashboardPage() {
       }
 
       try {
+        // Check if PDF sharing is supported (some Android browsers don't support it)
+        if (
+          deviceInfo.isAndroid &&
+          extension === 'pdf' &&
+          typeof navigator.canShare === 'function'
+        ) {
+          const pdfShareSupported = navigator.canShare({ files: [file] });
+          if (!pdfShareSupported) {
+            // PDF sharing not supported, will fall back to download
+            throw new Error('pdf_not_shareable');
+          }
+        }
+
         await navigator.share({
           files: [file],
           title: title ?? (t('orders.digital_ticket') || 'Ticket digital Xoco Café'),
@@ -1378,6 +1391,12 @@ export default function OrdersDashboardPage() {
         });
       } catch (error) {
         console.error('Error al compartir ticket:', error);
+
+        // If it's our custom pdf_not_shareable error, re-throw it
+        if (error instanceof Error && error.message === 'pdf_not_shareable') {
+          throw error;
+        }
+
         if (
           error instanceof DOMException &&
           (error.name === 'AbortError' || error.name === 'NotAllowedError')
@@ -1414,6 +1433,17 @@ export default function OrdersDashboardPage() {
           });
         } catch (mobileError) {
           if (mobileError instanceof Error) {
+            // Automatically download if sharing is not supported (Opera, some Android browsers)
+            if (
+              mobileError.message === 'pdf_not_shareable' ||
+              mobileError.message === 'image_not_shareable'
+            ) {
+              console.log(
+                'File sharing not supported on this browser, automatically downloading instead'
+              );
+              triggerDownload(pdfBlob, filename, 'pdf');
+              return;
+            }
             if (mobileError.message === 'gallery_permission_denied') {
               throw mobileError;
             }
@@ -1482,14 +1512,24 @@ export default function OrdersDashboardPage() {
       }
       const filename = `${buildTicketFileName()}-imagen`;
       if (isMobileShareFlow) {
-        await shareTicketFileDirectly({
-          blob: snapshot.blob,
-          filename,
-          extension: 'png',
-          text:
-            t('orders.share_photo_text') ||
-            'Compartiremos tu ticket como imagen PNG para que puedas enviarlo o guardarlo fácilmente.',
-        });
+        try {
+          await shareTicketFileDirectly({
+            blob: snapshot.blob,
+            filename,
+            extension: 'png',
+            text:
+              t('orders.share_photo_text') ||
+              'Compartiremos tu ticket como imagen PNG para que puedas enviarlo o guardarlo fácilmente.',
+          });
+        } catch (shareError) {
+          // If image sharing is not supported (like in Opera), automatically download
+          if (shareError instanceof Error && shareError.message === 'image_not_shareable') {
+            console.log('Image sharing not supported, triggering download');
+            triggerDownload(snapshot.blob, filename, 'png');
+            return;
+          }
+          throw shareError;
+        }
       } else {
         triggerDownload(snapshot.blob, filename, 'png');
       }
