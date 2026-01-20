@@ -54,12 +54,17 @@ export async function generateMetadata({
 
 export default function BlogPost({ params }: { params: { slug: string } }) {
   const slug = params.slug;
-  const post = allBlogs.find((p) => p.slug === slug);
+
+  // Note: Since this is a server component, we can't use useLanguage hook.
+  // The client can toggle language which will re-render ListLayout with filtered posts.
+  // For individual blog posts, we default to Spanish if multiple locales exist with same slug.
+  const matchingPosts = allBlogs.filter((p) => p.slug === slug);
+  const post = matchingPosts.find((p) => p.locale === 'es') || matchingPosts[0];
   const author = post?.author || ['default'];
 
   // Filter posts by the same locale as the current post for navigation
   const filteredPosts = sortedBlogPost(allBlogs.filter((p) => p.locale === post?.locale));
-  const postIndex = filteredPosts.findIndex((p) => p.slug === slug);
+  const postIndex = filteredPosts.findIndex((p) => p.slug === slug && p.locale === post?.locale);
   const prevContent = filteredPosts[postIndex + 1] || null;
   const prev = prevContent ? coreContent(prevContent) : null;
   const nextContent = filteredPosts[postIndex - 1] || null;

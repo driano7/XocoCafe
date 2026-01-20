@@ -1346,11 +1346,18 @@ export default function OrdersDashboardPage() {
       const file = new File([blob], `${filename}.${extension}`, {
         type: blob.type || 'application/octet-stream',
       });
-      const supportsFiles =
-        typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] });
-      if (!supportsFiles && !deviceInfo.isAndroid) {
+
+      // For Android, always try to share files
+      // For other platforms, check if canShare supports files
+      const canShareFiles =
+        deviceInfo.isAndroid ||
+        typeof navigator.canShare !== 'function' ||
+        navigator.canShare({ files: [file] });
+
+      if (!canShareFiles) {
         throw new Error('gallery_not_supported');
       }
+
       try {
         await navigator.share({
           files: [file],

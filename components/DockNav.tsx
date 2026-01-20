@@ -4,6 +4,7 @@ import classNames from 'classnames';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import {
   FiCalendar,
   FiCoffee,
@@ -227,42 +228,55 @@ export default function DockNav() {
   return (
     <div className="fixed inset-x-0 bottom-4 z-50 px-4 sm:hidden">
       {!isCollapsed && showExtras && (
-        <div className="absolute bottom-24 right-6 flex flex-col space-y-3 rounded-3xl border border-white/20 bg-white/80 p-4 text-gray-900 shadow-2xl backdrop-blur-lg dark:border-black/10 dark:bg-gray-900/80 dark:text-white">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 10 }}
+          transition={{ duration: 0.2 }}
+          className="absolute bottom-24 right-6 flex flex-col space-y-3 rounded-3xl border border-white/20 bg-white/80 p-4 text-gray-900 shadow-2xl backdrop-blur-lg dark:border-black/10 dark:bg-gray-900/80 dark:text-white"
+        >
           <div className="flex flex-col items-center space-y-3">
-            {HIDDEN_DRAWER_LINKS.map((entry) => {
+            {HIDDEN_DRAWER_LINKS.map((entry, index) => {
               const link = entry.variant === 'internal' ? localizeLink(entry, t) : entry;
               const Icon = link.icon;
               const active = link.variant === 'internal' && isActiveRoute(pathname ?? '', link);
               const ariaLabel = link.labelTid ? t(link.labelTid) : link.label;
               return (
-                <Link
+                <motion.div
                   key={link.href}
-                  href={link.href}
-                  aria-label={ariaLabel}
-                  onClick={handleLinkClick}
-                  className={classNames(
-                    DOCK_BUTTON_BASE,
-                    'h-12',
-                    link.variant === 'social'
-                      ? classNames(
-                          'w-12 border border-black/5 dark:border-white/15',
-                          DOCK_BUTTON_INACTIVE
-                        )
-                      : classNames(
-                          'w-full text-base',
-                          active ? DOCK_BUTTON_ACTIVE : DOCK_BUTTON_INACTIVE
-                        )
-                  )}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
                 >
-                  <Icon />
-                  <span className="sr-only">
-                    {link.labelTid ? (
-                      <TranslatedText tid={link.labelTid} fallback={link.label} />
-                    ) : (
-                      link.label
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    aria-label={ariaLabel}
+                    onClick={handleLinkClick}
+                    className={classNames(
+                      DOCK_BUTTON_BASE,
+                      'h-12',
+                      link.variant === 'social'
+                        ? classNames(
+                            'w-12 border border-black/5 dark:border-white/15',
+                            DOCK_BUTTON_INACTIVE
+                          )
+                        : classNames(
+                            'w-full text-base',
+                            active ? DOCK_BUTTON_ACTIVE : DOCK_BUTTON_INACTIVE
+                          )
                     )}
-                  </span>
-                </Link>
+                  >
+                    <Icon />
+                    <span className="sr-only">
+                      {link.labelTid ? (
+                        <TranslatedText tid={link.labelTid} fallback={link.label} />
+                      ) : (
+                        link.label
+                      )}
+                    </span>
+                  </Link>
+                </motion.div>
               );
             })}
           </div>
@@ -274,7 +288,7 @@ export default function DockNav() {
           >
             <FiEyeOff />
           </button>
-        </div>
+        </motion.div>
       )}
       <div className="relative flex w-full items-end justify-center">
         <nav
@@ -283,31 +297,42 @@ export default function DockNav() {
             isCollapsed ? 'scale-0 opacity-0 pointer-events-none' : 'scale-100 opacity-100'
           )}
         >
-          {links.map((baseLink) => {
+          {links.map((baseLink, index) => {
             const link = localizeLink(baseLink, t);
             const Icon = link.icon;
             const active = isActiveRoute(pathname ?? '', link);
             const ariaLabel = link.labelTid ? t(link.labelTid) : link.label;
             return (
-              <Link
+              <motion.div
                 key={link.href}
-                href={link.href}
-                aria-label={ariaLabel}
-                onClick={handleLinkClick}
-                className={classNames(
-                  DOCK_BUTTON_BASE,
-                  active ? DOCK_BUTTON_ACTIVE : DOCK_BUTTON_INACTIVE
-                )}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: 0.3,
+                  delay: index * 0.08,
+                  ease: [0.25, 0.1, 0.25, 1],
+                }}
               >
-                <Icon />
-                <span className="sr-only">
-                  {link.labelTid ? (
-                    <TranslatedText tid={link.labelTid} fallback={link.label} />
-                  ) : (
-                    link.label
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  aria-label={ariaLabel}
+                  onClick={handleLinkClick}
+                  className={classNames(
+                    DOCK_BUTTON_BASE,
+                    active ? DOCK_BUTTON_ACTIVE : DOCK_BUTTON_INACTIVE
                   )}
-                </span>
-              </Link>
+                >
+                  <Icon />
+                  <span className="sr-only">
+                    {link.labelTid ? (
+                      <TranslatedText tid={link.labelTid} fallback={link.label} />
+                    ) : (
+                      link.label
+                    )}
+                  </span>
+                </Link>
+              </motion.div>
             );
           })}
           <button

@@ -427,26 +427,31 @@ export default function UserProfile({ user }: { user: User }) {
         typeof navigator.share === 'function'
       ) {
         const shareFile = new File([blob], `${filename}.png`, { type: 'image/png' });
-        const canShareFiles =
-          typeof navigator.canShare !== 'function' || navigator.canShare({ files: [shareFile] });
         try {
-          const sharePayload =
-            canShareFiles || deviceInfo.isAndroid
-              ? {
-                  files: [shareFile],
-                  title: 'Programa de lealtad Xoco Café',
-                  text: 'Comparte tu avance del programa de lealtad y tus favoritos.',
-                }
-              : {
-                  title: 'Programa de lealtad Xoco Café',
-                  text: 'Comparte tu avance del programa de lealtad y tus favoritos.',
-                };
-          if (!canShareFiles && !deviceInfo.isAndroid) {
+          // For Android, always include files in the share payload
+          const sharePayload: ShareData = deviceInfo.isAndroid
+            ? {
+                files: [shareFile],
+                title: 'Programa de lealtad Xoco Café',
+                text: 'Comparte tu avance del programa de lealtad y tus favoritos.',
+              }
+            : typeof navigator.canShare !== 'function' || navigator.canShare({ files: [shareFile] })
+            ? {
+                files: [shareFile],
+                title: 'Programa de lealtad Xoco Café',
+                text: 'Comparte tu avance del programa de lealtad y tus favoritos.',
+              }
+            : {
+                title: 'Programa de lealtad Xoco Café',
+                text: 'Comparte tu avance del programa de lealtad y tus favoritos.',
+              };
+
+          // Check if we can share files (skip check for Android)
+          if (!deviceInfo.isAndroid && !('files' in sharePayload)) {
             throw new Error('share_not_supported');
           }
-          await navigator.share({
-            ...sharePayload,
-          });
+
+          await navigator.share(sharePayload);
           setIsExportingLoyaltyPanel(false);
           return;
         } catch (shareError) {
