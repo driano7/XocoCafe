@@ -322,6 +322,23 @@ export function OrderDetailPanel({
   const shippingCustomerDisplayName =
     decryptedCustomerName ?? ticketCustomerName ?? fallbackOrderCustomer ?? 'Público general';
 
+  const hasPaymentDetails = Boolean(
+    rawPaymentMethod ||
+      paymentReference ||
+      paymentTraceSummary ||
+      assignedStaff ||
+      handlerStatusBadge ||
+      formattedDeliveryTip ||
+      deliveryPercentLabel ||
+      customerNotes ||
+      staffNotes ||
+      fallbackNotes
+  );
+
+  if (!showShippingCard && !hasPaymentDetails) {
+    return null;
+  }
+
   return (
     <section
       className={`space-y-3 rounded-[28px] border border-gray-200 bg-white/90 p-4 text-[13px] shadow-lg dark:border-white/10 dark:bg-gray-900/70 dark:text-gray-100 sm:space-y-4 sm:p-5 sm:text-sm ${

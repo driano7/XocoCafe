@@ -95,6 +95,7 @@ Xoco Café es un proyecto de café artesanal inspirado en la riqueza del café m
 - **Payload QR extendido.** `lib/orderQrPayload.ts`, `components/Orders/VirtualTicket.tsx` y `app/api/orders/web/route.ts` adjuntan en el QR el alias de la dirección, líneas del domicilio, teléfono (incluyendo si es WhatsApp) y la propina de entrega cuando el cliente la proporciona.
 - **Pagos y envíos alineados.** `OrderDetailPanel` y `VirtualTicket` muestran ahora el nombre del cliente asignado a la entrega junto con método, referencia, monto recibido y cambio en efectivo, de modo que barra, cocina y reparto consultan la misma evidencia.
 - **Alertas low-stock/out-of-stock.** `/api/products` expone los flags `lowStock` y `soldOut`, y la página `/order` usa esos campos para prevenir la selección de productos agotados y lanzar snackbars amarillos/naranja cuando la disponibilidad es limitada.
+- **Compartir tickets como foto o PDF.** El flujo móvil pregunta si deseas enviar la imagen o el PDF, reutiliza la misma captura del ticket y comparte el archivo directamente (sin abrirlo en pantalla) para que los clientes sepan exactamente qué hacer.
 
 ---
 
@@ -225,6 +226,7 @@ Xoco Café is an artisanal Mexican coffee project centered on sustainability, co
 - **Extended QR payload.** `lib/orderQrPayload.ts`, `components/Orders/VirtualTicket.tsx`, and `app/api/orders/web/route.ts` now embed the address label, address lines, contact info (including WhatsApp), and delivery-tip snapshot into the ticket QR body when the customer supplied those fields.
 - **Aligned payment & delivery snapshots.** `OrderDetailPanel` and `VirtualTicket` now show the destination customer name plus payment method, reference, cash tendered, and change so front-of-house and couriers share the same proof.
 - **Low-stock/out-of-stock warnings.** `/api/products` returns `lowStock`/`soldOut` flags that the `/order` page consumes to block depleted items and trigger yellow/orange snackbars when stock runs low.
+- **Share tickets as photo or PDF.** The mobile share flow asks which format you prefer, reuses the same ticket snapshot, and hands the file straight to the system share sheet so users never get stuck staring at a full-screen PDF preview.
 
 ---
 

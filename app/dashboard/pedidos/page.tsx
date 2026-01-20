@@ -104,6 +104,14 @@ type NoticePayload = {
   body?: string;
 };
 
+type TicketSnapshot = {
+  blob: Blob;
+  displayWidth: number;
+  displayHeight: number;
+  imageWidth: number;
+  imageHeight: number;
+};
+
 const useOrderStatusTracker = (
   showSnackbar: (
     message: string,
@@ -668,11 +676,13 @@ export default function OrdersDashboardPage() {
     isIPadOS: false,
   });
   const [isShareSupported, setIsShareSupported] = useState(false);
-  const [ticketShareBlob, setTicketShareBlob] = useState<Blob | null>(null);
-  const [isPreparingShareBlob, setIsPreparingShareBlob] = useState(false);
-  const isShareCapableDevice = isShareSupported && (deviceInfo.isAndroid || deviceInfo.isIOS);
-  const isTicketShareReady = Boolean(ticketShareBlob);
-  const shouldShowShareButton = false;
+  const [ticketShareSnapshot, setTicketShareSnapshot] = useState<TicketSnapshot | null>(null);
+  const [ticketSharePdf, setTicketSharePdf] = useState<Blob | null>(null);
+  const [isPreparingShareSnapshot, setIsPreparingShareSnapshot] = useState(false);
+  const isShareCapableDevice =
+    isShareSupported && (deviceInfo.isAndroid || deviceInfo.isIOS || deviceInfo.isIPadOS);
+  const isTicketShareReady = Boolean(ticketShareSnapshot);
+  const shouldShowShareButton = deviceInfo.isMobile;
   const ticketRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const isAuthenticated = Boolean(user && token);
@@ -1037,7 +1047,7 @@ export default function OrdersDashboardPage() {
   const dataUrlToBlob = (dataUrl: string): Blob => {
     const [metadata, content] = dataUrl.split(',');
     const mimeMatch = metadata.match(/:(.*?);/);
-    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const mime = mimeMatch ? mimeMatch[1] : 'image/png';
     const byteString = atob(content);
     const length = byteString.length;
     const arrayBuffer = new ArrayBuffer(length);
@@ -1046,14 +1056,6 @@ export default function OrdersDashboardPage() {
       uintArray[i] = byteString.charCodeAt(i);
     }
     return new Blob([uintArray], { type: mime });
-  };
-
-  type TicketSnapshot = {
-    blob: Blob;
-    displayWidth: number;
-    displayHeight: number;
-    imageWidth: number;
-    imageHeight: number;
   };
 
   const captureTicketSnapshot = useCallback(async (): Promise<TicketSnapshot | null> => {
@@ -1069,7 +1071,7 @@ export default function OrdersDashboardPage() {
       new Promise<Blob | null>((resolve, reject) => {
         if (typeof canvas.toBlob !== 'function') {
           try {
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+            const dataUrl = canvas.toDataURL('image/png');
             resolve(dataUrlToBlob(dataUrl));
             return;
           } catch (error) {
@@ -1077,17 +1079,13 @@ export default function OrdersDashboardPage() {
             return;
           }
         }
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error('No pudimos generar la imagen del ticket.'));
-              return;
-            }
-            resolve(blob);
-          },
-          'image/jpeg',
-          0.95
-        );
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error('No pudimos generar la imagen del ticket.'));
+            return;
+          }
+          resolve(blob);
+        }, 'image/png');
       });
 
     let blob: Blob | null = null;
@@ -1187,12 +1185,13 @@ export default function OrdersDashboardPage() {
     if (!selectedOrder) return 'ticket-xoco-cafe';
     return (selectedOrder.ticketId ?? selectedOrder.orderNumber ?? selectedOrder.id).toString();
   }, [selectedOrder]);
-  const refreshTicketShareBlob = useCallback(async () => {
+  const refreshTicketShareSnapshot = useCallback(async () => {
     if (!selectedOrder || typeof window === 'undefined') {
-      setTicketShareBlob(null);
+      setTicketShareSnapshot(null);
+      setTicketSharePdf(null);
       return null;
     }
-    setIsPreparingShareBlob(true);
+    setIsPreparingShareSnapshot(true);
     try {
       let attempts = 0;
       while (!ticketRef.current && attempts < 6) {
@@ -1201,32 +1200,67 @@ export default function OrdersDashboardPage() {
         attempts += 1;
       }
       if (!ticketRef.current) {
-        setTicketShareBlob(null);
+        setTicketShareSnapshot(null);
+        setTicketSharePdf(null);
         return null;
       }
-      const blob = await generateTicketPdf();
-      setTicketShareBlob(blob);
-      return blob;
+      const snapshot = await captureTicketSnapshot();
+      setTicketShareSnapshot(snapshot);
+      setTicketSharePdf(null);
+      return snapshot;
     } catch (error) {
       console.error('Error generando ticket para compartir:', error);
-      setTicketShareBlob(null);
+      setTicketShareSnapshot(null);
+      setTicketSharePdf(null);
       return null;
     } finally {
-      setIsPreparingShareBlob(false);
+      setIsPreparingShareSnapshot(false);
     }
-  }, [generateTicketPdf, selectedOrder]);
+  }, [captureTicketSnapshot, selectedOrder]);
 
   useEffect(() => {
     if (!selectedOrder) {
       setTicketIdentifier(null);
-      setTicketShareBlob(null);
-      setIsPreparingShareBlob(false);
+      setTicketShareSnapshot(null);
+      setTicketSharePdf(null);
+      setIsPreparingShareSnapshot(false);
       return;
     }
     const identifier = selectedOrder.ticketId ?? selectedOrder.orderNumber ?? selectedOrder.id;
     setTicketIdentifier((prev) => (prev === identifier ? prev : identifier));
-    void refreshTicketShareBlob();
-  }, [refreshTicketShareBlob, selectedOrder]);
+    void refreshTicketShareSnapshot();
+  }, [refreshTicketShareSnapshot, selectedOrder]);
+
+  const ensureTicketSnapshot = useCallback(async () => {
+    if (ticketShareSnapshot) {
+      return ticketShareSnapshot;
+    }
+    return refreshTicketShareSnapshot();
+  }, [refreshTicketShareSnapshot, ticketShareSnapshot]);
+
+  const ensureTicketPdf = useCallback(async () => {
+    if (ticketSharePdf) {
+      return ticketSharePdf;
+    }
+    const snapshot = await ensureTicketSnapshot();
+    if (!snapshot) {
+      return null;
+    }
+    const pdf = await createPdfFromSnapshot(snapshot);
+    setTicketSharePdf(pdf);
+    return pdf;
+  }, [createPdfFromSnapshot, ensureTicketSnapshot, ticketSharePdf]);
+
+  const requestShareFormat = useCallback((): 'photo' | 'pdf' => {
+    if (typeof window === 'undefined' || typeof window.confirm !== 'function') {
+      return 'pdf';
+    }
+    const wantsPhoto = window.confirm(
+      t('orders.share_choice_prompt') ||
+        '¿Quieres compartir tu ticket como PNG? Presiona Aceptar para enviarlo como imagen o Cancelar para usar PDF.\nDo you want to share the ticket as a PNG photo? Press OK for the image or Cancel to generate a PDF.'
+    );
+    return wantsPhoto ? 'photo' : 'pdf';
+  }, [t]);
 
   useEffect(() => {
     if (!selectedOrder || !deviceInfo.isMobile) {
@@ -1267,7 +1301,19 @@ export default function OrdersDashboardPage() {
   );
 
   const shareTicketFileDirectly = useCallback(
-    async (blob: Blob, filename: string) => {
+    async ({
+      blob,
+      filename,
+      extension,
+      title,
+      text,
+    }: {
+      blob: Blob;
+      filename: string;
+      extension: string;
+      title?: string;
+      text?: string;
+    }) => {
       if (
         !isShareCapableDevice ||
         typeof navigator === 'undefined' ||
@@ -1275,7 +1321,9 @@ export default function OrdersDashboardPage() {
       ) {
         throw new Error('gallery_not_supported');
       }
-      const file = new File([blob], `${filename}.pdf`, { type: 'application/pdf' });
+      const file = new File([blob], `${filename}.${extension}`, {
+        type: blob.type || 'application/octet-stream',
+      });
       const supportsFiles =
         typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] });
       if (!supportsFiles && !deviceInfo.isAndroid) {
@@ -1284,11 +1332,14 @@ export default function OrdersDashboardPage() {
       try {
         await navigator.share({
           files: [file],
-          title: t('orders.digital_ticket') || 'Ticket digital Xoco Café',
-          text: t('orders.save_gallery_text') || 'Guardaremos tu ticket en PDF.',
+          title: title ?? (t('orders.digital_ticket') || 'Ticket digital Xoco Café'),
+          text:
+            text ||
+            t('orders.save_gallery_text') ||
+            'Guardaremos tu ticket como PDF o foto en tus archivos.',
         });
       } catch (error) {
-        console.error('Error al compartir ticket en PDF:', error);
+        console.error('Error al compartir ticket:', error);
         if (
           error instanceof DOMException &&
           (error.name === 'AbortError' || error.name === 'NotAllowedError')
@@ -1316,7 +1367,13 @@ export default function OrdersDashboardPage() {
       const filename = buildTicketFileName();
       if (deviceInfo.isMobile && isShareCapableDevice) {
         try {
-          await shareTicketFileDirectly(pdfBlob, filename);
+          await shareTicketFileDirectly({
+            blob: pdfBlob,
+            filename,
+            extension: 'pdf',
+            text:
+              t('orders.save_gallery_text') || 'Guardaremos tu ticket como PDF en tu dispositivo.',
+          });
         } catch (mobileError) {
           if (mobileError instanceof Error && mobileError.message === 'gallery_permission_denied') {
             throw mobileError;
@@ -1387,39 +1444,35 @@ export default function OrdersDashboardPage() {
     setTicketActionError(null);
     setIsProcessingTicket(true);
     try {
-      let blob = ticketShareBlob;
-      if (!blob) {
-        blob = await refreshTicketShareBlob();
+      const format = requestShareFormat();
+      const filename = buildTicketFileName();
+      if (format === 'photo') {
+        const snapshot = await ensureTicketSnapshot();
+        if (!snapshot) {
+          throw new Error('ticket_unavailable');
+        }
+        await shareTicketFileDirectly({
+          blob: snapshot.blob,
+          filename: `${filename}-foto`,
+          extension: 'png',
+          text:
+            t('orders.share_photo_text') ||
+            'Compartiremos tu ticket como imagen PNG para que puedas enviarlo o guardarlo fácilmente.',
+        });
+      } else {
+        const pdfBlob = await ensureTicketPdf();
+        if (!pdfBlob) {
+          throw new Error('ticket_unavailable');
+        }
+        await shareTicketFileDirectly({
+          blob: pdfBlob,
+          filename,
+          extension: 'pdf',
+          text:
+            t('orders.share_ticket_text') ||
+            'Comparte tu ticket con otra persona o guárdalo como PDF.',
+        });
       }
-      if (!blob) {
-        throw new Error('ticket_unavailable');
-      }
-      const file = new File([blob], `${buildTicketFileName()}.pdf`, {
-        type: 'application/pdf',
-      });
-      const supportsFiles =
-        typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] });
-      const forceFileShare = deviceInfo.isAndroid;
-      const sharePayload =
-        supportsFiles || forceFileShare
-          ? {
-              files: [file],
-              title: t('orders.digital_ticket') || 'Ticket digital Xoco Café',
-              text:
-                t('orders.share_ticket_text') ||
-                'Comparte tu ticket con otra persona o guárdalo como PDF.',
-            }
-          : (() => {
-              const objectUrl = URL.createObjectURL(blob);
-              setTimeout(() => URL.revokeObjectURL(objectUrl), 6_000);
-              return {
-                url: objectUrl,
-                title: t('orders.digital_ticket') || 'Ticket digital Xoco Café',
-                text:
-                  t('orders.share_link_text') || 'Comparte este enlace para descargar tu ticket.',
-              };
-            })();
-      await navigator.share(sharePayload);
     } catch (error) {
       console.error('Error compartiendo ticket:', error);
       if (error instanceof DOMException && error.name === 'AbortError') {
@@ -1428,6 +1481,11 @@ export default function OrdersDashboardPage() {
         setTicketActionError(
           t('orders.ticket_unavailable') ||
             'No pudimos preparar el ticket para compartir. Intenta descargarlo.'
+        );
+      } else if (error instanceof Error && error.message?.startsWith('gallery_')) {
+        setTicketActionError(
+          t('orders.gallery_generic_error') ||
+            'No pudimos compartir el ticket directamente. Intenta descargarlo o revisa los permisos.'
         );
       } else {
         setTicketActionError(
@@ -1439,12 +1497,13 @@ export default function OrdersDashboardPage() {
     }
   }, [
     buildTicketFileName,
-    deviceInfo.isAndroid,
+    ensureTicketPdf,
+    ensureTicketSnapshot,
     isShareCapableDevice,
-    refreshTicketShareBlob,
+    requestShareFormat,
     selectedOrder,
+    shareTicketFileDirectly,
     t,
-    ticketShareBlob,
   ]);
 
   useEffect(() => {
@@ -1876,7 +1935,7 @@ export default function OrdersDashboardPage() {
                     {shouldShowShareButton && (!isShareCapableDevice || !isTicketShareReady) && (
                       <p className="text-center text-xs text-gray-500 dark:text-gray-400">
                         {isShareCapableDevice ? (
-                          isPreparingShareBlob ? (
+                          isPreparingShareSnapshot ? (
                             <TranslatedText
                               tid="orders.generating_preview"
                               fallback="Generando una vista previa del ticket para compartir…"

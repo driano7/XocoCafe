@@ -49,6 +49,20 @@ interface SnackbarState {
   id: number;
 }
 
+const chipVariants: Variants = {
+  hidden: { opacity: 0, y: 10, scale: 0.9 },
+  visible: (index: number = 0) => ({
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      delay: 0.15 + index * 0.12,
+      duration: 0.4,
+      ease: [0.16, 1, 0.3, 1],
+    },
+  }),
+};
+
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -62,38 +76,63 @@ export default function LoginPage() {
   const [formVisible, setFormVisible] = useState(false);
   const [formHasBeenVisible, setFormHasBeenVisible] = useState(false);
   const [animationSeed] = useState(() => Math.random());
+  const [chipsAnimated, setChipsAnimated] = useState(false);
   const pageShellClasses =
     'relative min-h-screen overflow-hidden bg-gradient-to-br from-primary-50 via-white to-white dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 py-12 px-4 sm:px-6 lg:px-8';
 
-  const highlightItems = [
-    {
-      title: t('auth.gratis_title') || 'Registro 100% gratuito',
-      description:
-        t('auth.gratis_desc') ||
-        'Sin cuotas de suscripción. Acceso vitalicio a tu perfil digital y beneficios.',
-      accent: t('nav.gratis') || 'Gratis',
-    },
-    {
-      title: t('auth.pedidos_title') || 'Pedidos inteligentes',
-      description:
-        t('auth.pedidos_desc') ||
-        'Confirma órdenes, monitorea estados y recibe alertas al instante.',
-      accent: t('auth.pedidos') || 'Pedidos',
-    },
-    {
-      title: t('auth.rewards_title') || 'Recompensas siempre visibles',
-      description:
-        t('auth.rewards_desc') ||
-        'Consultas tus métricas del programa de lealtad. ¡Más compras, más ganas!',
-      accent: t('nav.rewards') || 'Rewards',
-    },
-  ];
+  const highlightItems = useMemo(
+    () => [
+      {
+        title: t('auth.gratis_title') || 'Registro 100% gratuito',
+        description:
+          t('auth.gratis_desc') ||
+          'Sin cuotas de suscripción. Acceso vitalicio a tu perfil digital y beneficios.',
+        accent: t('nav.gratis') || 'Gratis',
+      },
+      {
+        title: t('auth.pedidos_title') || 'Pedidos inteligentes',
+        description:
+          t('auth.pedidos_desc') ||
+          'Confirma órdenes, monitorea estados y recibe alertas al instante.',
+        accent: t('auth.pedidos') || 'Pedidos',
+      },
+      {
+        title: t('auth.rewards_title') || 'Recompensas siempre visibles',
+        description:
+          t('auth.rewards_desc') ||
+          'Consultas tus métricas del programa de lealtad. ¡Más compras, más ganas!',
+        accent: t('nav.rewards') || 'Rewards',
+      },
+    ],
+    [t]
+  );
+  const chipItems = useMemo(
+    () => [
+      {
+        label: t('nav.gratis') || 'Gratis',
+        color: 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
+      },
+      {
+        label: t('auth.pedidos') || 'Pedidos',
+        color: 'bg-primary-500/10 text-primary-700 dark:bg-primary-500/20 dark:text-primary-300',
+      },
+      {
+        label: t('nav.rewards') || 'Rewards',
+        color: 'bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
+      },
+    ],
+    [t]
+  );
 
   useEffect(() => {
     router.prefetch('/profile');
     router.prefetch('/onboarding/favorites');
     router.prefetch('/dashboard/pedidos');
   }, [router]);
+
+  useEffect(() => {
+    setChipsAnimated(true);
+  }, []);
 
   useEffect(() => {
     const target = formCardRef.current;
@@ -429,31 +468,20 @@ export default function LoginPage() {
 
             {/* Mobile Chips Layout */}
             <div className="mb-6 flex flex-wrap items-center justify-center gap-2 lg:hidden">
-              {[
-                {
-                  label: 'Gratis',
-                  color:
-                    'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
-                },
-                {
-                  label: 'Pedidos',
-                  color:
-                    'bg-primary-500/10 text-primary-700 dark:bg-primary-500/20 dark:text-primary-300',
-                },
-                {
-                  label: 'Rewards',
-                  color: 'bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
-                },
-              ].map((chip) => (
-                <span
+              {chipItems.map((chip, index) => (
+                <motion.span
                   key={chip.label}
                   className={classNames(
                     'rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest',
                     chip.color
                   )}
+                  variants={chipVariants}
+                  initial="hidden"
+                  animate={chipsAnimated ? 'visible' : 'hidden'}
+                  custom={index}
                 >
                   {chip.label}
-                </span>
+                </motion.span>
               ))}
             </div>
 
