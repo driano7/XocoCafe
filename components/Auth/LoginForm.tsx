@@ -57,6 +57,7 @@ export default function LoginForm({
   const { trackLogin, trackFormSubmit } = useConversionTracking();
   void onForgotPassword;
   const inputClasses = 'brand-input';
+  const EMAIL_DOMAIN_SUGGESTIONS = ['@gmail.com', '@outlook.com', '@hotmail.com', '@icloud.com'];
 
   const fieldVariants = useMemo<Variants>(() => {
     return {
@@ -79,10 +80,28 @@ export default function LoginForm({
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
   });
+  const emailValue = watch('email') ?? '';
+  const emailLocalPart = emailValue.includes('@')
+    ? emailValue.slice(0, emailValue.indexOf('@'))
+    : emailValue;
+  const showEmailDomainChips =
+    emailLocalPart.trim().length > 0 && (!emailValue.includes('@') || emailValue.endsWith('@'));
+
+  const handleDomainSuggestion = (domain: string) => {
+    const localValue = emailLocalPart.trim();
+    if (!localValue) return;
+    setValue('email', `${localValue}${domain}`, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+  };
 
   const onSubmit = async (data: LoginInput) => {
     setIsLoading(true);
@@ -135,6 +154,21 @@ export default function LoginForm({
           placeholder={t('auth.email_placeholder') || 'tu@email.com'}
         />
         {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
+        {showEmailDomainChips && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {EMAIL_DOMAIN_SUGGESTIONS.map((domain) => (
+              <button
+                key={domain}
+                type="button"
+                onClick={() => handleDomainSuggestion(domain)}
+                className="rounded-full border border-primary-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary-700 transition hover:border-primary-400 dark:border-primary-700 dark:text-primary-200"
+              >
+                {emailLocalPart}
+                {domain}
+              </button>
+            ))}
+          </div>
+        )}
       </motion.div>
 
       <motion.div variants={fieldVariants} initial="hidden" animate={animationState} custom={1}>

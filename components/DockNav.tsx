@@ -14,10 +14,14 @@ import {
   FiMoreHorizontal,
   FiShoppingBag,
 } from 'react-icons/fi';
-import { FaWhatsapp, FaInstagram, FaTiktok } from 'react-icons/fa';
 import { PiTrayBold } from 'react-icons/pi';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import siteMetadata from 'content/siteMetadata';
+import {
+  MinimalInstagramIcon,
+  MinimalTiktokIcon,
+  MinimalWhatsappIcon,
+} from '@/components/icons/MinimalSocialIcons';
 
 type DockLink = {
   href: string;
@@ -68,24 +72,21 @@ type HiddenLink = DockLink & {
 const HIDDEN_DRAWER_LINKS: HiddenLink[] = [
   {
     href: siteMetadata.whats,
-    icon: FaWhatsapp,
+    icon: MinimalWhatsappIcon,
     label: 'WhatsApp',
     variant: 'social',
-    accentClass: 'bg-[#25D366] text-white shadow-[#25D366]/40',
   },
   {
     href: siteMetadata.instagram,
-    icon: FaInstagram,
+    icon: MinimalInstagramIcon,
     label: 'Instagram',
     variant: 'social',
-    accentClass: 'bg-gradient-to-tr from-[#feda75] via-[#d62976] to-[#962fbf] text-white',
   },
   {
     href: siteMetadata.tiktok,
-    icon: FaTiktok,
+    icon: MinimalTiktokIcon,
     label: 'TikTok',
     variant: 'social',
-    accentClass: 'bg-black text-white shadow-lg shadow-black/20',
   },
   { ...FACTURACION_LINK, variant: 'internal' },
   { ...BLOG_LINK, variant: 'internal' },
@@ -205,7 +206,10 @@ export default function DockNav() {
                     DOCK_BUTTON_BASE,
                     'h-12',
                     link.variant === 'social'
-                      ? classNames('w-12 shadow-lg hover:scale-105 transition', link.accentClass)
+                      ? classNames(
+                          'w-12 border border-black/5 dark:border-white/15',
+                          DOCK_BUTTON_INACTIVE
+                        )
                       : classNames(
                           'w-full text-base',
                           active ? DOCK_BUTTON_ACTIVE : DOCK_BUTTON_INACTIVE

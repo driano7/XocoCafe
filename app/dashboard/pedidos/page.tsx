@@ -677,12 +677,11 @@ export default function OrdersDashboardPage() {
   });
   const [isShareSupported, setIsShareSupported] = useState(false);
   const [ticketShareSnapshot, setTicketShareSnapshot] = useState<TicketSnapshot | null>(null);
-  const [ticketSharePdf, setTicketSharePdf] = useState<Blob | null>(null);
   const [isPreparingShareSnapshot, setIsPreparingShareSnapshot] = useState(false);
   const isShareCapableDevice =
     isShareSupported && (deviceInfo.isAndroid || deviceInfo.isIOS || deviceInfo.isIPadOS);
   const isTicketShareReady = Boolean(ticketShareSnapshot);
-  const shouldShowShareButton = deviceInfo.isMobile;
+  const isMobileShareFlow = deviceInfo.isMobile && isShareCapableDevice;
   const ticketRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const isAuthenticated = Boolean(user && token);
@@ -1188,7 +1187,6 @@ export default function OrdersDashboardPage() {
   const refreshTicketShareSnapshot = useCallback(async () => {
     if (!selectedOrder || typeof window === 'undefined') {
       setTicketShareSnapshot(null);
-      setTicketSharePdf(null);
       return null;
     }
     setIsPreparingShareSnapshot(true);
@@ -1201,17 +1199,14 @@ export default function OrdersDashboardPage() {
       }
       if (!ticketRef.current) {
         setTicketShareSnapshot(null);
-        setTicketSharePdf(null);
         return null;
       }
       const snapshot = await captureTicketSnapshot();
       setTicketShareSnapshot(snapshot);
-      setTicketSharePdf(null);
       return snapshot;
     } catch (error) {
       console.error('Error generando ticket para compartir:', error);
       setTicketShareSnapshot(null);
-      setTicketSharePdf(null);
       return null;
     } finally {
       setIsPreparingShareSnapshot(false);
@@ -1222,7 +1217,6 @@ export default function OrdersDashboardPage() {
     if (!selectedOrder) {
       setTicketIdentifier(null);
       setTicketShareSnapshot(null);
-      setTicketSharePdf(null);
       setIsPreparingShareSnapshot(false);
       return;
     }
@@ -1238,30 +1232,6 @@ export default function OrdersDashboardPage() {
     return refreshTicketShareSnapshot();
   }, [refreshTicketShareSnapshot, ticketShareSnapshot]);
 
-  const ensureTicketPdf = useCallback(async () => {
-    if (ticketSharePdf) {
-      return ticketSharePdf;
-    }
-    const snapshot = await ensureTicketSnapshot();
-    if (!snapshot) {
-      return null;
-    }
-    const pdf = await createPdfFromSnapshot(snapshot);
-    setTicketSharePdf(pdf);
-    return pdf;
-  }, [createPdfFromSnapshot, ensureTicketSnapshot, ticketSharePdf]);
-
-  const requestShareFormat = useCallback((): 'photo' | 'pdf' => {
-    if (typeof window === 'undefined' || typeof window.confirm !== 'function') {
-      return 'pdf';
-    }
-    const wantsPhoto = window.confirm(
-      t('orders.share_choice_prompt') ||
-        '¿Quieres compartir tu ticket como PNG? Presiona Aceptar para enviarlo como imagen o Cancelar para usar PDF.\nDo you want to share the ticket as a PNG photo? Press OK for the image or Cancel to generate a PDF.'
-    );
-    return wantsPhoto ? 'photo' : 'pdf';
-  }, [t]);
-
   useEffect(() => {
     if (!selectedOrder || !deviceInfo.isMobile) {
       return;
@@ -1272,33 +1242,17 @@ export default function OrdersDashboardPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [deviceInfo.isMobile, selectedOrder]);
 
-  const triggerDownload = useCallback(
-    (blob: Blob, filename: string, extension: string) => {
-      const objectUrl = URL.createObjectURL(blob);
-      if (deviceInfo.isMobile) {
-        const newTab = window.open(objectUrl, '_blank');
-        if (!newTab) {
-          const mobileLink = document.createElement('a');
-          mobileLink.href = objectUrl;
-          mobileLink.download = `${filename}.${extension}`;
-          mobileLink.rel = 'noopener';
-          document.body.appendChild(mobileLink);
-          mobileLink.click();
-          document.body.removeChild(mobileLink);
-        }
-        setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
-        return;
-      }
-      const link = document.createElement('a');
-      link.href = objectUrl;
-      link.download = `${filename}.${extension}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
-    },
-    [deviceInfo.isMobile]
-  );
+  const triggerDownload = useCallback((blob: Blob, filename: string, extension: string) => {
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = `${filename}.${extension}`;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
+  }, []);
 
   const shareTicketFileDirectly = useCallback(
     async ({
@@ -1365,7 +1319,7 @@ export default function OrdersDashboardPage() {
         throw new Error('No pudimos generar el ticket');
       }
       const filename = buildTicketFileName();
-      if (deviceInfo.isMobile && isShareCapableDevice) {
+      if (isMobileShareFlow) {
         try {
           await shareTicketFileDirectly({
             blob: pdfBlob,
@@ -1417,9 +1371,8 @@ export default function OrdersDashboardPage() {
     }
   }, [
     buildTicketFileName,
-    isShareCapableDevice,
     generateTicketPdf,
-    deviceInfo.isMobile,
+    isMobileShareFlow,
     shareTicketFileDirectly,
     selectedOrder,
     t,
@@ -1430,48 +1383,25 @@ export default function OrdersDashboardPage() {
     if (!selectedOrder) {
       return;
     }
-    if (
-      !isShareCapableDevice ||
-      typeof navigator === 'undefined' ||
-      typeof navigator.share !== 'function'
-    ) {
-      setTicketActionError(
-        t('orders.share_not_supported') ||
-          'Tu navegador no permite compartir directamente este archivo.'
-      );
-      return;
-    }
     setTicketActionError(null);
     setIsProcessingTicket(true);
     try {
-      const format = requestShareFormat();
-      const filename = buildTicketFileName();
-      if (format === 'photo') {
-        const snapshot = await ensureTicketSnapshot();
-        if (!snapshot) {
-          throw new Error('ticket_unavailable');
-        }
+      const snapshot = await ensureTicketSnapshot();
+      if (!snapshot) {
+        throw new Error('ticket_unavailable');
+      }
+      const filename = `${buildTicketFileName()}-imagen`;
+      if (isMobileShareFlow) {
         await shareTicketFileDirectly({
           blob: snapshot.blob,
-          filename: `${filename}-foto`,
+          filename,
           extension: 'png',
           text:
             t('orders.share_photo_text') ||
             'Compartiremos tu ticket como imagen PNG para que puedas enviarlo o guardarlo fácilmente.',
         });
       } else {
-        const pdfBlob = await ensureTicketPdf();
-        if (!pdfBlob) {
-          throw new Error('ticket_unavailable');
-        }
-        await shareTicketFileDirectly({
-          blob: pdfBlob,
-          filename,
-          extension: 'pdf',
-          text:
-            t('orders.share_ticket_text') ||
-            'Comparte tu ticket con otra persona o guárdalo como PDF.',
-        });
+        triggerDownload(snapshot.blob, filename, 'png');
       }
     } catch (error) {
       console.error('Error compartiendo ticket:', error);
@@ -1482,14 +1412,20 @@ export default function OrdersDashboardPage() {
           t('orders.ticket_unavailable') ||
             'No pudimos preparar el ticket para compartir. Intenta descargarlo.'
         );
-      } else if (error instanceof Error && error.message?.startsWith('gallery_')) {
+      } else if (
+        isMobileShareFlow &&
+        error instanceof Error &&
+        error.message?.startsWith('gallery_')
+      ) {
         setTicketActionError(
           t('orders.gallery_generic_error') ||
             'No pudimos compartir el ticket directamente. Intenta descargarlo o revisa los permisos.'
         );
       } else {
         setTicketActionError(
-          t('orders.share_error') || 'No pudimos compartir el ticket en este dispositivo.'
+          isMobileShareFlow
+            ? t('orders.share_error') || 'No pudimos compartir el ticket en este dispositivo.'
+            : t('orders.download_error') || 'No pudimos descargar el ticket. Intenta de nuevo.'
         );
       }
     } finally {
@@ -1497,13 +1433,12 @@ export default function OrdersDashboardPage() {
     }
   }, [
     buildTicketFileName,
-    ensureTicketPdf,
     ensureTicketSnapshot,
-    isShareCapableDevice,
-    requestShareFormat,
+    isMobileShareFlow,
     selectedOrder,
     shareTicketFileDirectly,
     t,
+    triggerDownload,
   ]);
 
   useEffect(() => {
@@ -1913,43 +1848,60 @@ export default function OrdersDashboardPage() {
                           fallback="Generando ticket…"
                         />
                       ) : (
-                        <TranslatedText tid="orders.download_ticket" fallback="Descargar Ticket" />
+                        <TranslatedText
+                          tid={
+                            deviceInfo.isMobile
+                              ? 'orders.pdf_action_mobile'
+                              : 'orders.pdf_action_desktop'
+                          }
+                          fallback={deviceInfo.isMobile ? 'Compartir PDF' : 'Descargar PDF'}
+                        />
                       )}
                     </button>
-                    {shouldShowShareButton && (
-                      <button
-                        type="button"
-                        onClick={() => void handleShareTicket()}
-                        disabled={isProcessingTicket || !isShareCapableDevice}
-                        className="w-full rounded-full border border-primary-200 px-4 py-3 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-primary-500/60 dark:text-primary-200 dark:hover:bg-primary-500/10"
-                      >
-                        {isProcessingTicket
-                          ? 'Compartiendo ticket…'
-                          : isShareCapableDevice
-                          ? isTicketShareReady
-                            ? 'Compartir ticket'
-                            : 'Preparando ticket…'
-                          : 'Compartir no disponible'}
-                      </button>
-                    )}
-                    {shouldShowShareButton && (!isShareCapableDevice || !isTicketShareReady) && (
+                    <button
+                      type="button"
+                      onClick={() => void handleShareTicket()}
+                      disabled={isProcessingTicket}
+                      className="w-full rounded-full border border-primary-200 px-4 py-3 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-primary-500/60 dark:text-primary-200 dark:hover:bg-primary-500/10"
+                    >
+                      {isProcessingTicket ? (
+                        <TranslatedText
+                          tid={
+                            deviceInfo.isMobile
+                              ? 'orders.sharing_ticket'
+                              : 'orders.downloading_image'
+                          }
+                          fallback={
+                            deviceInfo.isMobile ? 'Compartiendo ticket…' : 'Descargando imagen…'
+                          }
+                        />
+                      ) : (
+                        <TranslatedText
+                          tid={
+                            deviceInfo.isMobile
+                              ? 'orders.image_action_mobile'
+                              : 'orders.image_action_desktop'
+                          }
+                          fallback={deviceInfo.isMobile ? 'Compartir imagen' : 'Descargar PNG'}
+                        />
+                      )}
+                    </button>
+                    {deviceInfo.isMobile && (!isShareCapableDevice || !isTicketShareReady) && (
                       <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                        {isShareCapableDevice ? (
-                          isPreparingShareSnapshot ? (
-                            <TranslatedText
-                              tid="orders.generating_preview"
-                              fallback="Generando una vista previa del ticket para compartir…"
-                            />
-                          ) : (
-                            <TranslatedText
-                              tid="orders.share_prepare_error"
-                              fallback="No pudimos preparar el ticket para compartir. Usa la descarga para guardarlo."
-                            />
-                          )
-                        ) : (
+                        {!isShareCapableDevice ? (
                           <TranslatedText
                             tid="orders.share_not_supported"
                             fallback="Tu navegador no soporta compartir archivos. Usa la descarga para guardar tu ticket."
+                          />
+                        ) : isPreparingShareSnapshot ? (
+                          <TranslatedText
+                            tid="orders.preparing_ticket_image"
+                            fallback="Preparando la imagen del ticket para compartir…"
+                          />
+                        ) : (
+                          <TranslatedText
+                            tid="orders.share_prepare_error"
+                            fallback="No pudimos preparar el ticket para compartir. Usa la descarga para guardarlo."
                           />
                         )}
                       </p>

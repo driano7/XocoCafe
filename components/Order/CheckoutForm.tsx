@@ -256,6 +256,7 @@ export default function CheckoutForm({ token, user, onAddressesUpdate }: Checkou
     () => savedAddresses.find((address) => address.id === selectedAddressId) ?? null,
     [savedAddresses, selectedAddressId]
   );
+  const selectedAddressIsDefault = Boolean(selectedAddress?.isDefault);
 
   useEffect(() => {
     if (selectedAddress) {
@@ -282,6 +283,12 @@ export default function CheckoutForm({ token, user, onAddressesUpdate }: Checkou
       setIsWhatsapp(Boolean(selectedAddress.isWhatsapp));
     }
   }, [selectedAddress, user?.phone]);
+
+  useEffect(() => {
+    if (selectedAddressIsDefault && wantsToSaveAddress) {
+      setWantsToSaveAddress(false);
+    }
+  }, [selectedAddressIsDefault, wantsToSaveAddress]);
 
   const shippingAddressLabel = useMemo(() => {
     const savedLabel = selectedAddress?.label?.trim();
@@ -995,10 +1002,17 @@ export default function CheckoutForm({ token, user, onAddressesUpdate }: Checkou
                       setNewAddressLabel('');
                     }
                   }}
+                  disabled={selectedAddressIsDefault}
                   className="h-4 w-4 rounded border-primary-300 text-primary-600 focus:ring-primary-500"
                 />
                 Guardar esta dirección para pedidos futuros
               </label>
+              {selectedAddressIsDefault && (
+                <p className="mt-1 text-xs text-primary-700 dark:text-primary-200">
+                  Ya estás usando tu dirección prioritaria. Puedes cambiarla desde tu perfil si lo
+                  necesitas.
+                </p>
+              )}
               {wantsToSaveAddress && (
                 <>
                   <p className="mt-1 text-xs text-primary-700 dark:text-primary-200">

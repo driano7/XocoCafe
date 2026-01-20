@@ -103,6 +103,7 @@ export default function UserProfile({ user }: { user: User }) {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isUpdatingConsent, setIsUpdatingConsent] = useState(false);
   const [pushPermissionInfo, setPushPermissionInfo] = useState<string | null>(null);
+  const [isRequestingPushPermission, setIsRequestingPushPermission] = useState(false);
   const [deviceInfo, setDeviceInfo] = useState(() => detectDeviceInfo());
   const [loyaltyCoffeeCount, setLoyaltyCoffeeCount] = useState(() => user?.weeklyCoffeeCount ?? 0);
   const loyaltyPanelRef = useRef<HTMLDivElement | null>(null);
@@ -608,6 +609,23 @@ export default function UserProfile({ user }: { user: User }) {
     },
     [deviceInfo, setConsentValue, updateConsentPreferences, user]
   );
+
+  const requestDevicePushPermission = useCallback(async () => {
+    setIsRequestingPushPermission(true);
+    try {
+      const permissionResult = await ensurePushPermission(deviceInfo);
+      setPushPermissionInfo(permissionResult.message);
+      if (permissionResult.granted) {
+        setConsentValue('marketingPush', true);
+        const success = await updateConsentPreferences({ marketingPush: true });
+        if (!success) {
+          setConsentValue('marketingPush', false);
+        }
+      }
+    } finally {
+      setIsRequestingPushPermission(false);
+    }
+  }, [deviceInfo, setConsentValue, updateConsentPreferences]);
 
   const onUpdateProfile = async (data: UpdateProfileInput) => {
     try {
@@ -1530,6 +1548,16 @@ export default function UserProfile({ user }: { user: User }) {
                     />
                   </label>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => void requestDevicePushPermission()}
+                  disabled={isRequestingPushPermission || isUpdatingConsent}
+                  className="inline-flex items-center rounded-full border border-primary-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary-700 transition hover:border-primary-400 disabled:opacity-60 dark:border-primary-700 dark:text-primary-200"
+                >
+                  {isRequestingPushPermission
+                    ? 'Solicitando permisos...'
+                    : 'Configurar desde la app'}
+                </button>
                 {pushPermissionInfo && (
                   <p className="text-xs text-gray-600 dark:text-gray-400">{pushPermissionInfo}</p>
                 )}

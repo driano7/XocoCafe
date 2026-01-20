@@ -10,7 +10,13 @@
 
 import classNames from 'classnames';
 import { useEffect, useRef, useState } from 'react';
-import { FaInstagram, FaSpotify, FaTiktok, FaTwitter, FaWhatsapp } from 'react-icons/fa';
+import { FaSpotify, FaTwitter } from 'react-icons/fa';
+import {
+  MinimalInstagramIcon,
+  MinimalSocialIconKey,
+  MinimalTiktokIcon,
+  MinimalWhatsappIcon,
+} from '@/components/icons/MinimalSocialIcons';
 
 const SOCIAL_ICON_CLASSES =
   'group relative flex h-10 w-10 items-center justify-center rounded-full text-base text-current transition-all duration-300 ease-out hover:-translate-y-1 hover:text-primary-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:hover:text-primary-200 sm:h-10 sm:w-10 sm:text-lg';
@@ -18,14 +24,14 @@ const SOCIAL_ICON_CLASSES =
 const SOCIAL_ICON_GLOW =
   'pointer-events-none absolute inset-0 rounded-full bg-primary-500/15 opacity-0 transition-opacity duration-300 group-hover:opacity-100';
 
-type IconKey = 'tiktok' | 'instagram' | 'twitter' | 'spotify' | 'whatsapp';
+type IconKey = MinimalSocialIconKey | 'twitter' | 'spotify';
 
 const ICON_MAP: Record<IconKey, React.ComponentType> = {
-  tiktok: FaTiktok,
-  instagram: FaInstagram,
+  tiktok: MinimalTiktokIcon,
+  instagram: MinimalInstagramIcon,
   twitter: FaTwitter,
   spotify: FaSpotify,
-  whatsapp: FaWhatsapp,
+  whatsapp: MinimalWhatsappIcon,
 };
 
 type Props = {
