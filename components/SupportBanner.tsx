@@ -256,11 +256,11 @@ export default function SupportBanner() {
           />
         </p>
       </div>
-      <dl className="grid gap-4 md:grid-cols-3 text-white">
+      <dl className="grid w-full gap-4 text-white md:grid-cols-3">
         {DONATION_METHODS.map((method, index) => (
           <motion.div
             key={method.label}
-            className="flex flex-col gap-4 rounded-2xl bg-black/10 p-5 backdrop-blur-sm transition hover:bg-black/15"
+            className="flex w-full flex-col gap-4 rounded-2xl bg-black/10 p-5 backdrop-blur-sm transition hover:bg-black/15"
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, amount: 0.3 }}
