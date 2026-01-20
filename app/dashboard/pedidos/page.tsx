@@ -1343,19 +1343,28 @@ export default function OrdersDashboardPage() {
       ) {
         throw new Error('gallery_not_supported');
       }
-      const file = new File([blob], `${filename}.${extension}`, {
-        type: blob.type || 'application/octet-stream',
+      // Ensure blob has explicit MIME type for Android compatibility
+      const mimeType = extension === 'pdf' ? 'application/pdf' : 'image/png';
+      const properBlob = blob.type === mimeType ? blob : new Blob([blob], { type: mimeType });
+
+      const file = new File([properBlob], `${filename}.${extension}`, {
+        type: mimeType,
       });
 
-      // For Android, always try to share files
-      // For other platforms, check if canShare supports files
-      const canShareFiles =
-        deviceInfo.isAndroid ||
-        typeof navigator.canShare !== 'function' ||
-        navigator.canShare({ files: [file] });
+      console.log('Sharing file:', {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        isAndroid: deviceInfo.isAndroid,
+      });
 
-      if (!canShareFiles) {
-        throw new Error('gallery_not_supported');
+      // For Android, skip canShare check as it's unreliable
+      if (!deviceInfo.isAndroid) {
+        const canShare =
+          typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] });
+        if (!canShare) {
+          throw new Error('gallery_not_supported');
+        }
       }
 
       try {
