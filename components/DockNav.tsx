@@ -17,6 +17,8 @@ import {
 import { FaInstagram, FaTiktok, FaWhatsapp } from 'react-icons/fa';
 import { PiTrayBold } from 'react-icons/pi';
 import { useAuth } from '@/components/Auth/AuthProvider';
+import { useLanguage } from '@/components/Language/LanguageProvider';
+import TranslatedText from '@/components/Language/TranslatedText';
 import siteMetadata from 'content/siteMetadata';
 
 type DockLink = {
@@ -24,6 +26,8 @@ type DockLink = {
   icon: ComponentType<{ className?: string }>;
   label: string;
   startsWith?: string;
+  labelTid?: string;
+  slugKey?: string;
 };
 
 const LOCATION_LINK: DockLink = {
@@ -31,23 +35,32 @@ const LOCATION_LINK: DockLink = {
   icon: FiMapPin,
   label: 'Ubicación',
   startsWith: '/blog/ubicacion',
+  slugKey: 'ubicacion',
+  labelTid: 'nav.ubicacion',
 };
 
 const AUTH_LINKS: DockLink[] = [
-  { href: '/', icon: FiHome, label: 'Inicio' },
+  { href: '/', icon: FiHome, label: 'Inicio', labelTid: 'nav.home' },
   {
     href: '/dashboard/pedidos',
     icon: FiShoppingBag,
     label: 'Pedidos',
     startsWith: '/dashboard/pedidos',
+    labelTid: 'nav.pedidos',
   },
-  { href: '/reserve', icon: FiCalendar, label: 'Reservas', startsWith: '/reserve' },
-  { href: '/uses', icon: PiTrayBold, label: 'Menú', startsWith: '/uses' },
+  {
+    href: '/reserve',
+    icon: FiCalendar,
+    label: 'Reservas',
+    startsWith: '/reserve',
+    labelTid: 'nav.reservas',
+  },
+  { href: '/uses', icon: PiTrayBold, label: 'Menú', startsWith: '/uses', labelTid: 'nav.menu' },
 ];
 
 const PUBLIC_LINKS: DockLink[] = [
-  { href: '/', icon: FiHome, label: 'Inicio' },
-  { href: '/uses', icon: PiTrayBold, label: 'Menú', startsWith: '/uses' },
+  { href: '/', icon: FiHome, label: 'Inicio', labelTid: 'nav.home' },
+  { href: '/uses', icon: PiTrayBold, label: 'Menú', startsWith: '/uses', labelTid: 'nav.menu' },
   LOCATION_LINK,
 ];
 
@@ -56,9 +69,17 @@ const FACTURACION_LINK: DockLink = {
   icon: FiFileText,
   label: 'Facturación',
   startsWith: '/blog/facturacion',
+  slugKey: 'facturacion',
+  labelTid: 'nav.facturacion',
 };
 
-const BLOG_LINK: DockLink = { href: '/blog', icon: FiCoffee, label: 'Blog', startsWith: '/blog' };
+const BLOG_LINK: DockLink = {
+  href: '/blog',
+  icon: FiCoffee,
+  label: 'Blog',
+  startsWith: '/blog',
+  labelTid: 'nav.blog',
+};
 
 type HiddenLink = DockLink & {
   variant: 'social' | 'internal';
@@ -88,6 +109,24 @@ const HIDDEN_DRAWER_LINKS: HiddenLink[] = [
   { ...BLOG_LINK, variant: 'internal' },
 ];
 
+const localizeLink = <T extends DockLink>(link: T, translate: (path: string) => string): T => {
+  const slugKey = link.slugKey;
+  let localizedSlug: string | undefined;
+  if (slugKey) {
+    const translationKey = `blog.slug_${slugKey}`;
+    const translation = translate(translationKey);
+    localizedSlug = translation && translation !== translationKey ? translation : slugKey;
+  }
+  const href =
+    localizedSlug && link.href.startsWith('/blog/') ? `/blog/${localizedSlug}` : link.href;
+  const startsWith =
+    localizedSlug && link.startsWith?.startsWith('/blog/')
+      ? `/blog/${localizedSlug}`
+      : link.startsWith;
+
+  return { ...link, href, startsWith } as T;
+};
+
 const DOCK_BUTTON_BASE =
   'flex h-11 w-11 items-center justify-center rounded-2xl text-xl transition';
 const DOCK_BUTTON_ACTIVE = 'bg-black text-white shadow-lg dark:bg-white dark:text-gray-900';
@@ -107,6 +146,7 @@ const isActiveRoute = (pathname: string, link: DockLink) => {
 export default function DockNav() {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [showExtras, setShowExtras] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -189,14 +229,16 @@ export default function DockNav() {
       {!isCollapsed && showExtras && (
         <div className="absolute bottom-24 right-6 flex flex-col space-y-3 rounded-3xl border border-white/20 bg-white/80 p-4 text-gray-900 shadow-2xl backdrop-blur-lg dark:border-black/10 dark:bg-gray-900/80 dark:text-white">
           <div className="flex flex-col items-center space-y-3">
-            {HIDDEN_DRAWER_LINKS.map((link) => {
+            {HIDDEN_DRAWER_LINKS.map((entry) => {
+              const link = entry.variant === 'internal' ? localizeLink(entry, t) : entry;
               const Icon = link.icon;
               const active = link.variant === 'internal' && isActiveRoute(pathname ?? '', link);
+              const ariaLabel = link.labelTid ? t(link.labelTid) : link.label;
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  aria-label={link.label}
+                  aria-label={ariaLabel}
                   onClick={handleLinkClick}
                   className={classNames(
                     DOCK_BUTTON_BASE,
@@ -213,6 +255,13 @@ export default function DockNav() {
                   )}
                 >
                   <Icon />
+                  <span className="sr-only">
+                    {link.labelTid ? (
+                      <TranslatedText tid={link.labelTid} fallback={link.label} />
+                    ) : (
+                      link.label
+                    )}
+                  </span>
                 </Link>
               );
             })}
@@ -234,14 +283,16 @@ export default function DockNav() {
             isCollapsed ? 'scale-0 opacity-0 pointer-events-none' : 'scale-100 opacity-100'
           )}
         >
-          {links.map((link) => {
+          {links.map((baseLink) => {
+            const link = localizeLink(baseLink, t);
             const Icon = link.icon;
             const active = isActiveRoute(pathname ?? '', link);
+            const ariaLabel = link.labelTid ? t(link.labelTid) : link.label;
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                aria-label={link.label}
+                aria-label={ariaLabel}
                 onClick={handleLinkClick}
                 className={classNames(
                   DOCK_BUTTON_BASE,
@@ -249,6 +300,13 @@ export default function DockNav() {
                 )}
               >
                 <Icon />
+                <span className="sr-only">
+                  {link.labelTid ? (
+                    <TranslatedText tid={link.labelTid} fallback={link.label} />
+                  ) : (
+                    link.label
+                  )}
+                </span>
               </Link>
             );
           })}

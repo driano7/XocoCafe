@@ -267,7 +267,7 @@ export default function SupportBanner() {
             variants={donationVariants}
             custom={index}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:text-left">
               <span
                 className="flex h-11 w-11 items-center justify-center rounded-full bg-black/20 text-2xl"
                 style={{ color: method.accent }}
@@ -282,22 +282,25 @@ export default function SupportBanner() {
                 )}
               </dt>
             </div>
-            <dd className="mt-2 flex flex-col gap-2 font-mono text-sm text-white/90 sm:flex-row sm:items-center sm:gap-3">
-              <div className="flex w-full flex-col overflow-hidden rounded-2xl border border-white/20 bg-white/10 p-3">
-                <span className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-1">
+            <dd className="mt-2 flex flex-col gap-2 text-center font-mono text-sm text-white/90 sm:text-left">
+              <div className="flex w-full flex-col items-center overflow-hidden rounded-2xl border border-white/20 bg-white/10 p-3 text-center sm:items-start sm:text-left">
+                <span className="mb-1 text-[10px] font-black uppercase tracking-widest text-white/60">
                   {method.labelTid ? (
                     <TranslatedText tid={method.labelTid} fallback={method.label} />
                   ) : (
                     method.label
                   )}
                 </span>
-                <span className="truncate text-xs font-bold text-white mb-2" title={method.value}>
+                <span
+                  className="mb-2 w-full truncate text-xs font-bold text-white"
+                  title={method.value}
+                >
                   {method.value}
                 </span>
                 <button
                   type="button"
                   onClick={() => handleCopy(method.label, method.value!)}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-white/20 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-white hover:text-primary-600"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-white/20 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-white hover:text-primary-600"
                 >
                   {copyFeedback?.label === method.label ? (
                     <TranslatedText tid="common.copied" fallback="Copiado" />
