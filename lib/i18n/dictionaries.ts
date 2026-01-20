@@ -544,6 +544,7 @@ export const dictionaries = {
         'Conecta con Xoco Café en tus plataformas favoritas para descubrir nuevos lanzamientos, eventos y actualizaciones del proyecto.',
       copy_method_desc:
         'Copia el método que prefieras y gracias por impulsar a Xoco Café. Nuestro equipo recibe las contribuciones directamente para financiar mejoras en la experiencia.',
+      bank_account: 'Cuenta bancaria',
     },
   },
   en: {
@@ -1030,12 +1031,31 @@ export const dictionaries = {
       view_detail: 'View detail',
       date_time: 'Date and Time',
     },
+    support: {
+      follow_us: 'Follow us',
+      creating_community: 'We are building community',
+      support_project: 'Support the project',
+      donations_open: 'Open donations to keep building.',
+      connect_desc:
+        'Connect with Xoco Café on your favorite platforms to discover new releases, events, and project updates.',
+      copy_method_desc:
+        'Copy the method you prefer and thank you for boosting Xoco Café. Our team receives the contributions directly to fund new improvements.',
+      bank_account: 'Bank account',
+    },
     common: {
       loading: 'Loading...',
       error: 'An error occurred',
       success: 'Success',
       save: 'Save',
       cancel: 'Cancel',
+      search: 'Search',
+      clear: 'Clear',
+      refresh: 'Refresh',
+      copy: 'Copy',
+      copied: 'Copied',
+      copy_error: 'We could not copy automatically. Select the text and copy it manually.',
+      back: 'Back',
+      close: 'Close',
     },
   },
 };

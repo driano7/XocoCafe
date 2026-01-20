@@ -63,6 +63,25 @@ const chipVariants: Variants = {
   }),
 };
 
+const switchLinkVariants: Variants = {
+  hidden: { opacity: 0, y: 8, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.45, ease: [0.17, 0.55, 0.55, 1] },
+  },
+  pulse: {
+    scale: [1, 1.05, 1],
+    boxShadow: [
+      '0 0 0 rgba(190, 75, 12, 0)',
+      '0 0 18px rgba(190, 75, 12, 0.3)',
+      '0 0 0 rgba(190, 75, 12, 0)',
+    ],
+    transition: { delay: 0.3, duration: 1.1, repeat: 1 },
+  },
+};
+
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -572,11 +591,21 @@ export default function LoginPage() {
                     }}
                     className="brand-tertiary-btn w-full justify-center"
                   >
-                    {showForgotPassword
-                      ? t('auth.back_to_login') || 'Volver a iniciar sesión'
-                      : isLogin
-                      ? t('auth.no_account') || '¿No tienes cuenta? Regístrate aquí'
-                      : t('auth.have_account') || '¿Ya tienes cuenta? Inicia sesión aquí'}
+                    {showForgotPassword ? (
+                      <span>{t('auth.back_to_login') || 'Volver a iniciar sesión'}</span>
+                    ) : (
+                      <motion.span
+                        key={isLogin ? 'register-cta' : 'login-cta'}
+                        className="underline-magical inline-flex items-center font-semibold"
+                        variants={switchLinkVariants}
+                        initial="hidden"
+                        animate={shouldAnimateLoginStack ? ['visible', 'pulse'] : 'visible'}
+                      >
+                        {isLogin
+                          ? t('auth.no_account') || '¿No tienes cuenta? Regístrate aquí'
+                          : t('auth.have_account') || '¿Ya tienes cuenta? Inicia sesión aquí'}
+                      </motion.span>
+                    )}
                   </button>
                 </motion.div>
 

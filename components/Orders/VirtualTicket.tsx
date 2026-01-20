@@ -14,6 +14,7 @@ import {
 } from '@/lib/paymentDisplay';
 
 type ItemCategory = 'beverage' | 'food' | 'package' | 'other';
+type ItemEntry = ItemLike | string;
 
 export interface OrderItem {
   name: string;
@@ -43,8 +44,8 @@ export interface VirtualTicketProps {
     vatPercent?: number | null;
     deliveryTipAmount?: number | null;
     deliveryTipPercent?: number | null;
-    items?: any;
-    qrPayload?: any;
+    items?: unknown;
+    qrPayload?: unknown;
     metadata?: unknown;
     queuedPaymentMethod?: string | null;
     queuedPaymentReference?: string | null;
@@ -122,6 +123,23 @@ const CATEGORY_LABELS: Record<ItemCategory, string> = {
   other: 'Otros',
 };
 
+type ItemLike = Record<string, unknown>;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const readString = (value: unknown): string | null => (typeof value === 'string' ? value : null);
+const readNumber = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+const getNestedRecord = (record: unknown, key: string): Record<string, unknown> | null => {
+  if (!isRecord(record)) {
+    return null;
+  }
+  const nested = record[key];
+  return isRecord(nested) ? nested : null;
+};
+
 const toNumericValue = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -167,20 +185,21 @@ const buildFullName = (first?: string | null, last?: string | null) => {
 const normalizeText = (value?: string | null) =>
   (value ?? '').toString().toLowerCase().normalize('NFD');
 
-const classifyItemCategory = (item: any): ItemCategory => {
-  const directCategory = normalizeText(item.category);
+const classifyItemCategory = (item: ItemLike): ItemCategory => {
+  const product = isRecord(item.product) ? item.product : null;
+  const directCategory = normalizeText(readString(item.category));
   if (directCategory.includes('beverage')) return 'beverage';
   if (directCategory.includes('food')) return 'food';
   if (directCategory.includes('package')) return 'package';
 
   const haystack = [
-    normalizeText(item.category),
-    normalizeText(item.subcategory),
-    normalizeText(item.name),
-    normalizeText(item.productName),
-    normalizeText(item.product?.name),
-    normalizeText(item.product?.displayName),
-    normalizeText(item.productId),
+    normalizeText(readString(item.category)),
+    normalizeText(readString(item.subcategory)),
+    normalizeText(readString(item.name)),
+    normalizeText(readString(item.productName)),
+    normalizeText(product ? readString(product.name) : null),
+    normalizeText(product ? readString(product.displayName) : null),
+    normalizeText(readString(item.productId)),
   ].join(' ');
 
   if (haystack && PACKAGE_KEYWORDS.some((keyword) => haystack.includes(keyword))) {
@@ -222,7 +241,7 @@ const summarizeItems = (items: OrderItem[]) =>
     { beverages: 0, foods: 0, packages: 0, other: 0, total: 0 }
   );
 
-const parseMaybeJson = (value: any) => {
+const parseMaybeJson = (value: unknown) => {
   if (typeof value === 'string') {
     try {
       return JSON.parse(value);
@@ -250,7 +269,7 @@ const parseTextItem = (value: string): OrderItem | null => {
   };
 };
 
-const buildOrderItem = (item: any): OrderItem => {
+const buildOrderItem = (item: ItemLike | string): OrderItem => {
   if (typeof item === 'string') {
     const parsed = parseTextItem(item);
     if (parsed) return parsed;
@@ -263,65 +282,63 @@ const buildOrderItem = (item: any): OrderItem => {
       packageItems: null,
     };
   }
+  const product = isRecord(item.product) ? item.product : null;
+  const rawName =
+    readString(item.name) ??
+    readString(item.productName) ??
+    (product ? readString(product.name) ?? readString(product.displayName) : null) ??
+    readString(item.productId) ??
+    readString(item.n);
+  const packageItemsSource = Array.isArray(item.packageItems)
+    ? item.packageItems
+    : Array.isArray(item.items)
+    ? item.items
+    : null;
   return {
-    name: String(
-      item?.name ??
-        item?.productName ??
-        item?.product?.name ??
-        item?.product?.displayName ??
-        item?.productId ??
-        item?.n ??
-        'Producto'
-    ),
-    quantity: normalizeQuantity(item?.quantity ?? item?.qty ?? item?.q),
-    price: Number.isFinite(Number(item?.price ?? item?.amount ?? item?.p))
-      ? Number(item?.price ?? item?.amount ?? item?.p)
-      : 0,
+    name: String(rawName ?? 'Producto'),
+    quantity: normalizeQuantity(item.quantity ?? item.qty ?? item.q),
+    price: toNumericValue(item.price ?? item.amount ?? item.p) ?? 0,
     category:
-      typeof item?.category === 'string'
+      typeof item.category === 'string'
         ? (item.category as ItemCategory)
-        : typeof item?.c === 'string'
+        : typeof item.c === 'string'
         ? (item.c as ItemCategory)
-        : classifyItemCategory(item),
-    size: typeof item?.size === 'string' ? item.size : typeof item?.s === 'string' ? item.s : null,
-    packageItems: Array.isArray(item?.packageItems)
-      ? item.packageItems.map((entry: any) => String(entry))
+        : classifyItemCategory(item as ItemLike),
+    size: readString(item.size) ?? readString(item.s),
+    packageItems: Array.isArray(packageItemsSource)
+      ? packageItemsSource.map((entry) => String(entry))
       : null,
-    productId:
-      typeof item?.productId === 'string'
-        ? item.productId
-        : typeof item?.id === 'string'
-        ? item.id
-        : null,
+    productId: readString(item.productId) ?? readString(item.id),
   };
 };
 
-const isPotentialItemEntry = (value: any) => {
+const isPotentialItemEntry = (value: unknown): value is ItemEntry => {
   if (typeof value === 'string') {
-    return /\d+\s*[x×]/i.test(value);
+    return Boolean(value.trim());
   }
-  if (typeof value === 'object' && value !== null) {
-    return (
-      'name' in value ||
-      'productName' in value ||
-      'productId' in value ||
-      'n' in value ||
-      'description' in value ||
-      'text' in value
-    );
+  if (!isRecord(value)) {
+    return false;
   }
-  return false;
+  return (
+    typeof value.name === 'string' ||
+    typeof value.productName === 'string' ||
+    typeof value.productId === 'string' ||
+    typeof value.n === 'string' ||
+    typeof value.description === 'string' ||
+    typeof value.text === 'string'
+  );
 };
 
-const findNestedItemArray = (value: any): any[] | null => {
+const findNestedItemArray = (value: unknown): ItemEntry[] | null => {
   if (!value) return null;
   if (Array.isArray(value)) {
-    return value.some(isPotentialItemEntry) ? value : null;
+    const filtered = value.filter(isPotentialItemEntry) as ItemEntry[];
+    return filtered.length ? filtered : null;
   }
-  if (typeof value === 'object') {
+  if (isRecord(value)) {
     for (const key of Object.keys(value)) {
-      const nested = findNestedItemArray((value as Record<string, unknown>)[key]);
-      if (nested) {
+      const nested = findNestedItemArray(value[key]);
+      if (nested && nested.length) {
         return nested;
       }
     }
@@ -329,21 +346,22 @@ const findNestedItemArray = (value: any): any[] | null => {
   return null;
 };
 
-const extractItemsFromSource = (source: any): OrderItem[] => {
+const extractItemsFromSource = (source: unknown): OrderItem[] => {
   if (!source) return [];
   const parsedSource = parseMaybeJson(source) ?? source;
 
-  const mapEntries = (entries: any[]) => entries.map((entry) => buildOrderItem(entry));
+  const mapEntries = (entries: ItemEntry[]) => entries.map((entry) => buildOrderItem(entry));
 
   if (Array.isArray(parsedSource)) {
-    return mapEntries(parsedSource);
+    const normalized = parsedSource.filter(isPotentialItemEntry) as ItemEntry[];
+    return mapEntries(normalized);
   }
-  if (typeof parsedSource === 'object') {
+  if (isRecord(parsedSource)) {
     if (Array.isArray(parsedSource.list)) {
-      return mapEntries(parsedSource.list);
+      return mapEntries(parsedSource.list.filter(isPotentialItemEntry) as ItemEntry[]);
     }
     if (Array.isArray(parsedSource.items)) {
-      return mapEntries(parsedSource.items);
+      return mapEntries(parsedSource.items.filter(isPotentialItemEntry) as ItemEntry[]);
     }
     if (typeof parsedSource.body === 'string') {
       const entries = parsedSource.body
@@ -351,30 +369,44 @@ const extractItemsFromSource = (source: any): OrderItem[] => {
         .map((line: string) => line.trim())
         .filter(Boolean);
       if (entries.length) {
-        return entries.map((entry: string) => buildOrderItem(entry));
+        return entries.map((entry) => buildOrderItem(entry));
       }
     }
     if (Array.isArray(parsedSource.body)) {
-      return mapEntries(parsedSource.body);
+      return mapEntries(parsedSource.body.filter(isPotentialItemEntry) as ItemEntry[]);
     }
     if (
       Array.isArray(parsedSource.beverages) ||
       Array.isArray(parsedSource.foods) ||
       Array.isArray(parsedSource.others)
     ) {
-      const beverages = Array.isArray(parsedSource.beverages) ? parsedSource.beverages : [];
-      const foods = Array.isArray(parsedSource.foods) ? parsedSource.foods : [];
-      const others = Array.isArray(parsedSource.others) ? parsedSource.others : [];
+      const beverages = Array.isArray(parsedSource.beverages)
+        ? (parsedSource.beverages.filter(isPotentialItemEntry) as ItemEntry[])
+        : [];
+      const foods = Array.isArray(parsedSource.foods)
+        ? (parsedSource.foods.filter(isPotentialItemEntry) as ItemEntry[])
+        : [];
+      const others = Array.isArray(parsedSource.others)
+        ? (parsedSource.others.filter(isPotentialItemEntry) as ItemEntry[])
+        : [];
       return mapEntries([...beverages, ...foods, ...others]);
     }
     if (Array.isArray(parsedSource.i)) {
-      return parsedSource.i.map((entry: any) => ({
-        name: String(entry?.n ?? 'Producto'),
-        quantity: normalizeQuantity(entry?.q),
-        price: Number.isFinite(Number(entry?.p)) ? Number(entry?.p) : 0,
-        category: typeof entry?.c === 'string' ? (entry.c as ItemCategory) : 'other',
-        size: typeof entry?.s === 'string' ? entry.s : null,
-      }));
+      return parsedSource.i.map((entry) => {
+        if (typeof entry === 'string') {
+          return buildOrderItem(entry);
+        }
+        const itemRecord = isRecord(entry) ? entry : {};
+        return {
+          name: String(itemRecord.n ?? 'Producto'),
+          quantity: normalizeQuantity(itemRecord.q),
+          price: toNumericValue(itemRecord.p) ?? 0,
+          category: typeof itemRecord.c === 'string' ? (itemRecord.c as ItemCategory) : 'other',
+          size: readString(itemRecord.s),
+          packageItems: null,
+          productId: null,
+        };
+      });
     }
     const nested = findNestedItemArray(parsedSource);
     if (nested) {
@@ -434,13 +466,12 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
       if (typeof order.tipAmount === 'number') {
         return order.tipAmount;
       }
-      if (
-        order.items &&
-        typeof order.items === 'object' &&
-        (order.items as any)?.totals &&
-        typeof (order.items as any).totals.tip === 'number'
-      ) {
-        return (order.items as any).totals.tip;
+      const totalsRecord = getNestedRecord(order.items, 'totals');
+      if (totalsRecord) {
+        const tipValue = readNumber(totalsRecord.tip);
+        if (tipValue !== null) {
+          return tipValue;
+        }
       }
       return 0;
     }, [order.items, order.tipAmount]);
@@ -449,13 +480,12 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
       if (typeof order.tipPercent === 'number') {
         return order.tipPercent;
       }
-      if (
-        order.items &&
-        typeof order.items === 'object' &&
-        (order.items as any)?.totals &&
-        typeof (order.items as any).totals.tipPercent === 'number'
-      ) {
-        return (order.items as any).totals.tipPercent;
+      const totalsRecord = getNestedRecord(order.items, 'totals');
+      if (totalsRecord) {
+        const percentValue = readNumber(totalsRecord.tipPercent);
+        if (percentValue !== null) {
+          return percentValue;
+        }
       }
       if (typeof order.total === 'number' && order.total > 0 && tipAmount > 0) {
         const subtotal = order.total - tipAmount;
@@ -466,12 +496,7 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
       return null;
     }, [order.items, order.tipPercent, order.total, tipAmount]);
 
-    const totalsSnapshot = useMemo(() => {
-      if (order.items && typeof order.items === 'object' && (order.items as any)?.totals) {
-        return (order.items as any).totals;
-      }
-      return null;
-    }, [order.items]);
+    const totalsSnapshot = useMemo(() => getNestedRecord(order.items, 'totals'), [order.items]);
 
     const summary = useMemo(() => summarizeItems(items), [items]);
     const packageDetails = useMemo(
@@ -494,11 +519,9 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
         if (order.shipping && typeof order.shipping === 'object') {
           return order.shipping as Record<string, unknown>;
         }
-        if (order.items && typeof order.items === 'object' && (order.items as any)?.shipping) {
-          const candidate = (order.items as any).shipping;
-          if (candidate && typeof candidate === 'object') {
-            return candidate as Record<string, unknown>;
-          }
+        const shippingFromItems = getNestedRecord(order.items, 'shipping');
+        if (shippingFromItems) {
+          return shippingFromItems;
         }
         return null;
       };
@@ -511,35 +534,28 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
       // If we have a generic "needsShipping" flag in root or shipping record, check it.
       // (This depends on backend, but let's be safe: if address is empty, it's not shipping).
 
-      const nestedAddress =
-        shippingRecord.address && typeof shippingRecord.address === 'object'
-          ? (shippingRecord.address as Record<string, unknown>)
-          : null;
+      const nestedAddress = getNestedRecord(shippingRecord, 'address');
 
       const resolveField = (key: string) => {
-        const nestedValue =
-          nestedAddress && key in nestedAddress
-            ? toTrimmedString((nestedAddress[key] as string) ?? null)
-            : null;
+        const nestedValue = nestedAddress ? toTrimmedString(nestedAddress[key] as string) : null;
         if (nestedValue) {
           return nestedValue;
         }
-        return toTrimmedString((shippingRecord[key] as string) ?? null);
+        return toTrimmedString(shippingRecord[key] as string);
       };
 
       const street = resolveField('street');
       const country = resolveField('country');
       const postalCode = resolveField('postalCode');
-
-      // CRITICAL CHECK: To consider it a valid shipping order to display,
-      // we must have at least a street or postal code.
-      // If it's just a stray object with empty strings, return null.
-      if (!street && !postalCode) {
-        // Also check if maybe ONLY delivery tip is present?
-        // Typically a delivery tip implies delivery, but if there's no address,
-        // it might be a data anomaly. We'll hide it to be safe effectively masking "Ghost" delivery info.
-        return null;
-      }
+      const existingLinesSource = Array.isArray(shippingRecord.addressLines)
+        ? shippingRecord.addressLines
+        : Array.isArray(nestedAddress?.lines)
+        ? nestedAddress?.lines
+        : [];
+      const normalizedLines =
+        (existingLinesSource as unknown[])
+          .map((line) => toTrimmedString(line as string))
+          .filter((line): line is string => Boolean(line)) ?? [];
 
       const city = resolveField('city');
       const state = resolveField('state');
@@ -551,13 +567,16 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
             (shippingRecord.label as string | undefined)
         ) ??
         resolveField('label') ??
-        resolveField('nickname');
+        resolveField('nickname') ??
+        toTrimmedString('label' in shippingRecord ? (shippingRecord.label as string) : null);
 
-      const lines = [
+      const fallbackLines = [
         street,
         [city, state, country].filter(Boolean).join(', ') || null,
         postalCode ? `CP ${postalCode}` : null,
       ].filter((line): line is string => Boolean(line && line.trim().length));
+
+      const lines = normalizedLines.length > 0 ? normalizedLines : fallbackLines;
 
       const contactPhone = toTrimmedString(
         (shippingRecord.contactPhone as string | undefined) ?? order.shipping?.contactPhone ?? null
@@ -565,12 +584,30 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
 
       const contactName =
         toTrimmedString(shippingRecord.contactName as string | undefined) ??
+        toTrimmedString((shippingRecord as { receiver?: string }).receiver ?? null) ??
+        toTrimmedString((shippingRecord as { customerName?: string }).customerName ?? null) ??
         (nestedAddress ? toTrimmedString(nestedAddress.name as string | undefined) : null) ??
         null;
 
-      const isWhatsapp = Boolean(
-        (shippingRecord.isWhatsapp as boolean | undefined) ?? order.shipping?.isWhatsapp ?? false
-      );
+      const isWhatsapp =
+        typeof shippingRecord.isWhatsapp === 'boolean'
+          ? shippingRecord.isWhatsapp
+          : typeof shippingRecord.isWhatsapp === 'string'
+          ? shippingRecord.isWhatsapp.toLowerCase() === 'true'
+          : Boolean(order.shipping?.isWhatsapp ?? false);
+
+      const hasExplicitShippingFlag =
+        Boolean(
+          (shippingRecord.needsShipping as boolean | undefined) ||
+            (shippingRecord.required as boolean | undefined) ||
+            (shippingRecord.type as string | undefined) === 'shipping' ||
+            (shippingRecord.addressId as string | undefined) ||
+            order.shipping?.addressId
+        ) || Boolean(contactPhone || contactName || reference || label);
+
+      if (!hasExplicitShippingFlag && lines.length === 0) {
+        return null;
+      }
 
       return {
         label: label ?? null,
@@ -713,23 +750,20 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
       if (typeof order.deliveryTipAmount === 'number') {
         return Math.max(order.deliveryTipAmount, 0);
       }
-      if (
-        order.shipping?.deliveryTip &&
-        typeof order.shipping.deliveryTip.amount === 'number' &&
-        order.shipping.deliveryTip.amount > 0
-      ) {
-        return order.shipping.deliveryTip.amount;
+      const deliveryTipRecord =
+        (order.shipping?.deliveryTip as Record<string, unknown> | null) ??
+        getNestedRecord(order.items, 'deliveryTip');
+      if (deliveryTipRecord) {
+        const amountValue = readNumber(deliveryTipRecord.amount);
+        if (amountValue !== null) {
+          return Math.max(amountValue, 0);
+        }
       }
-      if (
-        order.items &&
-        typeof order.items === 'object' &&
-        (order.items as any)?.deliveryTip &&
-        typeof (order.items as any).deliveryTip.amount === 'number'
-      ) {
-        return (order.items as any).deliveryTip.amount;
-      }
-      if (totalsSnapshot && typeof totalsSnapshot.deliveryTip === 'number') {
-        return totalsSnapshot.deliveryTip;
+      if (totalsSnapshot) {
+        const snapshotValue = readNumber(totalsSnapshot.deliveryTip);
+        if (snapshotValue !== null) {
+          return Math.max(snapshotValue, 0);
+        }
       }
       return 0;
     }, [order.deliveryTipAmount, order.items, order.shipping?.deliveryTip, totalsSnapshot]);
@@ -738,19 +772,23 @@ const VirtualTicket = forwardRef<HTMLDivElement, VirtualTicketProps>(
       if (typeof order.deliveryTipPercent === 'number') {
         return order.deliveryTipPercent;
       }
-      if (order.shipping?.deliveryTip && typeof order.shipping.deliveryTip.percent === 'number') {
-        return order.shipping.deliveryTip.percent;
+      const deliveryTipRecord =
+        (order.shipping?.deliveryTip as Record<string, unknown> | null) ??
+        getNestedRecord(order.items, 'deliveryTip');
+      if (deliveryTipRecord) {
+        const percentValue = readNumber(deliveryTipRecord.percent);
+        if (percentValue !== null) {
+          return percentValue;
+        }
       }
-      if (
-        order.items &&
-        typeof order.items === 'object' &&
-        (order.items as any)?.deliveryTip &&
-        typeof (order.items as any).deliveryTip.percent === 'number'
-      ) {
-        return (order.items as any).deliveryTip.percent;
+      if (totalsSnapshot) {
+        const snapshotPercent = readNumber(totalsSnapshot.deliveryTipPercent);
+        if (snapshotPercent !== null) {
+          return snapshotPercent;
+        }
       }
       return null;
-    }, [order.deliveryTipPercent, order.items, order.shipping?.deliveryTip]);
+    }, [order.deliveryTipPercent, order.items, order.shipping?.deliveryTip, totalsSnapshot]);
 
     const lineItemsTotal = useMemo(
       () => items.reduce((total, item) => total + item.price * item.quantity, 0),

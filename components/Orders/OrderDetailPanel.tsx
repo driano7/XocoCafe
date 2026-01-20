@@ -224,6 +224,19 @@ export function OrderDetailPanel({
       : null;
   };
   const shippingAddressLines: string[] = [];
+  if (
+    normalizedShippingObject &&
+    Array.isArray((normalizedShippingObject as { addressLines?: unknown }).addressLines)
+  ) {
+    const explicitLines = ((normalizedShippingObject as { addressLines?: unknown }).addressLines ??
+      []) as unknown[];
+    explicitLines.forEach((line) => {
+      const cleaned = toTrimmedString(line);
+      if (cleaned) {
+        shippingAddressLines.push(cleaned);
+      }
+    });
+  }
   const shippingStreet = resolveShippingField('street');
   const shippingCity = resolveShippingField('city');
   const shippingState = resolveShippingField('state');
@@ -310,7 +323,12 @@ export function OrderDetailPanel({
       : null;
   const deliveryPercentLabel =
     typeof deliveryTipPercent === 'number' ? `${deliveryTipPercent}%` : null;
-  const showShippingCard = shippingAddressLines.length > 0;
+  const showShippingCard =
+    Boolean(normalizedShippingObject) &&
+    (shippingAddressLines.length > 0 ||
+      Boolean(shippingReference) ||
+      Boolean(shippingContact) ||
+      Boolean(shippingLabel));
   const decryptedCustomerName = buildFullName(
     decryptedCustomer?.firstName,
     decryptedCustomer?.lastName
@@ -406,26 +424,26 @@ export function OrderDetailPanel({
         />
       </div>
       {showShippingCard && (
-        <div className="rounded-2xl border border-primary-100 bg-primary-50/70 p-3 text-sm text-primary-900 shadow-inner dark:border-primary-800/60 dark:bg-primary-950/30 dark:text-primary-50">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-primary-700 dark:text-primary-200">
+        <div className="rounded-2xl border border-primary-100 bg-primary-50/70 p-3 text-sm text-primary-900 shadow-inner dark:border-primary-800/60 dark:bg-primary-950/30 dark:text-white">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-primary-700 dark:text-white">
             Entrega a domicilio
           </p>
           {shippingLabel && (
-            <p className="mt-0.5 text-base font-semibold text-primary-900 dark:text-primary-50">
+            <p className="mt-0.5 text-base font-semibold text-primary-900 dark:text-white">
               {shippingLabel}
             </p>
           )}
-          <p className="mt-2 text-xs font-semibold uppercase tracking-[0.3em] text-primary-600 dark:text-primary-100">
+          <p className="mt-2 text-xs font-semibold uppercase tracking-[0.3em] text-primary-600 dark:text-white">
             Cliente
           </p>
-          <p className="text-sm font-semibold text-primary-900 dark:text-primary-50">
+          <p className="text-sm font-semibold text-primary-900 dark:text-white">
             {shippingCustomerDisplayName}
           </p>
-          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.25em] text-primary-600 dark:text-primary-100">
+          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.25em] text-primary-600 dark:text-white">
             Dirección de envío
           </p>
           {shippingAddressLines.length > 0 ? (
-            <div className="mt-1 space-y-0.5 text-primary-900 dark:text-primary-50">
+            <div className="mt-1 space-y-0.5 text-primary-900 dark:text-white">
               {shippingAddressLines.map((line, index) => (
                 <p key={`${line}-${index}`} className="text-sm">
                   {line}
@@ -433,28 +451,28 @@ export function OrderDetailPanel({
               ))}
             </div>
           ) : (
-            <p className="mt-1 text-sm text-primary-800/80 dark:text-primary-100/80">
+            <p className="mt-1 text-sm text-primary-800/80 dark:text-white/80">
               Sin dirección registrada.
             </p>
           )}
           {shippingReference && (
-            <p className="mt-2 text-sm text-primary-900 dark:text-primary-50">
+            <p className="mt-2 text-sm text-primary-900 dark:text-white">
               Referencias: {shippingReference}
             </p>
           )}
           {shippingContact && (
-            <p className="mt-2 text-sm text-primary-900 dark:text-primary-50">
-              <span className="font-semibold">Contacto:</span> {shippingContact}
+            <p className="mt-2 text-sm text-primary-900 dark:text-white">
+              <span className="font-semibold dark:text-white">Contacto:</span> {shippingContact}
             </p>
           )}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-primary-900 dark:text-primary-50">
-            <span className="text-xs font-semibold uppercase tracking-[0.35em] text-primary-700 dark:text-primary-200">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-primary-900 dark:text-white">
+            <span className="text-xs font-semibold uppercase tracking-[0.35em] text-primary-700 dark:text-white">
               Propina para baristas
             </span>
-            <span className="text-base font-semibold">
+            <span className="text-base font-semibold dark:text-white">
               {formattedDeliveryTip ?? 'Sin propina registrada'}
               {deliveryPercentLabel && formattedDeliveryTip && (
-                <span className="ml-2 text-xs font-semibold text-primary-700/80 dark:text-primary-200/80">
+                <span className="ml-2 text-xs font-semibold text-primary-700/80 dark:text-white/80">
                   {deliveryPercentLabel}
                 </span>
               )}

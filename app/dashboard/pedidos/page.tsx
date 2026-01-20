@@ -104,12 +104,20 @@ type NoticePayload = {
   body?: string;
 };
 
+type TicketSnapshotFormat = 'png' | 'jpeg';
+
 type TicketSnapshot = {
   blob: Blob;
+  mimeType: string;
   displayWidth: number;
   displayHeight: number;
   imageWidth: number;
   imageHeight: number;
+};
+
+type TicketSnapshotOptions = {
+  format?: TicketSnapshotFormat;
+  quality?: number;
 };
 
 const useOrderStatusTracker = (
@@ -1057,56 +1065,116 @@ export default function OrdersDashboardPage() {
     return new Blob([uintArray], { type: mime });
   };
 
-  const captureTicketSnapshot = useCallback(async (): Promise<TicketSnapshot | null> => {
-    if (!ticketRef.current) return null;
-    await waitForTicketAssets();
-    const html2canvas = (await import('html2canvas')).default;
-    const canvas = await html2canvas(ticketRef.current, {
-      scale: 1.5,
-      backgroundColor: '#ffffff',
-      useCORS: true,
-    });
-    const toBlob = () =>
-      new Promise<Blob | null>((resolve, reject) => {
-        if (typeof canvas.toBlob !== 'function') {
-          try {
-            const dataUrl = canvas.toDataURL('image/png');
-            resolve(dataUrlToBlob(dataUrl));
-            return;
-          } catch (error) {
-            reject(error);
-            return;
-          }
-        }
-        canvas.toBlob((blob) => {
-          if (!blob) {
-            reject(new Error('No pudimos generar la imagen del ticket.'));
-            return;
-          }
-          resolve(blob);
-        }, 'image/png');
+  const captureTicketSnapshot = useCallback(
+    async (options?: TicketSnapshotOptions): Promise<TicketSnapshot | null> => {
+      if (!ticketRef.current) return null;
+      const format: TicketSnapshotFormat =
+        options?.format === 'jpeg' || options?.format === 'png' ? options.format : 'png';
+      const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+      const normalizedQuality =
+        typeof options?.quality === 'number'
+          ? Math.min(1, Math.max(0, options.quality))
+          : format === 'jpeg'
+          ? 0.92
+          : undefined;
+      await waitForTicketAssets();
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(ticketRef.current, {
+        scale: 1.5,
+        backgroundColor: '#ffffff',
+        useCORS: true,
       });
+      const toBlob = () =>
+        new Promise<Blob | null>((resolve, reject) => {
+          if (typeof canvas.toBlob !== 'function') {
+            try {
+              const dataUrl = canvas.toDataURL(
+                mimeType,
+                typeof normalizedQuality === 'number' ? normalizedQuality : undefined
+              );
+              resolve(dataUrlToBlob(dataUrl));
+              return;
+            } catch (error) {
+              reject(error);
+              return;
+            }
+          }
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error('No pudimos generar la imagen del ticket.'));
+                return;
+              }
+              resolve(blob);
+            },
+            mimeType,
+            normalizedQuality
+          );
+        });
 
-    let blob: Blob | null = null;
-    try {
-      blob = await toBlob();
-    } catch (error) {
-      console.error('No pudimos convertir el ticket en imagen (fallback).', error);
-      blob = null;
-    }
-    if (!blob) return null;
-    const rect = ticketRef.current.getBoundingClientRect();
-    return {
-      blob,
-      displayWidth: Math.max(1, rect.width || canvas.width),
-      displayHeight: Math.max(1, rect.height || canvas.height),
-      imageWidth: Math.max(1, canvas.width),
-      imageHeight: Math.max(1, canvas.height),
-    };
-  }, [ticketRef, waitForTicketAssets]);
+      let blob: Blob | null = null;
+      try {
+        blob = await toBlob();
+      } catch (error) {
+        console.error('No pudimos convertir el ticket en imagen (fallback).', error);
+        blob = null;
+      }
+      if (!blob) return null;
+      const resolvedMimeType = blob.type || mimeType;
+      const rect = ticketRef.current.getBoundingClientRect();
+      return {
+        blob,
+        mimeType: resolvedMimeType,
+        displayWidth: Math.max(1, rect.width || canvas.width),
+        displayHeight: Math.max(1, rect.height || canvas.height),
+        imageWidth: Math.max(1, canvas.width),
+        imageHeight: Math.max(1, canvas.height),
+      };
+    },
+    [ticketRef, waitForTicketAssets]
+  );
 
   const createPdfFromSnapshot = useCallback(async (snapshot: TicketSnapshot) => {
-    const jpegBytes = new Uint8Array(await snapshot.blob.arrayBuffer());
+    const ensureJpegBlob = async () => {
+      if (snapshot.mimeType === 'image/jpeg') {
+        return snapshot.blob;
+      }
+      const objectUrl = URL.createObjectURL(snapshot.blob);
+      try {
+        const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => resolve(img);
+          img.onerror = (error) => reject(error);
+          img.src = objectUrl;
+        });
+        const canvasEl = document.createElement('canvas');
+        canvasEl.width = Math.max(1, Math.round(snapshot.imageWidth));
+        canvasEl.height = Math.max(1, Math.round(snapshot.imageHeight));
+        const ctx = canvasEl.getContext('2d');
+        if (!ctx) {
+          throw new Error('No pudimos preparar el lienzo para exportar el ticket.');
+        }
+        ctx.drawImage(image, 0, 0, canvasEl.width, canvasEl.height);
+        return await new Promise<Blob>((resolve, reject) => {
+          canvasEl.toBlob(
+            (blob) => {
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error('No pudimos convertir el ticket a JPEG.'));
+              }
+            },
+            'image/jpeg',
+            0.92
+          );
+        });
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+    const jpegBlob = await ensureJpegBlob();
+    const jpegBytes = new Uint8Array(await jpegBlob.arrayBuffer());
     const pxToPt = (px: number) => Math.max(1, Math.round((px * 72) / 96));
     const widthPt = pxToPt(snapshot.displayWidth);
     const heightPt = pxToPt(snapshot.displayHeight);
@@ -1168,7 +1236,7 @@ export default function OrdersDashboardPage() {
   }, []);
 
   const generateTicketPdf = useCallback(async () => {
-    const snapshot = await captureTicketSnapshot();
+    const snapshot = await captureTicketSnapshot({ format: 'jpeg', quality: 0.94 });
     if (!snapshot) {
       return null;
     }
@@ -1329,18 +1397,24 @@ export default function OrdersDashboardPage() {
               t('orders.save_gallery_text') || 'Guardaremos tu ticket como PDF en tu dispositivo.',
           });
         } catch (mobileError) {
-          if (mobileError instanceof Error && mobileError.message === 'gallery_permission_denied') {
-            throw mobileError;
+          if (mobileError instanceof Error) {
+            if (mobileError.message === 'gallery_permission_denied') {
+              throw mobileError;
+            }
+            if (mobileError.message === 'gallery_not_supported') {
+              triggerDownload(pdfBlob, filename, 'pdf');
+              return;
+            }
           }
           console.warn(
-            'Fallo al compartir ticket como PDF, aplicando descarga estándar:',
+            'Fallo al compartir ticket como PDF, deteniendo la previsualización:',
             mobileError
           );
           setTicketActionError(
-            t('orders.gallery_save_failed_fallback') ||
-              'No pudimos guardar tu ticket como PDF en tus archivos, pero lo enviamos a tu carpeta de descargas.'
+            t('orders.gallery_share_failed_no_preview') ||
+              'No pudimos compartir el PDF de tu ticket. Intenta más tarde o descárgalo desde una computadora.'
           );
-          triggerDownload(pdfBlob, filename, 'pdf');
+          return;
         }
         return;
       }
@@ -1349,8 +1423,9 @@ export default function OrdersDashboardPage() {
       console.error('Error descargando ticket:', error);
       if (error instanceof DOMException && error.name === 'AbortError') {
         setTicketActionError(
-          t('orders.download_aborted') || 'Cancelaste la acción antes de guardar el ticket.'
+          t('orders.download_cancelled') || 'Cancelaste la descarga del ticket.'
         );
+        return;
       } else if (error instanceof Error && error.message === 'gallery_permission_denied') {
         setTicketActionError(
           t('orders.gallery_permission_denied') ||
@@ -1373,12 +1448,11 @@ export default function OrdersDashboardPage() {
     buildTicketFileName,
     generateTicketPdf,
     isMobileShareFlow,
-    shareTicketFileDirectly,
     selectedOrder,
+    shareTicketFileDirectly,
     t,
     triggerDownload,
   ]);
-
   const handleShareTicket = useCallback(async () => {
     if (!selectedOrder) {
       return;
@@ -1835,7 +1909,7 @@ export default function OrdersDashboardPage() {
                 )}
 
                 {!expiredSelectedOrder && (
-                  <div className="border-t border-gray-100 pb-2 pt-3 space-y-2">
+                  <div className="border-t border-gray-100 pb-2 pt-3 space-y-2 sm:hidden">
                     <button
                       type="button"
                       onClick={() => void handleDownloadTicket()}
@@ -1914,6 +1988,51 @@ export default function OrdersDashboardPage() {
                   </div>
                 )}
               </div>
+
+              {!expiredSelectedOrder && (
+                <div className="hidden border-t border-white/30 bg-white/70 px-5 py-4 sm:flex sm:flex-col sm:gap-3 dark:border-white/10 dark:bg-gray-900/70">
+                  <div className="flex flex-col gap-3 lg:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => void handleDownloadTicket()}
+                      disabled={isProcessingTicket}
+                      className="w-full rounded-full bg-primary-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {isProcessingTicket ? (
+                        <TranslatedText
+                          tid="orders.generating_ticket"
+                          fallback="Generando ticket…"
+                        />
+                      ) : (
+                        <TranslatedText tid="orders.pdf_action_desktop" fallback="Descargar PDF" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleShareTicket()}
+                      disabled={isProcessingTicket}
+                      className="w-full rounded-full border border-primary-200 px-4 py-3 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-primary-500/60 dark:text-primary-200 dark:hover:bg-primary-500/10"
+                    >
+                      {isProcessingTicket ? (
+                        <TranslatedText
+                          tid="orders.downloading_image"
+                          fallback="Descargando imagen…"
+                        />
+                      ) : (
+                        <TranslatedText
+                          tid="orders.image_action_desktop"
+                          fallback="Descargar PNG"
+                        />
+                      )}
+                    </button>
+                  </div>
+                  {ticketActionError && (
+                    <p className="text-center text-xs text-red-600 dark:text-red-400">
+                      {ticketActionError}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

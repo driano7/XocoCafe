@@ -14,14 +14,10 @@ import {
   FiMoreHorizontal,
   FiShoppingBag,
 } from 'react-icons/fi';
+import { FaInstagram, FaTiktok, FaWhatsapp } from 'react-icons/fa';
 import { PiTrayBold } from 'react-icons/pi';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import siteMetadata from 'content/siteMetadata';
-import {
-  MinimalInstagramIcon,
-  MinimalTiktokIcon,
-  MinimalWhatsappIcon,
-} from '@/components/icons/MinimalSocialIcons';
 
 type DockLink = {
   href: string;
@@ -72,19 +68,19 @@ type HiddenLink = DockLink & {
 const HIDDEN_DRAWER_LINKS: HiddenLink[] = [
   {
     href: siteMetadata.whats,
-    icon: MinimalWhatsappIcon,
+    icon: FaWhatsapp,
     label: 'WhatsApp',
     variant: 'social',
   },
   {
     href: siteMetadata.instagram,
-    icon: MinimalInstagramIcon,
+    icon: FaInstagram,
     label: 'Instagram',
     variant: 'social',
   },
   {
     href: siteMetadata.tiktok,
-    icon: MinimalTiktokIcon,
+    icon: FaTiktok,
     label: 'TikTok',
     variant: 'social',
   },

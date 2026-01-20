@@ -52,6 +52,7 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
   const inputClasses = 'brand-input';
   const labelClasses =
     'block text-sm font-semibold tracking-wide text-primary-900 dark:text-primary-100';
+  const EMAIL_DOMAIN_SUGGESTIONS = ['@gmail.com', '@outlook.com', '@hotmail.com', '@icloud.com'];
 
   const {
     register,
@@ -64,8 +65,24 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
   });
 
   const countryValue = watch('country');
+  const emailValue = watch('email', '');
   const passwordValue = watch('password', '');
   const confirmPasswordValue = watch('confirmPassword', '');
+  const emailLocalPart = emailValue.includes('@')
+    ? emailValue.slice(0, emailValue.indexOf('@'))
+    : emailValue;
+  const showEmailDomainChips =
+    emailLocalPart.trim().length > 0 && (!emailValue.includes('@') || emailValue.endsWith('@'));
+
+  const handleEmailDomainSuggestion = (domain: string) => {
+    const localValue = emailLocalPart.trim();
+    if (!localValue) return;
+    setValue('email', `${localValue}${domain}`, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+  };
 
   const passwordCriteria = [
     {
@@ -293,6 +310,21 @@ export default function RegisterForm({ onSuccess, onError, onExistingAccount }: 
           placeholder={t('auth.email_placeholder') || 'tu@email.com'}
         />
         {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
+        {showEmailDomainChips && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {EMAIL_DOMAIN_SUGGESTIONS.map((domain) => (
+              <button
+                key={domain}
+                type="button"
+                onClick={() => handleEmailDomainSuggestion(domain)}
+                className="rounded-full border border-primary-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary-700 transition hover:border-primary-400 dark:border-primary-700 dark:text-primary-200"
+              >
+                {emailLocalPart}
+                {domain}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

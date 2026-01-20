@@ -111,64 +111,11 @@ export default function UserProfile({ user }: { user: User }) {
   const addressesSectionRef = useRef<HTMLDivElement | null>(null);
   const [isExportingLoyaltyPanel, setIsExportingLoyaltyPanel] = useState(false);
   const [loyaltyPanelActionError, setLoyaltyPanelActionError] = useState<string | null>(null);
-  const [promoCodeInput, setPromoCodeInput] = useState('');
-  const [isRedeemingPromo, setIsRedeemingPromo] = useState(false);
-  const [lastPromo, setLastPromo] = useState<{
-    code: string;
-    appliesTo?: string | null;
-    discountType?: string | null;
-    discountValue?: number | null;
-  } | null>(null);
   const [isWebShareAvailable, setIsWebShareAvailable] = useState(
     typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   );
   const { snackbar, showSnackbar, dismissSnackbar } = useSnackbarNotifications();
   const { stats: loyaltyStats, isLoading: isLoyaltyStatsLoading } = useLoyalty();
-  const promoTargetLabel = useMemo(() => {
-    if (!lastPromo) {
-      return null;
-    }
-    if (lastPromo.appliesTo === 'membership') {
-      return t('profile.promotions_target_membership') || 'Membresías';
-    }
-    if (lastPromo.appliesTo === 'both') {
-      return t('profile.promotions_target_both') || 'Pedidos y membresías';
-    }
-    return t('profile.promotions_target_orders') || 'Pedidos';
-  }, [lastPromo, t]);
-
-  const handleRedeemPromoCode = useCallback(async () => {
-    if (!promoCodeInput.trim()) {
-      showSnackbar(t('profile.promo_error_empty') || 'Ingresa un código válido.', 'error');
-      return;
-    }
-
-    setIsRedeemingPromo(true);
-    try {
-      const response = await fetch('/api/promotions/redeem', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ code: promoCodeInput }),
-      });
-      const result = await response.json();
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || 'No pudimos validar el código.');
-      }
-
-      setLastPromo(result.data);
-      setPromoCodeInput('');
-      showSnackbar(result.message || 'Código aplicado.', 'profile');
-    } catch (error) {
-      showSnackbar(
-        error instanceof Error ? error.message : 'No pudimos validar el código.',
-        'error'
-      );
-    } finally {
-      setIsRedeemingPromo(false);
-    }
-  }, [promoCodeInput, showSnackbar, t]);
   const scrollToAddressesSection = useCallback(() => {
     if (!addressesSectionRef.current || typeof window === 'undefined') {
       return;
@@ -840,6 +787,50 @@ export default function UserProfile({ user }: { user: User }) {
     user?.email,
   ]);
 
+  const addressesPreviewContent = useMemo(() => {
+    const addresses = user?.addresses ?? [];
+
+    if (!addresses.length) {
+      return (
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          <TranslatedText
+            tid="profile.no_addresses"
+            fallback="You haven't saved any addresses yet."
+          />
+        </p>
+      );
+    }
+
+    const previewAddresses = addresses.slice(0, 2);
+    const remaining = addresses.length - previewAddresses.length;
+
+    return (
+      <div className="space-y-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {previewAddresses.map((address) => (
+            <div
+              key={address.id || `preview-${address.label}`}
+              className="rounded-2xl border border-gray-200 bg-white/60 p-3 text-left text-xs shadow-sm dark:border-gray-700 dark:bg-gray-800/50"
+            >
+              <p className="font-semibold text-gray-900 dark:text-white">{address.label}</p>
+              <p className="mt-1 line-clamp-2 text-gray-600 dark:text-gray-400">
+                {address.street}, {address.city}
+              </p>
+            </div>
+          ))}
+        </div>
+        {remaining > 0 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            <TranslatedText
+              tid="profile.addresses_more"
+              fallback={`+${remaining} more address${remaining === 1 ? '' : 'es'}`}
+            />
+          </p>
+        )}
+      </div>
+    );
+  }, [user?.addresses]);
+
   if (isLoading) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 text-center text-gray-700 dark:text-gray-200">
@@ -1278,66 +1269,74 @@ export default function UserProfile({ user }: { user: User }) {
         </motion.section>
 
         <CollapsibleSection
-          titleId="profile.promotions_title"
-          titleFallback="Promociones y códigos"
+          titleId="profile.addresses"
+          titleFallback="Mis direcciones"
+          preview={addressesPreviewContent}
         >
-          <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-            <TranslatedText
-              tid="profile.promotions_desc"
-              fallback="Ingresa un código promocional para aplicarlo a tus pedidos o membresías."
-            />
-          </p>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <input
-              type="text"
-              value={promoCodeInput}
-              onChange={(event) => setPromoCodeInput(event.target.value.toUpperCase())}
-              placeholder={t('profile.promotions_placeholder') || 'XOCO-2025'}
-              className="flex-1 rounded-2xl border border-gray-200 px-4 py-3 text-sm font-semibold uppercase tracking-[0.2em] text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-900/60 dark:text-white"
-            />
-            <button
-              type="button"
-              onClick={handleRedeemPromoCode}
-              disabled={isRedeemingPromo}
-              className="rounded-2xl bg-primary-600 px-6 py-3 text-sm font-semibold text-white shadow hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isRedeemingPromo ? (
-                <TranslatedText tid="profile.promotions_redeeming" fallback="Aplicando..." />
-              ) : (
-                <TranslatedText tid="profile.promotions_apply" fallback="Aplicar código" />
-              )}
-            </button>
-          </div>
-          {lastPromo && (
-            <div className="mt-4 rounded-2xl border border-primary-100/60 bg-primary-50/60 p-4 text-sm text-primary-900 dark:border-primary-500/30 dark:bg-primary-900/20 dark:text-primary-100">
-              <p className="font-semibold">
-                <TranslatedText tid="profile.promotions_success" fallback="Código válido" />:{' '}
-                {lastPromo.code}
-              </p>
-              {promoTargetLabel && (
-                <p className="mt-1">
-                  <TranslatedText tid="profile.promotions_applies_to" fallback="Aplicable a:" />{' '}
-                  <span className="font-semibold">{promoTargetLabel}</span>
-                </p>
-              )}
-              {lastPromo.discountValue !== null && lastPromo.discountValue !== undefined && (
-                <p>
-                  <TranslatedText tid="profile.promotions_discount" fallback="Descuento" />:{' '}
-                  <span className="font-semibold">
-                    {lastPromo.discountType === 'percentage'
-                      ? `${lastPromo.discountValue}%`
-                      : `$${lastPromo.discountValue}`}
-                  </span>
-                </p>
-              )}
-              <p className="mt-2 text-xs text-primary-800/70 dark:text-primary-100/60">
+          <div ref={addressesSectionRef} className="space-y-3">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  scrollToAddressesSection();
+                  setIsAddressModalOpen(true);
+                }}
+                className="text-sm font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400"
+              >
+                <TranslatedText tid="profile.manage" fallback="Administrar" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              <TranslatedText
+                tid="profile.addresses_desc"
+                fallback="Administra tus domicilios guardados y asígnales un nombre para pedir más rápido."
+              />
+            </p>
+            {user.addresses && user.addresses.length > 0 ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {user.addresses.map((address: AddressInput) => (
+                  <div
+                    key={address.id || address.label}
+                    className="rounded-2xl border border-gray-200 bg-white/50 p-3 text-xs dark:border-gray-700 dark:bg-gray-800/50"
+                  >
+                    <p className="font-bold text-gray-900 dark:text-white">{address.label}</p>
+                    <p className="mt-1 line-clamp-2 text-gray-500 dark:text-gray-400">
+                      {address.street}, {address.city}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-gray-200 p-4 text-center text-sm text-gray-500 dark:border-gray-700">
                 <TranslatedText
-                  tid="profile.promotions_pos_reminder"
-                  fallback="El POS aplicará el beneficio cuando termines tu compra en sucursal."
+                  tid="profile.no_addresses"
+                  fallback="No tienes direcciones guardadas."
+                />
+              </div>
+            )}
+            <div className="mt-2 flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                <TranslatedText
+                  tid="profile.addresses_max_notice"
+                  fallback="Puedes guardar hasta 3 direcciones activas."
                 />
               </p>
+              <button
+                type="button"
+                onClick={() => {
+                  scrollToAddressesSection();
+                  setIsAddressModalOpen(true);
+                }}
+                className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                {user.addresses && user.addresses.length > 0 ? (
+                  <TranslatedText tid="profile.edit_addresses" fallback="Editar direcciones" />
+                ) : (
+                  <TranslatedText tid="profile.add_address" fallback="Agregar dirección" />
+                )}
+              </button>
             </div>
-          )}
+          </div>
         </CollapsibleSection>
 
         <CollapsibleSection
@@ -1362,85 +1361,6 @@ export default function UserProfile({ user }: { user: User }) {
           </p>
           <ShareExperienceForm />
         </CollapsibleSection>
-
-        <motion.section
-          ref={addressesSectionRef}
-          className={sectionCardClass}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.2 }}
-          variants={sectionVariants}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-              <TranslatedText tid="profile.addresses" fallback="Mis direcciones" />
-            </h3>
-            <button
-              type="button"
-              onClick={() => {
-                scrollToAddressesSection();
-                setIsAddressModalOpen(true);
-              }}
-              className="text-sm font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400"
-            >
-              <TranslatedText tid="profile.manage" fallback="Administrar" />
-            </button>
-          </div>
-          <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-            <TranslatedText
-              tid="profile.addresses_desc"
-              fallback="Administra tus domicilios guardados y asígnales un nombre para pedir más rápido."
-            />
-          </p>
-
-          <div className="space-y-3">
-            {user.addresses && user.addresses.length > 0 ? (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {user.addresses.map((address: AddressInput) => (
-                  <div
-                    key={address.id || address.label}
-                    className="rounded-2xl border border-gray-200 bg-white/50 p-3 text-xs dark:border-gray-700 dark:bg-gray-800/50"
-                  >
-                    <p className="font-bold text-gray-900 dark:text-white">{address.label}</p>
-                    <p className="mt-1 line-clamp-2 text-gray-500 dark:text-gray-400">
-                      {address.street}, {address.city}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-gray-200 p-4 text-center text-sm text-gray-500 dark:border-gray-700">
-                <TranslatedText
-                  tid="profile.no_addresses"
-                  fallback="No tienes direcciones guardadas."
-                />
-              </div>
-            )}
-
-            <div className="mt-2 flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800">
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                <TranslatedText
-                  tid="profile.addresses_max_notice"
-                  fallback="Puedes guardar hasta 3 direcciones activas."
-                />
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  scrollToAddressesSection();
-                  setIsAddressModalOpen(true);
-                }}
-                className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
-                {user.addresses && user.addresses.length > 0 ? (
-                  <TranslatedText tid="profile.edit_addresses" fallback="Editar direcciones" />
-                ) : (
-                  <TranslatedText tid="profile.add_address" fallback="Agregar dirección" />
-                )}
-              </button>
-            </div>
-          </div>
-        </motion.section>
 
         <CollapsibleSection
           titleId="profile.advanced_settings"
@@ -1720,11 +1640,13 @@ function CollapsibleSection({
   titleFallback,
   children,
   defaultOpen = false,
+  preview,
 }: {
   titleId: string;
   titleFallback: string;
   children: ReactNode;
   defaultOpen?: boolean;
+  preview?: ReactNode;
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
@@ -1774,6 +1696,10 @@ function CollapsibleSection({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {!isOpen && preview && (
+        <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">{preview}</div>
+      )}
 
       {!isOpen && (
         <button
