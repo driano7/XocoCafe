@@ -48,6 +48,7 @@ import type { AddressInput } from '@/lib/validations/auth';
 import CoffeeBackground from '@/components/CoffeeBackground';
 import Snackbar from '@/components/Feedback/Snackbar';
 import { useSnackbarNotifications } from '@/hooks/useSnackbarNotifications';
+import AvailabilitySnackbar from '@/components/AvailabilitySnackbar';
 
 interface DbProduct {
   id: string;
@@ -667,6 +668,7 @@ export default function OrderPage() {
         </div>
       </CoffeeBackground>
       <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
+      <AvailabilitySnackbar cartItems={items} />
     </>
   );
 }
