@@ -39,6 +39,7 @@ import ThemeSwitch from './ThemeSwitch';
 import LanguageToggle from './Language/LanguageToggle';
 import { useLanguage } from './Language/LanguageProvider';
 import TranslatedText from './Language/TranslatedText';
+import { buildLocalizedBlogHref } from '@/lib/i18n/blogSlug';
 
 export default function Header() {
   const { t } = useLanguage();
@@ -122,14 +123,12 @@ export default function Header() {
           <nav className="hidden items-center gap-4 sm:flex lg:gap-6">
             {headerNavLinks.map(({ title, href }) => {
               const active = href === '/' ? pathName === '/' : pathName?.startsWith(href);
-              const tid = title
+              const sanitizedTitle = title
                 .toLowerCase()
                 .normalize('NFD')
                 .replace(/[\u0300-\u036f]/g, '')
                 .replace(/\s+/g, '_');
-              const localizedSlug = t(`blog.slug_${tid}`);
-              const localizedHref =
-                localizedSlug && href.startsWith('/blog/') ? `/blog/${localizedSlug}` : href;
+              const localizedHref = buildLocalizedBlogHref(href, t);
 
               return (
                 <Link
@@ -143,14 +142,7 @@ export default function Header() {
                   aria-label={title}
                 >
                   <span className="transition-transform duration-200 group-hover:-translate-y-0.5">
-                    <TranslatedText
-                      tid={`nav.${title
-                        .toLowerCase()
-                        .normalize('NFD')
-                        .replace(/[\u0300-\u036f]/g, '')
-                        .replace(/\s+/g, '_')}`}
-                      fallback={title}
-                    />
+                    <TranslatedText tid={`nav.${sanitizedTitle}`} fallback={title} />
                   </span>
                   <span
                     className={classNames(

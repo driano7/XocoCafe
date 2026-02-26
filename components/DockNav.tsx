@@ -20,6 +20,7 @@ import { PiTrayBold } from 'react-icons/pi';
 import { useAuth } from '@/components/Auth/AuthProvider';
 import { useLanguage } from '@/components/Language/LanguageProvider';
 import TranslatedText from '@/components/Language/TranslatedText';
+import { getLocalizedBlogSlug } from '@/lib/i18n/blogSlug';
 import siteMetadata from 'content/siteMetadata';
 
 type DockLink = {
@@ -112,12 +113,7 @@ const HIDDEN_DRAWER_LINKS: HiddenLink[] = [
 
 const localizeLink = <T extends DockLink>(link: T, translate: (path: string) => string): T => {
   const slugKey = link.slugKey;
-  let localizedSlug: string | undefined;
-  if (slugKey) {
-    const translationKey = `blog.slug_${slugKey}`;
-    const translation = translate(translationKey);
-    localizedSlug = translation && translation !== translationKey ? translation : slugKey;
-  }
+  const localizedSlug = slugKey ? getLocalizedBlogSlug(slugKey, translate) : undefined;
   const href =
     localizedSlug && link.href.startsWith('/blog/') ? `/blog/${localizedSlug}` : link.href;
   const startsWith =

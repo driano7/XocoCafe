@@ -256,7 +256,7 @@ export default function SupportBanner() {
           />
         </p>
       </div>
-      <dl className="grid w-full gap-4 text-white md:grid-cols-3">
+      <dl className="grid w-full grid-cols-1 gap-4 text-white sm:grid-cols-2 md:grid-cols-3">
         {DONATION_METHODS.map((method, index) => (
           <motion.div
             key={method.label}
