@@ -25,7 +25,6 @@
  * --------------------------------------------------------------------
  */
 
-import classNames from 'classnames';
 import { ensureProductExists } from '@/lib/products';
 import { supabase } from '@/lib/supabase';
 import { decryptUserData } from '@/lib/encryption';
@@ -186,17 +185,29 @@ export default async function BlogFeedbackSection() {
                 </div>
                 <div className="flex flex-col items-end">
                   <div className="flex items-center gap-1 text-sm text-white/70">
-                    {Array.from({ length: 5 }, (_, index) => (
-                      <FiStar
-                        key={index}
-                        className={classNames(
-                          'h-4 w-4 transition-colors',
-                          ratingSummary.count && index < Math.round(ratingSummary.average)
-                            ? 'text-yellow-400'
-                            : 'text-white/50'
-                        )}
-                      />
-                    ))}
+                    {Array.from({ length: 5 }, (_, index) => {
+                      const fillRatio = ratingSummary.count
+                        ? Math.min(Math.max(ratingSummary.average - index, 0), 1)
+                        : 0;
+                      const fillPercent = Math.round(fillRatio * 100);
+
+                      const starStyle =
+                        ratingSummary.count > 0
+                          ? {
+                              background: `linear-gradient(90deg, #facc15 ${fillPercent}%, rgba(255,255,255,0.4) ${fillPercent}%)`,
+                              WebkitBackgroundClip: 'text' as const,
+                              WebkitTextFillColor: 'transparent' as const,
+                            }
+                          : undefined;
+
+                      return (
+                        <FiStar
+                          key={index}
+                          className="h-4 w-4 transition-colors text-white/30"
+                          style={starStyle}
+                        />
+                      );
+                    })}
                     <span className="text-base font-semibold text-white">
                       {ratingSummary.count ? ratingSummary.count : 'Sin reseñas'}
                     </span>
