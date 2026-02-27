@@ -193,21 +193,18 @@ export default async function BlogFeedbackSection() {
                         : 0;
                       const fillPercent = Math.round(fillRatio * 100);
 
-                      const starStyle =
-                        ratingSummary.count > 0
-                          ? {
-                              background: `linear-gradient(90deg, #facc15 ${fillPercent}%, rgba(255,255,255,0.4) ${fillPercent}%)`,
-                              WebkitBackgroundClip: 'text' as const,
-                              WebkitTextFillColor: 'transparent' as const,
-                            }
-                          : undefined;
-
                       return (
-                        <FiStar
-                          key={index}
-                          className="h-4 w-4 transition-colors text-white/30"
-                          style={starStyle}
-                        />
+                        <span key={index} className="relative inline-flex h-4 w-4">
+                          <FiStar className="absolute inset-0 text-white/30" />
+                          {ratingSummary.count > 0 && fillPercent > 0 && (
+                            <span
+                              className="absolute inset-0 overflow-hidden"
+                              style={{ width: `${fillPercent}%` }}
+                            >
+                              <FiStar className="text-yellow-400" />
+                            </span>
+                          )}
+                        </span>
                       );
                     })}
                     <span className="text-base font-semibold text-white">

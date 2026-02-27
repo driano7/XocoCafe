@@ -824,10 +824,10 @@ export const dictionaries = {
     blog: {
       search_articles: 'Search articles',
       read_article: 'Read "{title}"',
-      slug_chocolate: 'chocolate.en',
-      slug_cafe: 'cafe.en',
-      slug_ubicacion: 'ubicacion.en',
-      slug_facturacion: 'facturacion.en',
+      slug_chocolate: 'chocolate',
+      slug_cafe: 'cafe',
+      slug_ubicacion: 'ubicacion',
+      slug_facturacion: 'facturacion',
     },
     orders: {
       title: 'My orders',
