@@ -30,6 +30,7 @@ const headerNavLinks = [
   { href: '/blog/cafe', title: 'Café' },
   { href: '/uses', title: 'Menú' },
   { href: '/blog/ubicacion', title: 'Ubicación' },
+  { href: '/comentarios', title: 'Comentarios' },
   { href: '/blog/facturacion', title: 'Facturación' },
   { href: '/blog', title: 'Blog' },
   { href: '/dashboard/pedidos', title: 'Mis pedidos' },

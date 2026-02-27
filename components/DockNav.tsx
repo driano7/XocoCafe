@@ -12,7 +12,7 @@ import {
   FiEyeOff,
   FiHome,
   FiMapPin,
-  FiMessageCircle,
+  FiMessageSquare,
   FiMoreHorizontal,
   FiShoppingBag,
 } from 'react-icons/fi';
@@ -109,8 +109,8 @@ const HIDDEN_DRAWER_LINKS: HiddenLink[] = [
     variant: 'social',
   },
   {
-    href: '/blog#feedback',
-    icon: FiMessageCircle,
+    href: '/comentarios',
+    icon: FiMessageSquare,
     label: 'Comentarios',
     variant: 'internal',
     accentClass:
