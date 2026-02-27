@@ -38,12 +38,56 @@ import Pre from './Pre';
 import TOCInline from './TOCInline';
 import WhatsAppCTA from './WhatsAppCTA';
 import LocationMap from './Location/LocationMap';
-import AutoTranslateContent from './AutoTranslateContent';
+import { AutoTranslateChildren } from './AutoTranslateContent';
+import type { ElementType, ReactNode } from 'react';
+
+const autoTranslateTags: Array<keyof JSX.IntrinsicElements> = [
+  'p',
+  'span',
+  'div',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'li',
+  'blockquote',
+  'strong',
+  'em',
+  'small',
+  'summary',
+  'label',
+  'caption',
+  'th',
+  'td',
+];
+
+type AutoTranslateWrapperProps = {
+  children?: ReactNode;
+  [key: string]: unknown;
+};
+
+const createAutoTranslateComponent =
+  (Tag: ElementType) =>
+  ({ children, ...rest }: AutoTranslateWrapperProps) => (
+    <Tag {...rest}>
+      <AutoTranslateChildren>{children}</AutoTranslateChildren>
+    </Tag>
+  );
 
 interface MDXLayout {
   content: Blog | Authors;
   [key: string]: unknown;
 }
+
+const autoTranslateComponents = autoTranslateTags.reduce<Record<string, ElementType>>(
+  (acc, tag) => {
+    acc[tag] = createAutoTranslateComponent(tag);
+    return acc;
+  },
+  {}
+);
 
 export const components: MDXComponents = {
   Image,
@@ -53,15 +97,12 @@ export const components: MDXComponents = {
   LinkButton,
   WhatsAppCTA,
   LocationMap,
+  ...autoTranslateComponents,
 };
 
 export const MDXLayoutRenderer = ({ content, ...rest }: MDXLayout) => {
   const MDXLayout = useMDXComponent(content.body.code);
   const mainContent = coreContent(content);
 
-  return (
-    <AutoTranslateContent>
-      <MDXLayout content={mainContent} components={components} {...rest} />
-    </AutoTranslateContent>
-  );
+  return <MDXLayout content={mainContent} components={components} {...rest} />;
 };

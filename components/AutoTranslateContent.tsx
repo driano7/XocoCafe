@@ -5,12 +5,12 @@ import AutoTranslatedText from '@/components/AutoTranslatedText';
 import { useLanguage } from '@/components/Language/LanguageProvider';
 
 type AutoTranslateContentProps = {
-  children: ReactNode;
+  children?: ReactNode;
 };
 
 const shouldTranslateText = (text: string) => text.trim().length > 0;
 
-const translateNode = (node: ReactNode): ReactNode => {
+export const translateReactNode = (node: ReactNode): ReactNode => {
   if (typeof node === 'string') {
     if (!shouldTranslateText(node)) {
       return node;
@@ -20,23 +20,30 @@ const translateNode = (node: ReactNode): ReactNode => {
 
   if (Array.isArray(node)) {
     return node.map((child, index) => (
-      <Fragment key={`mdx-auto-${index}`}>{translateNode(child)}</Fragment>
+      <Fragment key={`mdx-auto-${index}`}>{translateReactNode(child)}</Fragment>
     ));
   }
 
   if (isValidElement(node)) {
+    if (node.type === AutoTranslatedText) {
+      return node;
+    }
     const { children, ...props } = node.props as { children: ReactNode };
-    return cloneElement(node, props, translateNode(children));
+    return cloneElement(node, props, translateReactNode(children));
   }
 
   return node;
 };
 
-export default function AutoTranslateContent({ children }: AutoTranslateContentProps) {
+export function AutoTranslateChildren({ children }: AutoTranslateContentProps) {
   const { currentLanguage } = useLanguage();
   if (currentLanguage !== 'en') {
     return <>{children}</>;
   }
 
-  return <>{translateNode(children)}</>;
+  return <>{translateReactNode(children)}</>;
+}
+
+export default function AutoTranslateContent({ children }: AutoTranslateContentProps) {
+  return <AutoTranslateChildren>{children}</AutoTranslateChildren>;
 }

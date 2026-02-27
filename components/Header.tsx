@@ -40,6 +40,7 @@ import LanguageToggle from './Language/LanguageToggle';
 import { useLanguage } from './Language/LanguageProvider';
 import TranslatedText from './Language/TranslatedText';
 import { buildLocalizedBlogHref } from '@/lib/i18n/blogSlug';
+import HeaderWallet from './HeaderWallet';
 
 export default function Header() {
   const { t } = useLanguage();
@@ -163,15 +164,18 @@ export default function Header() {
             })}
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="hidden sm:block">
-              <LanguageToggle />
-            </div>
             <AuthNav />
-            <div className="sm:hidden">
-              <LanguageToggle />
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:block">
+                <LanguageToggle />
+              </div>
+              <div className="sm:hidden">
+                <LanguageToggle />
+              </div>
+              <HeaderWallet />
+              <ThemeSwitch />
             </div>
             <CommandPalette />
-            <ThemeSwitch />
           </div>
         </div>
       </header>
