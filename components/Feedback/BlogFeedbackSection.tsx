@@ -165,7 +165,9 @@ export default async function BlogFeedbackSection() {
     <section id="feedback" className="py-16 sm:py-20">
       <div className="mx-auto max-w-6xl space-y-10 rounded-[32px] border border-white/10 bg-gradient-to-br from-[#050912] via-[#0b1221] to-[#141f33] p-8 shadow-2xl shadow-black/40 sm:p-12">
         <div className="space-y-4 text-white">
-          <p className="text-xs uppercase tracking-[0.35em] text-white/70">Blog + Feedback</p>
+          <p className="text-xs uppercase tracking-[0.35em] text-white/70">
+            Tus comentarios nos hacen crecer para ti
+          </p>
           <h2 className="text-3xl font-black leading-tight sm:text-4xl">
             Tu experiencia inspira el próximo capítulo
           </h2>
