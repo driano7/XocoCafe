@@ -41,26 +41,37 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     const token = authHeader?.replace('Bearer ', '');
 
-    if (!token) {
-      return NextResponse.json(
-        { success: false, message: 'Token no proporcionado' },
-        { status: 401 }
-      );
-    }
+    let userId: string | null = null;
+    let userFullName: string | null = null;
 
-    const decoded = verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Token inválido' }, { status: 401 });
+    if (token) {
+      const decoded = verifyToken(token);
+      if (!decoded) {
+        return NextResponse.json({ success: false, message: 'Token inválido' }, { status: 401 });
+      }
+      const authenticatedUser = await getUserById(decoded.userId);
+      if (!authenticatedUser) {
+        return NextResponse.json(
+          { success: false, message: 'Usuario no encontrado' },
+          { status: 404 }
+        );
+      }
+      userId = authenticatedUser.id;
+      const fullName = [authenticatedUser.firstName, authenticatedUser.lastName]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      userFullName = fullName || null;
     }
 
     const body = await request.json();
     const validated = userFeedbackSchema.parse(body);
 
-    const user = await getUserById(decoded.userId);
-    if (!user) {
+    const resolvedName = validated.name || userFullName || null;
+    if (!userId && !resolvedName) {
       return NextResponse.json(
-        { success: false, message: 'Usuario no encontrado' },
-        { status: 404 }
+        { success: false, message: 'Agrega un nombre para publicar tu comentario.' },
+        { status: 400 }
       );
     }
 
@@ -76,7 +87,8 @@ export async function POST(request: NextRequest) {
 
     const feedbackRecord = {
       id: randomUUID(),
-      userId: decoded.userId,
+      userId,
+      reviewerName: resolvedName,
       productId: productRowId,
       rating: validated.rating,
       title: validated.title ?? null,

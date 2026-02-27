@@ -32,6 +32,8 @@ const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
 export default function LanguageToggle() {
   const { currentLanguage, setLanguage, isChanging } = useLanguage();
   const nextLanguage: SupportedLanguage = currentLanguage === 'es' ? 'en' : 'es';
+  const currentLanguageLabel = LANGUAGE_LABELS[currentLanguage];
+  const nextLanguageLabel = LANGUAGE_LABELS[nextLanguage];
 
   const handleToggle = useCallback(() => {
     setLanguage(nextLanguage);
@@ -50,18 +52,31 @@ export default function LanguageToggle() {
         isChanging ? 'opacity-60 pointer-events-none' : ''
       )}
     >
-      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 11.37 9.198 15.343 3 17.05"
-        />
-      </svg>
-      <span>{currentLanguage === 'es' ? 'ES' : 'EN'}</span>
-      <span className="text-[0.6rem] font-semibold tracking-[0.4em] text-gray-500 dark:text-gray-400">
-        {LANGUAGE_LABELS[nextLanguage]}
-      </span>
+      <div className="flex flex-col items-center gap-0.5">
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 11.37 9.198 15.343 3 17.05"
+          />
+        </svg>
+        <span className="text-[0.85rem] font-black uppercase tracking-[0.35em]">
+          {currentLanguage === 'es' ? 'ES' : 'EN'}
+        </span>
+        <span
+          className="text-[0.65rem] font-semibold tracking-[0.35em] text-gray-500 dark:text-gray-400 normal-case sm:hidden"
+          aria-hidden
+        >
+          {currentLanguageLabel}
+        </span>
+        <span
+          className="hidden text-[0.6rem] font-semibold tracking-[0.4em] text-gray-500 dark:text-gray-400 normal-case sm:block"
+          aria-hidden
+        >
+          {nextLanguageLabel}
+        </span>
+      </div>
     </button>
   );
 }

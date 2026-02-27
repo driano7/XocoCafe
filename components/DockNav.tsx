@@ -12,6 +12,7 @@ import {
   FiEyeOff,
   FiHome,
   FiMapPin,
+  FiMessageCircle,
   FiMoreHorizontal,
   FiShoppingBag,
 } from 'react-icons/fi';
@@ -106,6 +107,14 @@ const HIDDEN_DRAWER_LINKS: HiddenLink[] = [
     icon: FaTiktok,
     label: 'TikTok',
     variant: 'social',
+  },
+  {
+    href: '/blog#feedback',
+    icon: FiMessageCircle,
+    label: 'Comentarios',
+    variant: 'internal',
+    accentClass:
+      'border border-white/30 bg-gradient-to-br from-[#050912] via-[#0b1221] to-[#141f33] text-white shadow-2xl shadow-black/60',
   },
   { ...FACTURACION_LINK, variant: 'internal' },
   { ...BLOG_LINK, variant: 'internal' },
@@ -260,7 +269,8 @@ export default function DockNav() {
                         : classNames(
                             'w-full text-base',
                             active ? DOCK_BUTTON_ACTIVE : DOCK_BUTTON_INACTIVE
-                          )
+                          ),
+                      entry.accentClass
                     )}
                   >
                     <Icon />

@@ -306,7 +306,8 @@ CREATE TRIGGER trg_products_touch_updated_at
 
 CREATE TABLE IF NOT EXISTS public.reviews (
   id TEXT PRIMARY KEY,
-  "userId" TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  "userId" TEXT REFERENCES public.users(id) ON DELETE SET NULL,
+  "reviewerName" TEXT,
   "productId" TEXT NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
   "orderId" TEXT REFERENCES public.orders(id) ON DELETE SET NULL,
   rating INTEGER NOT NULL,

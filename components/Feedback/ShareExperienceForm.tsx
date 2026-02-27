@@ -27,8 +27,8 @@
 
 'use client';
 
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useEffect, useMemo, useState } from 'react';
+import { Resolver, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import clsx from 'clsx';
 import { useAuth } from '@/components/Auth/AuthProvider';
@@ -38,14 +38,18 @@ interface ShareExperienceFormProps {
   layout?: 'card' | 'modal';
   onSubmitted?: () => void;
   className?: string;
+  showNameField?: boolean;
+  allowAnonymous?: boolean;
 }
 
 export default function ShareExperienceForm({
   layout = 'card',
   onSubmitted,
   className,
+  showNameField = false,
+  allowAnonymous = false,
 }: ShareExperienceFormProps) {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
 
@@ -54,37 +58,72 @@ export default function ShareExperienceForm({
     handleSubmit,
     reset,
     formState: { errors },
+    watch,
+    setValue,
   } = useForm<UserFeedbackInput>({
-    resolver: zodResolver(userFeedbackSchema),
+    resolver: zodResolver(userFeedbackSchema) as Resolver<UserFeedbackInput>,
     defaultValues: {
       rating: 5,
       title: '',
       content: '',
+      name: '',
     },
   });
+  const userFullName = useMemo(
+    () => [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim(),
+    [user]
+  );
+  const watchName = watch('name');
+
+  useEffect(() => {
+    if (!showNameField) {
+      return;
+    }
+    if (userFullName && !watchName) {
+      setValue('name', userFullName);
+    }
+  }, [showNameField, userFullName, watchName, setValue]);
 
   const submitFeedback = async (data: UserFeedbackInput) => {
-    if (!token) {
-      setFeedbackMessage('Inicia sesión para compartir tu experiencia.');
+    const resolvedName = data.name || (userFullName ? userFullName : undefined);
+
+    if (!token && !resolvedName) {
+      setFeedbackMessage(
+        allowAnonymous
+          ? 'Agrega tu nombre para compartir tu experiencia.'
+          : 'Inicia sesión o agrega tu nombre para compartir tu experiencia.'
+      );
       return;
     }
 
     setIsSendingFeedback(true);
     setFeedbackMessage(null);
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
       const response = await fetch('/api/user/feedback', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
+        headers,
+        body: JSON.stringify({
+          rating: data.rating,
+          title: data.title,
+          content: data.content,
+          name: resolvedName,
+        }),
       });
 
       const result = await response.json();
       if (result.success) {
         setFeedbackMessage(result.message || '¡Gracias por tu comentario!');
-        reset({ rating: 5, title: '', content: '' });
+        reset({
+          rating: 5,
+          title: '',
+          content: '',
+          name: userFullName,
+        });
         onSubmitted?.();
       } else {
         setFeedbackMessage(result.message || 'No pudimos guardar tu comentario. Intenta de nuevo.');
@@ -137,6 +176,26 @@ export default function ShareExperienceForm({
         </select>
         {errors.rating && <p className="mt-1 text-sm text-red-600">{errors.rating.message}</p>}
       </div>
+
+      {showNameField && (
+        <div>
+          <label
+            htmlFor={`${layout}-feedback-name`}
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+          >
+            Nombre
+          </label>
+          <input
+            id={`${layout}-feedback-name`}
+            type="text"
+            maxLength={80}
+            {...register('name')}
+            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            placeholder="Tu nombre completo"
+          />
+          {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
+        </div>
+      )}
 
       <div>
         <label

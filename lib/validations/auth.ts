@@ -198,6 +198,13 @@ export const userFeedbackSchema = z.object({
     .min(10, 'Cuéntanos con al menos 10 caracteres')
     .max(2000, 'El comentario es demasiado largo')
     .transform((value) => value.trim()),
+  name: z.preprocess((value) => {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : undefined;
+    }
+    return value;
+  }, z.string().max(80, 'El nombre debe tener máximo 80 caracteres').optional()),
 });
 
 export type UserFeedbackInput = z.infer<typeof userFeedbackSchema>;
@@ -239,7 +246,7 @@ export interface AuthUser {
   weeklyCoffeeCount?: number;
   loyaltyEnrolled?: boolean;
   loyaltyActivatedAt?: string | null;
-  monthlyMetrics?: any;
+  monthlyMetrics?: Record<string, unknown>;
   termsAccepted: boolean;
   privacyAccepted: boolean;
   marketingEmail: boolean;

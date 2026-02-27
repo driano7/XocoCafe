@@ -41,7 +41,6 @@ import ConsumptionChart from '@/components/ConsumptionChart';
 import SessionTimeoutNotice from '@/components/SessionTimeoutNotice';
 import AddressManager from '@/components/Auth/AddressManager';
 import { useAuth } from './AuthProvider';
-import ShareExperienceForm from '@/components/Feedback/ShareExperienceForm';
 import {
   updateProfileSchema,
   updateConsentSchema,
@@ -1357,16 +1356,6 @@ export default function UserProfile({ user }: { user: User }) {
             />
           </p>
           <ConsumptionChart />
-        </CollapsibleSection>
-
-        <CollapsibleSection titleId="profile.comments_title" titleFallback="Mis comentarios">
-          <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-            <TranslatedText
-              tid="profile.comments_desc"
-              fallback="Tu opinión nos ayuda a mejorar. Comparte sugerencias o cualquier detalle de tu experiencia."
-            />
-          </p>
-          <ShareExperienceForm />
         </CollapsibleSection>
 
         <CollapsibleSection

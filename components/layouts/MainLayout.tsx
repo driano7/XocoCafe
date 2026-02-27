@@ -25,8 +25,6 @@
  * --------------------------------------------------------------------
  */
 
-'use client';
-
 import { ReactNode } from 'react';
 import SectionContainer from '../SectionContainer';
 
