@@ -74,18 +74,25 @@ export default function ShareExperienceForm({
     [user]
   );
   const watchName = watch('name');
+  const [isAnonymous, setIsAnonymous] = useState(false);
 
   useEffect(() => {
     if (!showNameField) {
       return;
     }
+    if (isAnonymous) {
+      setValue('name', '');
+      return;
+    }
     if (userFullName && !watchName) {
       setValue('name', userFullName);
     }
-  }, [showNameField, userFullName, watchName, setValue]);
+  }, [showNameField, userFullName, watchName, setValue, isAnonymous]);
 
   const submitFeedback = async (data: UserFeedbackInput) => {
-    const resolvedName = data.name || (userFullName ? userFullName : undefined);
+    const resolvedName = isAnonymous
+      ? null
+      : data.name || (userFullName ? userFullName : undefined);
 
     if (!token && !resolvedName) {
       setFeedbackMessage(
@@ -178,19 +185,39 @@ export default function ShareExperienceForm({
       </div>
 
       {showNameField && (
-        <div>
-          <label
-            htmlFor={`${layout}-feedback-name`}
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-          >
-            Nombre
-          </label>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-4">
+            <label
+              htmlFor={`${layout}-feedback-name`}
+              className="text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Nombre{' '}
+              <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
+                (opcional)
+              </span>
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={isAnonymous}
+                onChange={(event) => setIsAnonymous(event.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-500"
+              />
+              Anónimo
+            </label>
+          </div>
           <input
             id={`${layout}-feedback-name`}
             type="text"
             maxLength={80}
             {...register('name')}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            disabled={isAnonymous}
+            className={clsx(
+              'mt-1 block w-full rounded-md border px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white',
+              isAnonymous
+                ? 'border-gray-200 bg-gray-100 text-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-500'
+                : 'border-gray-300 text-gray-900 dark:border-gray-600'
+            )}
             placeholder="Tu nombre completo"
           />
           {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}

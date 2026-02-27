@@ -11,16 +11,6 @@
       <atom:link href="https://xococafe.netlify.app/feed.xml" rel="self" type="application/rss+xml"/>
       
   <item>
-    <guid>https://xococafe.netlify.app/blog/cafe.en</guid>
-    <title>Coffee that doesn&#39;t please, isn&#39;t from Xoco</title>
-    <link>https://xococafe.netlify.app/blog/cafe.en</link>
-    <description>There&#39;s nothing like Xoco coffee.</description>
-    <pubDate>Thu, 03 Jul 2025 00:00:00 GMT</pubDate>
-    <author>dnvn77@gmail.com (Donovan Riaño)</author>
-    <category>Coffee</category><category>Senses</category><category>Taste</category>
-  </item>
-
-  <item>
     <guid>https://xococafe.netlify.app/blog/cafe</guid>
     <title>Café que no da gusto, no es de Xoco</title>
     <link>https://xococafe.netlify.app/blog/cafe</link>
@@ -28,16 +18,6 @@
     <pubDate>Thu, 03 Jul 2025 00:00:00 GMT</pubDate>
     <author>dnvn77@gmail.com (Donovan Riaño)</author>
     <category>Café</category><category>Sentidos</category><category>Gusto</category>
-  </item>
-
-  <item>
-    <guid>https://xococafe.netlify.app/blog/chocolate.en</guid>
-    <title>Here, chocolate is not just drunk, it&#39;s pampered</title>
-    <link>https://xococafe.netlify.app/blog/chocolate.en</link>
-    <description>Enjoy chocolate at Xoco Café.</description>
-    <pubDate>Wed, 02 Jul 2025 00:00:00 GMT</pubDate>
-    <author>dnvn77@gmail.com (Donovan Riaño)</author>
-    <category>Chocolate</category><category>Tradition</category><category>Love</category>
   </item>
 
   <item>
@@ -51,16 +31,6 @@
   </item>
 
   <item>
-    <guid>https://xococafe.netlify.app/blog/facturacion.en</guid>
-    <title>Billing that doesn&#39;t give a headache, is from Xoco</title>
-    <link>https://xococafe.netlify.app/blog/facturacion.en</link>
-    <description>Get your Xoco Café invoice quickly and easily.</description>
-    <pubDate>Sun, 03 Mar 2024 00:00:00 GMT</pubDate>
-    <author>dnvn77@gmail.com (Donovan Riaño)</author>
-    <category>Billing</category><category>Simple</category><category>Quick</category>
-  </item>
-
-  <item>
     <guid>https://xococafe.netlify.app/blog/facturacion</guid>
     <title>Facturación de Xoco</title>
     <link>https://xococafe.netlify.app/blog/facturacion</link>
@@ -68,16 +38,6 @@
     <pubDate>Sun, 03 Mar 2024 00:00:00 GMT</pubDate>
     <author>dnvn77@gmail.com (Donovan Riaño)</author>
     <category>Ubicación</category><category>Horarios</category><category>Mapa</category>
-  </item>
-
-  <item>
-    <guid>https://xococafe.netlify.app/blog/ubicacion.en</guid>
-    <title>Where we are is where you are</title>
-    <link>https://xococafe.netlify.app/blog/ubicacion.en</link>
-    <description>Visit us at our Xoco Café branch.</description>
-    <pubDate>Fri, 05 Jul 2024 00:00:00 GMT</pubDate>
-    <author>dnvn77@gmail.com (Donovan Riaño)</author>
-    <category>Location</category><category>Schedules</category><category>Map</category>
   </item>
 
   <item>

@@ -25,11 +25,14 @@
  * --------------------------------------------------------------------
  */
 
+import classNames from 'classnames';
 import { ensureProductExists } from '@/lib/products';
 import { supabase } from '@/lib/supabase';
 import { decryptUserData } from '@/lib/encryption';
+import AutoTranslatedText from '@/components/AutoTranslatedText';
 import ShareExperienceForm from './ShareExperienceForm';
 import FeedbackCarousel, { type FeedbackHighlight } from './FeedbackCarousel';
+import { FiStar } from 'react-icons/fi';
 
 const FEEDBACK_PRODUCT_ID = 'feedback-general';
 const FEEDBACK_PRODUCT_NAME = 'Feedback general';
@@ -55,6 +58,11 @@ type UserRow = {
   lastNameIv: string | null;
   lastNameTag: string | null;
   lastNameSalt: string | null;
+};
+
+type RatingSummary = {
+  average: number;
+  count: number;
 };
 
 const buildHighlights = (
@@ -95,6 +103,10 @@ export default async function BlogFeedbackSection() {
       createdAt: new Date().toISOString(),
     },
   ];
+  let ratingSummary: RatingSummary = {
+    average: 0,
+    count: 0,
+  };
 
   try {
     const productRowId = await ensureProductExists({
@@ -137,6 +149,15 @@ export default async function BlogFeedbackSection() {
     }
 
     highlights = buildHighlights(reviews, userNames);
+    const validRatings = reviews
+      .map((review) => review.rating)
+      .filter((rating): rating is number => typeof rating === 'number' && !Number.isNaN(rating));
+    const count = validRatings.length;
+    const average = count ? validRatings.reduce((total, rating) => total + rating, 0) / count : 0;
+    ratingSummary = {
+      average,
+      count,
+    };
   } catch (error: unknown) {
     console.error('No se pudieron cargar los comentarios dinámicos:', error);
   }
@@ -149,21 +170,54 @@ export default async function BlogFeedbackSection() {
           <h2 className="text-3xl font-black leading-tight sm:text-4xl">
             Tu experiencia inspira el próximo capítulo
           </h2>
-          <p className="max-w-3xl text-base text-white/80">
-            Deja un comentario, comparte lo que más te gustó o sugiere algo nuevo. Transformamos
-            estos insights en acciones reales y los mostramos en un carrusel que evoluciona
-            automáticamente, igualito a la experiencia de las reseñas de AirBnB.
-          </p>
+          <AutoTranslatedText
+            spanish="Deja un comentario, comparte lo que más te gustó o sugiere algo nuevo. Transformamos estos insights en acciones reales y los mostramos en un carrusel que evoluciona automáticamente."
+            as="p"
+            className="max-w-3xl text-base text-white/80"
+          />
         </div>
-        <div className="grid gap-8 lg:grid-cols-[1.05fr,0.95fr]">
-          <div className="rounded-3xl bg-white/90 p-6 shadow-2xl shadow-black/30 dark:bg-gray-950/80">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Comparte tu comentario
-            </h3>
-            <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">
-              ¿Tienes algo que contarnos? Usa el botón de mensajes del dock y deja tu voz aquí.
-            </p>
-            <ShareExperienceForm showNameField allowAnonymous className="text-sm" />
+        <div className="grid gap-8 lg:grid-cols-[1.1fr,0.9fr]">
+          <div className="space-y-6">
+            <div className="rounded-3xl border border-white/20 bg-white/5 p-6">
+              <p className="text-xs uppercase tracking-[0.3em] text-white/70">Calificación</p>
+              <div className="mt-3 flex items-center justify-between gap-4">
+                <div className="text-5xl font-black text-white">
+                  {ratingSummary.count ? ratingSummary.average.toFixed(1) : '—'}
+                </div>
+                <div className="flex flex-col items-end">
+                  <div className="flex items-center gap-1 text-sm text-white/70">
+                    {Array.from({ length: 5 }, (_, index) => (
+                      <FiStar
+                        key={index}
+                        className={classNames(
+                          'h-4 w-4 transition-colors',
+                          ratingSummary.count && index < Math.round(ratingSummary.average)
+                            ? 'text-yellow-400'
+                            : 'text-white/50'
+                        )}
+                      />
+                    ))}
+                    <span className="text-base font-semibold text-white">
+                      {ratingSummary.count ? ratingSummary.count : 'Sin reseñas'}
+                    </span>
+                  </div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-white/60">
+                    {ratingSummary.count ? 'reseñas' : 'Aún no hay calificaciones'}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-3xl bg-white/90 p-6 shadow-2xl shadow-black/30 dark:bg-gray-950/80">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Comparte tu comentario
+              </h3>
+              <AutoTranslatedText
+                spanish="¿Tienes algo que contarnos? Usa el botón de mensajes del dock y deja tu voz aquí."
+                as="p"
+                className="mb-4 text-sm text-gray-600 dark:text-gray-300"
+              />
+              <ShareExperienceForm showNameField allowAnonymous className="text-sm" />
+            </div>
           </div>
 
           <div className="rounded-3xl border border-white/20 bg-white/5 p-6">
