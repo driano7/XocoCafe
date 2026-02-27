@@ -38,6 +38,7 @@ import Pre from './Pre';
 import TOCInline from './TOCInline';
 import WhatsAppCTA from './WhatsAppCTA';
 import LocationMap from './Location/LocationMap';
+import AutoTranslateContent from './AutoTranslateContent';
 
 interface MDXLayout {
   content: Blog | Authors;
@@ -58,5 +59,9 @@ export const MDXLayoutRenderer = ({ content, ...rest }: MDXLayout) => {
   const MDXLayout = useMDXComponent(content.body.code);
   const mainContent = coreContent(content);
 
-  return <MDXLayout content={mainContent} components={components} {...rest} />;
+  return (
+    <AutoTranslateContent>
+      <MDXLayout content={mainContent} components={components} {...rest} />
+    </AutoTranslateContent>
+  );
 };
