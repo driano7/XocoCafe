@@ -44,7 +44,6 @@ import DockNav from '@/components/DockNav';
 import AndroidViewportFix from '@/components/Providers/AndroidViewportFix';
 import PageTransition from '@/components/PageTransition';
 import CartTimeoutWatcher from '@/components/CartTimeoutWatcher';
-import { CryptoProvider } from './providers/CryptoProvider';
 
 const lato = Lato({
   subsets: ['latin'],
@@ -87,46 +86,44 @@ export default function RootLayout({ children }: RootLayoutProps) {
       <body
         className={`${lato.className} ${lato.variable} bg-white text-black antialiased dark:bg-black dark:text-white overflow-x-hidden`}
       >
-        <CryptoProvider>
-          <SessionProvider>
-            <LanguageProvider fallbackLanguage="es">
-              <Suspense fallback={null}>
-                <AnalyticsProvider
-                  options={{
-                    trackPageViews: true,
-                    trackScrollDepth: true,
-                    trackTimeOnPage: true,
-                    trackBounce: true,
-                    trackExitPage: true,
-                    debug: process.env.NODE_ENV === 'development',
-                  }}
-                >
-                  <AuthProvider>
-                    <ThemeProvider
-                      attribute="class"
-                      defaultTheme="dark"
-                      enableSystem={false}
-                      themes={['dark', 'light']}
-                    >
-                      <AndroidViewportFix />
-                      <Header />
-                      <LenisProvider>
-                        <main className="pt-20 pb-4 sm:pt-20 sm:pb-10 lg:pt-24 lg:pb-16">
-                          <PageTransition>{children}</PageTransition>
-                        </main>
-                        <CartTimeoutWatcher />
-                      </LenisProvider>
-                      <DockNav />
-                      <Footer />
-                      <Analytics />
-                      <FeedbackPromptGate />
-                    </ThemeProvider>
-                  </AuthProvider>
-                </AnalyticsProvider>
-              </Suspense>
-            </LanguageProvider>
-          </SessionProvider>
-        </CryptoProvider>
+        <SessionProvider>
+          <LanguageProvider fallbackLanguage="es">
+            <Suspense fallback={null}>
+              <AnalyticsProvider
+                options={{
+                  trackPageViews: true,
+                  trackScrollDepth: true,
+                  trackTimeOnPage: true,
+                  trackBounce: true,
+                  trackExitPage: true,
+                  debug: process.env.NODE_ENV === 'development',
+                }}
+              >
+                <AuthProvider>
+                  <ThemeProvider
+                    attribute="class"
+                    defaultTheme="dark"
+                    enableSystem={false}
+                    themes={['dark', 'light']}
+                  >
+                    <AndroidViewportFix />
+                    <Header />
+                    <LenisProvider>
+                      <main className="pt-20 pb-4 sm:pt-20 sm:pb-10 lg:pt-24 lg:pb-16">
+                        <PageTransition>{children}</PageTransition>
+                      </main>
+                      <CartTimeoutWatcher />
+                    </LenisProvider>
+                    <DockNav />
+                    <Footer />
+                    <Analytics />
+                    <FeedbackPromptGate />
+                  </ThemeProvider>
+                </AuthProvider>
+              </AnalyticsProvider>
+            </Suspense>
+          </LanguageProvider>
+        </SessionProvider>
       </body>
     </html>
   );

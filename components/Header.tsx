@@ -40,7 +40,6 @@ import LanguageToggle from './Language/LanguageToggle';
 import { useLanguage } from './Language/LanguageProvider';
 import TranslatedText from './Language/TranslatedText';
 import { buildLocalizedBlogHref } from '@/lib/i18n/blogSlug';
-import HeaderWallet from './HeaderWallet';
 
 export default function Header() {
   const { t } = useLanguage();
@@ -172,7 +171,6 @@ export default function Header() {
               <div className="sm:hidden">
                 <LanguageToggle />
               </div>
-              <HeaderWallet />
               <ThemeSwitch />
             </div>
             <CommandPalette />
