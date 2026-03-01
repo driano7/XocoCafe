@@ -6,7 +6,9 @@ import {
   Button as LightningButton,
   init as initBitcoinConnect,
 } from '@getalby/bitcoin-connect-react';
-import type { WebLNProvider } from '@webbtc/webln-types';
+interface LightningProvider {
+  sendPayment: (invoice: string) => Promise<void>;
+}
 
 const QRCodeCanvas = dynamic(() => import('qrcode.react').then((mod) => mod.QRCodeCanvas), {
   ssr: false,
@@ -190,7 +192,7 @@ export function LightningPaymentFlow({
         <div className="text-center">
           <p className="text-sm text-gray-600 mb-3">O conecta tu wallet Lightning directamente:</p>
           <LightningButton
-            onConnected={async (provider: WebLNProvider) => {
+            onConnected={async (provider: LightningProvider) => {
               try {
                 await provider.sendPayment(invoice);
               } catch (error) {

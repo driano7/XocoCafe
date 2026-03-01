@@ -68,7 +68,8 @@ export function ChainTokenSelector({ onSelect }: ChainTokenSelectorProps) {
     }
   };
 
-  const handleTokenChange = (token: TokenSymbol) => {
+  const handleTokenChange = (value: string) => {
+    const token = value as TokenSymbol;
     setSelectedToken(token);
     const contract = getTokenContract(token, selectedChain);
     if (contract) {

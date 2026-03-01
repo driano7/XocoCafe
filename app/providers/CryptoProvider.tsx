@@ -19,8 +19,17 @@ import {
 } from 'wagmi/chains';
 import { http, defineChain, type Chain } from 'viem';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
-import { init as initBitcoinConnect } from '@getalby/bitcoin-connect-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+
+type BitcoinConnectInit = (options: { appName: string; showBalance: boolean }) => void;
+
+// IMPORTANTE: Inicialización condicional para evitar errores SSR
+let initBitcoinConnect: BitcoinConnectInit | null = null;
+if (typeof window !== 'undefined') {
+  import('@getalby/bitcoin-connect-react').then((mod) => {
+    initBitcoinConnect = mod.init;
+  });
+}
 
 const monadRpcHttp = process.env.NEXT_PUBLIC_MONAD_RPC_HTTP || 'https://monad.rpc.caldera.xyz/http';
 const monadRpcWs = process.env.NEXT_PUBLIC_MONAD_RPC_WS || 'wss://monad.rpc.caldera.xyz/ws';
@@ -121,12 +130,21 @@ export const testnetFaucets = {
 };
 
 export function CryptoProvider({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
-    initBitcoinConnect({
-      appName: 'Xoco Café',
-      showBalance: true,
-    });
+    setMounted(true);
+    if (initBitcoinConnect) {
+      initBitcoinConnect({
+        appName: 'Xoco Café',
+        showBalance: true,
+      });
+    }
   }, []);
+
+  if (!mounted) {
+    return <>{children}</>;
+  }
 
   return (
     <WagmiProvider config={wagmiConfig}>

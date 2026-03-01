@@ -33,7 +33,6 @@ import { ReactElement, useContext, useEffect, useRef } from 'react';
 import { HiOutlineArrowNarrowDown } from 'react-icons/hi';
 import TypewriterText from './TypewriterText';
 import { ScrollContext } from './Providers/ScrollProvider';
-import { renderCanvas } from './renderCanvas';
 import { useAuth } from './Auth/AuthProvider';
 import { useLanguage } from './Language/LanguageProvider';
 import TranslatedText from './Language/TranslatedText';
@@ -52,7 +51,21 @@ export default function Hero(): ReactElement {
   }
 
   useEffect(() => {
-    renderCanvas();
+    let mounted = true;
+
+    const startCanvas = async () => {
+      if (typeof window === 'undefined') return;
+      const { renderCanvas } = await import('./renderCanvas');
+      if (mounted) {
+        renderCanvas();
+      }
+    };
+
+    startCanvas();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const quienesVariants = {

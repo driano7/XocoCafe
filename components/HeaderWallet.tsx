@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount } from 'wagmi';
 import { Wallet, Sparkles, ChevronDown } from 'lucide-react';
+import { useMounted } from '@/hooks/useMounted';
 
 const supportedTokens = ['ETH', 'BTC', 'USDC', 'USDT', 'PayPal stablecoins'];
 const supportedNetworks = ['Ethereum', 'Bitcoin', 'Arbitrum', 'Optimism', 'zkSync'];
@@ -12,9 +13,10 @@ export default function HeaderWallet() {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const { isConnected, chain } = useAccount();
+  const mounted = useMounted();
 
   useEffect(() => {
-    if (!open) return;
+    if (!mounted || !open) return;
     const handleClick = (event: MouseEvent) => {
       if (
         panelRef.current &&
@@ -35,7 +37,22 @@ export default function HeaderWallet() {
       window.removeEventListener('mousedown', handleClick);
       window.removeEventListener('keydown', handleEscape);
     };
-  }, [open]);
+  }, [open, mounted]);
+
+  if (!mounted) {
+    return (
+      <button
+        type="button"
+        disabled
+        className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-3 py-1 text-sm font-medium text-gray-400 shadow-sm dark:border-gray-700 dark:bg-black/70"
+      >
+        <Wallet className="h-5 w-5" />
+        <span className="hidden font-semibold text-xs uppercase tracking-widest sm:block">
+          Wallet
+        </span>
+      </button>
+    );
+  }
 
   return (
     <div className="relative">
@@ -110,8 +127,8 @@ export default function HeaderWallet() {
 
           <div className="mt-3">
             <ConnectButton.Custom>
-              {({ openConnectModal, openAccountModal, mounted, account }) => {
-                if (!mounted) {
+              {({ openConnectModal, openAccountModal, mounted: rkMounted, account }) => {
+                if (!rkMounted) {
                   return (
                     <button
                       type="button"

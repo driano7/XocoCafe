@@ -71,6 +71,22 @@ const passwordResetCodeSchema = z
     message: 'Código de verificación inválido',
   });
 
+export const resetPasswordFieldsSchema = z
+  .object({
+    newPassword: z
+      .string()
+      .min(8, 'La contraseña debe tener al menos 8 caracteres')
+      .regex(/[A-Z]/, 'La contraseña debe contener al menos una letra mayúscula')
+      .regex(/[a-z]/, 'La contraseña debe contener al menos una letra minúscula')
+      .regex(/[0-9]/, 'La contraseña debe contener al menos un número')
+      .regex(/[!@#$%^&*]/, 'La contraseña debe contener al menos un caracter especial (!@#$%^&*)'),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Las contraseñas no coinciden',
+    path: ['confirmPassword'],
+  });
+
 // Esquema para actualizar perfil
 export const updateProfileSchema = z.object({
   firstName: z.string().optional(),
@@ -118,18 +134,8 @@ export const resetPasswordWithCodeSchema = z
     email: z.string().email('Email inválido'),
     requestId: z.string().min(1, 'Solicitud inválida'),
     code: passwordResetCodeSchema,
-    newPassword: z
-      .string()
-      .min(8, 'La contraseña debe tener al menos 8 caracteres')
-      .regex(/[A-Z]/, 'La contraseña debe contener al menos una letra mayúscula')
-      .regex(/[a-z]/, 'La contraseña debe contener al menos una letra minúscula')
-      .regex(/[0-9]/, 'La contraseña debe contener al menos un número'),
-    confirmPassword: z.string(),
   })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: 'Las contraseñas no coinciden',
-    path: ['confirmPassword'],
-  });
+  .merge(resetPasswordFieldsSchema);
 
 // Esquema para cambiar contraseña
 export const changePasswordSchema = z

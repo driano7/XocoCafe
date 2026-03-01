@@ -25,6 +25,16 @@
  * --------------------------------------------------------------------
  */
 
+/* eslint-env node */
+/* global globalThis */
+
+const globalScope = typeof globalThis !== 'undefined' ? globalThis : {};
+
+if (typeof globalScope.HTMLElement === 'undefined') {
+  class HTMLElement {}
+  globalScope.HTMLElement = HTMLElement;
+}
+
 process.env.NEXT_DISABLE_OPENTELEMETRY = '1';
 
 const { withContentlayer } = require('next-contentlayer');

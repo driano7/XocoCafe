@@ -33,7 +33,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   requestPasswordResetSchema,
-  resetPasswordWithCodeSchema,
+  resetPasswordFieldsSchema,
   verifyResetCodeSchema,
   type RequestPasswordResetInput,
 } from '@/lib/validations/auth';
@@ -48,10 +48,7 @@ type Step = 'request' | 'verify' | 'reset' | 'success';
 const codeStepSchema = verifyResetCodeSchema.omit({ email: true, requestId: true });
 type CodeStepInput = z.infer<typeof codeStepSchema>;
 
-const resetStepSchema = resetPasswordWithCodeSchema.pick({
-  newPassword: true,
-  confirmPassword: true,
-});
+const resetStepSchema = resetPasswordFieldsSchema;
 type ResetStepInput = z.infer<typeof resetStepSchema>;
 
 export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) {

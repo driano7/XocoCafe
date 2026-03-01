@@ -1,10 +1,18 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Bitcoin, Coins, Wallet } from 'lucide-react';
-import { EVMPaymentFlow } from './EVMPaymentFlow';
-import { LightningPaymentFlow } from './LightningPaymentFlow';
+
+const EVMPaymentFlow = dynamic(() => import('./EVMPaymentFlow').then((mod) => mod.EVMPaymentFlow), {
+  ssr: false,
+});
+
+const LightningPaymentFlow = dynamic(
+  () => import('./LightningPaymentFlow').then((mod) => mod.LightningPaymentFlow),
+  { ssr: false }
+);
 
 type PaymentMethodSelectorProps = {
   orderId: string;

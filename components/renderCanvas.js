@@ -169,6 +169,8 @@ function Node() {
 }
 
 export const renderCanvas = function () {
+  if (typeof document === 'undefined') return;
+
   ctx = document.getElementById('canvas').getContext('2d');
   ctx.running = true;
   ctx.frame = 1;
