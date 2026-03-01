@@ -44,7 +44,7 @@ import DockNav from '@/components/DockNav';
 import AndroidViewportFix from '@/components/Providers/AndroidViewportFix';
 import PageTransition from '@/components/PageTransition';
 import CartTimeoutWatcher from '@/components/CartTimeoutWatcher';
-import CryptoProviderClient from '@/components/Providers/CryptoProviderClient';
+import { CryptoProvider } from './providers/CryptoProvider';
 
 const lato = Lato({
   subsets: ['latin'],
@@ -57,7 +57,7 @@ const lato = Lato({
 export const metadata = {
   title: 'Xoco Café',
   description: 'Sabor ancestral, placer eterno',
-  metadataBase: new URL('http://localhost:8000'),
+  metadataBase: new URL('https://xococafe.netlify.app'),
 };
 
 export const viewport = {
@@ -87,7 +87,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
       <body
         className={`${lato.className} ${lato.variable} bg-white text-black antialiased dark:bg-black dark:text-white overflow-x-hidden`}
       >
-        <CryptoProviderClient>
+        <CryptoProvider>
           <SessionProvider>
             <LanguageProvider fallbackLanguage="es">
               <Suspense fallback={null}>
@@ -126,7 +126,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
               </Suspense>
             </LanguageProvider>
           </SessionProvider>
-        </CryptoProviderClient>
+        </CryptoProvider>
       </body>
     </html>
   );
