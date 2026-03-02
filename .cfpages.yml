@@ -1,0 +1,7 @@
+version: 1
+build:
+  command: npm run build
+  outputDirectory: .next
+  nodeVersion: 20
+  environment:
+    NODE_VERSION: "20"
