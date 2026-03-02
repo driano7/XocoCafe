@@ -1,7 +1,6 @@
 'use client';
 
-import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface Props {
   coffees: number;
@@ -11,6 +10,19 @@ interface Props {
 export default function AddToGoogleWalletButton({ coffees, goal }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAndroid, setIsAndroid] = useState(false);
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined') {
+      return;
+    }
+    const agent = navigator.userAgent || navigator.vendor || '';
+    setIsAndroid(/android/i.test(agent));
+  }, []);
+
+  if (!isAndroid) {
+    return null;
+  }
 
   const handleAddToWallet = async () => {
     try {
@@ -53,13 +65,12 @@ export default function AddToGoogleWalletButton({ coffees, goal }: Props) {
         <span className="text-sm">
           {loading ? 'Generando tarjeta...' : 'Agregar a Google Wallet'}
         </span>
-        <Image
+        <img
           src="https://wallet.google/static/media/Badge-dark.svg"
           alt="Google Wallet"
           width={80}
           height={24}
-          className="ml-auto"
-          unoptimized
+          className="ml-auto block"
         />
       </button>
 
