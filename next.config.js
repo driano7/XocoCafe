@@ -50,7 +50,11 @@ module.exports = withContentlayer({
     ignoreDuringBuilds: true,
     dirs: ['app', 'components', 'lib', 'layouts', 'scripts'],
   },
+  output: 'standalone',
   swcMinify: true,
+  compress: true,
+  poweredByHeader: false,
+  generateEtags: false,
   images: {
     remotePatterns: [
       {
@@ -92,6 +96,12 @@ module.exports = withContentlayer({
       '@/types': path.resolve(__dirname, 'types'),
     };
 
+    // Exclude heavy dependencies from bundle
+    config.externals = config.externals || [];
+    if (isServer) {
+      config.externals.push('sqlite3');
+    }
+
     // Asegurar que Prisma funcione correctamente
     if (!isServer) {
       config.resolve.fallback = {
@@ -99,6 +109,7 @@ module.exports = withContentlayer({
         fs: false,
         net: false,
         tls: false,
+        sqlite3: false,
       };
     }
 
