@@ -1,30 +1,29 @@
 /*
  * --------------------------------------------------------------------
- *  Xoco Café — Software Property
- *  Copyright (c) 2025 Xoco Café
- *  Principal Developer: Donovan Riaño
+ * Xoco Café — Software Property
+ * Copyright (c) 2025 Xoco Café
+ * Principal Developer: Donovan Riaño
  *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at:
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
- *  --------------------------------------------------------------------
- *  PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
- *  Copyright (c) 2025 Xoco Café.
- *  Desarrollador Principal: Donovan Riaño.
+ * --------------------------------------------------------------------
+ * PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
+ * Copyright (c) 2025 Xoco Café.
+ * Desarrollador Principal: Donovan Riaño.
  *
- *  Este archivo está licenciado bajo la Apache License 2.0.
- *  Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
+ * Este archivo está licenciado bajo la Apache License 2.0.
+ * Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
  * --------------------------------------------------------------------
  */
-
 'use client';
 
 import AnimatedHeading from '@/components/AnimatedHeading';
@@ -47,16 +46,23 @@ export default function ListLayout({ posts, title, initialDisplayPosts = [], pag
   const { currentLanguage, t } = useLanguage();
   const [searchValue, setSearchValue] = useState('');
 
-  const localizedPosts = posts.filter((post) => (post as any).locale === currentLanguage);
+  // Filter by current language, fallback to Spanish if no posts exist for that language
+  const postsInCurrentLang = posts.filter((post) => (post as any).locale === currentLanguage);
+  const localizedPosts = postsInCurrentLang.length > 0
+    ? postsInCurrentLang
+    : posts.filter((post) => (post as any).locale === 'es');
 
   const filteredBlogPosts = localizedPosts.filter((post) => {
     const searchContent = post.title + post.summary + post.tags?.join(' ');
     return searchContent.toLowerCase().includes(searchValue.toLowerCase());
   });
 
-  const localizedInitialPosts = initialDisplayPosts.filter(
+  const initialInCurrentLang = initialDisplayPosts.filter(
     (post) => (post as any).locale === currentLanguage
   );
+  const localizedInitialPosts = initialInCurrentLang.length > 0
+    ? initialInCurrentLang
+    : initialDisplayPosts.filter((post) => (post as any).locale === 'es');
 
   // If initialDisplayPosts exist, display it if no searchValue is specified.
   const displayPosts =
@@ -91,12 +97,22 @@ export default function ListLayout({ posts, title, initialDisplayPosts = [], pag
             />
           </svg>
         </div>
-        <PostCard posts={displayPosts} />
       </div>
-      {pagination && pagination.totalPages > 1 && !searchValue && (
-        <Pagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} />
-      )}
       <SupportBanner />
+      <ul>
+        {!filteredBlogPosts.length && (
+          <p className="text-center text-gray-500">{t('blog.no_posts') || 'No posts found.'}</p>
+        )}
+        {displayPosts.map((post) => (
+          <PostCard key={(post as any).slug} post={post} />
+        ))}
+      </ul>
+      {pagination && pagination.totalPages > 1 && !searchValue && (
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+        />
+      )}
     </>
   );
 }
