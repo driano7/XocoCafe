@@ -13,7 +13,7 @@
     "sync:sqlite": "node --env-file=.env.local scripts/sync-supabase-sqlite.mjs"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
     "@auth/supabase-adapter": "^1.11.1",
