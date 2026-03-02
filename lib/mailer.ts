@@ -1,9 +1,12 @@
 import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 const smtpHost = process.env.SMTP_HOST;
 const smtpPort = Number(process.env.SMTP_PORT ?? 587);
 const smtpUser = process.env.SMTP_USER;
 const smtpPass = process.env.SMTP_PASS;
+const resendApiKey = process.env.RESEND_API_KEY;
+const resendClient = resendApiKey ? new Resend(resendApiKey) : null;
 
 let transporter: nodemailer.Transporter | null = null;
 
@@ -22,7 +25,11 @@ if (smtpHost && smtpUser && smtpPass) {
 }
 
 const defaultFrom =
-  process.env.SMTP_FROM || (smtpUser ? `Xoco Café <${smtpUser}>` : 'hola@xococafe.mx');
+  process.env.SMTP_FROM ||
+  process.env.RESEND_FROM ||
+  (smtpUser ? `Xoco Café <${smtpUser}>` : 'hola@xococafe.mx');
+
+const resendFrom = process.env.RESEND_FROM || defaultFrom;
 
 type EmailResult = { success: boolean; message?: string };
 
@@ -126,6 +133,18 @@ export async function sendPasswordResetEmail({
   `;
 
   const textBody = `Hola ${name}, tu código de recuperación es ${code}. Expira a las ${formattedExpiration}. ID de solicitud: ${requestId}.`;
+
+  if (resendClient) {
+    await resendClient.emails.send({
+      from: resendFrom,
+      to,
+      subject,
+      html: htmlBody,
+      text: textBody,
+    });
+
+    return { success: true };
+  }
 
   const templateId = Number(
     process.env.BREVO_RESET_TEMPLATE_ID ?? process.env.BREVO_TEMPLATE_ID ?? 0

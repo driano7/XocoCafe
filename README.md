@@ -48,6 +48,12 @@
 
 Xoco Café es un proyecto de café artesanal inspirado en la riqueza del café mexicano, con enfoque en sostenibilidad, diseño consciente y colaboración directa con productores locales. Situado en la Colonia Roma, Ciudad de México, el proyecto busca convertirse en un espacio cultural donde convergen calidad, comunidad, estética y comercio justo.
 
+## ⚙️ Entornos paralelos
+
+- **Netlify** sigue siendo la rama de producción. Las variables reales viven en el panel Build & Deploy de Netlify; si necesitas replicarlas localmente ejecuta `npm run env:netlify` para copiar `env-samples/netlify.env.example` → `.env.local`.
+- **Infinity Free** recibe los mismos secretos pero con host y URLs diferentes: usa `npm run env:infinityfree` para clonar `env-samples/infinityfree.env.example` antes de ejecutar `npm run build` o `npm run export`.
+- **Resend** ahora envía los correos de recuperación, así que agrega `RESEND_API_KEY` (y opcionalmente `RESEND_FROM`) a los entornos de cada plataforma para que el endpoint `/api/auth/forgot-password` envíe la plantilla correcta.
+
 ---
 
 # ⭐ Propuesta de Valor
