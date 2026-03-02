@@ -48,9 +48,10 @@ export default function ListLayout({ posts, title, initialDisplayPosts = [], pag
 
   // Filter by current language, fallback to Spanish if no posts exist for that language
   const postsInCurrentLang = posts.filter((post) => (post as any).locale === currentLanguage);
-  const localizedPosts = postsInCurrentLang.length > 0
-    ? postsInCurrentLang
-    : posts.filter((post) => (post as any).locale === 'es');
+  const localizedPosts =
+    postsInCurrentLang.length > 0
+      ? postsInCurrentLang
+      : posts.filter((post) => (post as any).locale === 'es');
 
   const filteredBlogPosts = localizedPosts.filter((post) => {
     const searchContent = post.title + post.summary + post.tags?.join(' ');
@@ -60,9 +61,10 @@ export default function ListLayout({ posts, title, initialDisplayPosts = [], pag
   const initialInCurrentLang = initialDisplayPosts.filter(
     (post) => (post as any).locale === currentLanguage
   );
-  const localizedInitialPosts = initialInCurrentLang.length > 0
-    ? initialInCurrentLang
-    : initialDisplayPosts.filter((post) => (post as any).locale === 'es');
+  const localizedInitialPosts =
+    initialInCurrentLang.length > 0
+      ? initialInCurrentLang
+      : initialDisplayPosts.filter((post) => (post as any).locale === 'es');
 
   // If initialDisplayPosts exist, display it if no searchValue is specified.
   const displayPosts =
@@ -99,19 +101,12 @@ export default function ListLayout({ posts, title, initialDisplayPosts = [], pag
         </div>
       </div>
       <SupportBanner />
-      <ul>
-        {!filteredBlogPosts.length && (
-          <p className="text-center text-gray-500">{t('blog.no_posts') || 'No posts found.'}</p>
-        )}
-        {displayPosts.map((post) => (
-          <PostCard key={(post as any).slug} post={post} />
-        ))}
-      </ul>
+      {!filteredBlogPosts.length && (
+        <p className="text-center text-gray-500">{t('blog.no_posts') || 'No posts found.'}</p>
+      )}
+      <PostCard posts={displayPosts} />
       {pagination && pagination.totalPages > 1 && !searchValue && (
-        <Pagination
-          currentPage={pagination.currentPage}
-          totalPages={pagination.totalPages}
-        />
+        <Pagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} />
       )}
     </>
   );
