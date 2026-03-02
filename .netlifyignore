@@ -1,0 +1,39 @@
+# Dependencies that shouldn't be deployed
+node_modules/sqlite3
+node_modules/@prisma
+
+# Development files
+*.test.js
+*.test.ts
+*.test.tsx
+*.spec.js
+*.spec.ts
+*.spec.tsx
+__tests__
+.vscode
+.idea
+
+# Documentation
+*.md
+!README.md
+DOCS/
+docs/
+
+# Cache and temporary files
+.contentlayer/cache
+.next/cache
+*.log
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Large media files (keep optimized versions only)
+public/**/*.mp4
+public/**/*.mov
+public/**/*.avi
+public/**/*.psd
+public/**/*.ai
