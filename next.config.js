@@ -50,11 +50,7 @@ module.exports = withContentlayer({
     ignoreDuringBuilds: true,
     dirs: ['app', 'components', 'lib', 'layouts', 'scripts'],
   },
-  output: 'standalone',
   swcMinify: true,
-  compress: true,
-  poweredByHeader: false,
-  generateEtags: false,
   images: {
     remotePatterns: [
       {
