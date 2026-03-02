@@ -64,7 +64,6 @@
     "rehype-slug": "6.0.0",
     "remark": "14.0.3",
     "resend": "^4.0.0",
-    "sqlite3": "^5.1.7",
     "styled-components": "^6.1.17",
     "tailwindcss-animate": "^1.0.7",
     "use-breakpoint": "4.0.1",
@@ -99,6 +98,7 @@
     "postcss": "8.4.31",
     "prettier": "3.0.3",
     "prettier-plugin-tailwindcss": "0.5.6",
+    "sqlite3": "^5.1.7",
     "tailwind-scrollbar": "3.0.5",
     "tailwindcss": "3.3.5",
     "typescript": "5.2.2"
