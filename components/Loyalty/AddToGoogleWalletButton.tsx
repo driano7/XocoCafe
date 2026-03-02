@@ -66,7 +66,7 @@ export default function AddToGoogleWalletButton({ coffees, goal }: Props) {
           {loading ? 'Generando tarjeta...' : 'Agregar a Google Wallet'}
         </span>
         <img
-          src="https://wallet.google/static/media/Badge-dark.svg"
+          src="https://developers.google.com/static/wallet/images/googlewallet-brand/en_add_to_google_wallet_add-wallet-badge.png"
           alt="Google Wallet"
           width={80}
           height={24}
