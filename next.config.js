@@ -1,35 +1,32 @@
 /*
  * --------------------------------------------------------------------
- *  Xoco Café — Software Property
- *  Copyright (c) 2025 Xoco Café
- *  Principal Developer: Donovan Riaño
+ * Xoco Café — Software Property
+ * Copyright (c) 2025 Xoco Café
+ * Principal Developer: Donovan Riaño
  *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at:
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
- *  --------------------------------------------------------------------
- *  PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
- *  Copyright (c) 2025 Xoco Café.
- *  Desarrollador Principal: Donovan Riaño.
+ * --------------------------------------------------------------------
+ * PROPIEDAD DEL SOFTWARE — XOCO CAFÉ.
+ * Copyright (c) 2025 Xoco Café.
+ * Desarrollador Principal: Donovan Riaño.
  *
- *  Este archivo está licenciado bajo la Apache License 2.0.
- *  Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
+ * Este archivo está licenciado bajo la Apache License 2.0.
+ * Consulta el archivo LICENSE en la raíz del proyecto para más detalles.
  * --------------------------------------------------------------------
  */
-
 /* eslint-env node */
 /* global globalThis */
-
 const globalScope = typeof globalThis !== 'undefined' ? globalThis : {};
-
 if (typeof globalScope.HTMLElement === 'undefined') {
   class HTMLElement {}
   globalScope.HTMLElement = HTMLElement;
@@ -58,6 +55,14 @@ module.exports = withContentlayer({
         hostname: 'api.qrserver.com',
         pathname: '/v1/create-qr-code/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.googleusercontent.com',
+      },
     ],
   },
   experimental: {
@@ -77,6 +82,29 @@ module.exports = withContentlayer({
         source: '/:all*(svg|jpg|jpeg|png|gif|webp|ico|woff|woff2)',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
+      {
+        // Security headers para todas las rutas
+        source: '/(.*)',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "font-src 'self' https://fonts.gstatic.com",
+              "img-src 'self' data: blob: https: http:",
+              "connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com https://walletobjects.googleapis.com https://api2.amplitude.com https://*.supabase.co wss://*.supabase.co https://pay.google.com",
+              "frame-src 'self' https://accounts.google.com",
+              "frame-ancestors 'none'",
+            ].join('; '),
+          },
+        ],
+      },
     ];
   },
   webpack: (config, { isServer }) => {
@@ -91,13 +119,11 @@ module.exports = withContentlayer({
       '@/css': path.resolve(__dirname, 'css'),
       '@/types': path.resolve(__dirname, 'types'),
     };
-
     // Exclude heavy dependencies from bundle
     config.externals = config.externals || [];
     if (isServer) {
       config.externals.push('sqlite3');
     }
-
     // Asegurar que Prisma funcione correctamente
     if (!isServer) {
       config.resolve.fallback = {
@@ -108,7 +134,6 @@ module.exports = withContentlayer({
         sqlite3: false,
       };
     }
-
     return config;
   },
 });
