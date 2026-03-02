@@ -99,7 +99,7 @@ module.exports = withContentlayer({
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https: http:",
               "connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com https://walletobjects.googleapis.com https://api2.amplitude.com https://*.supabase.co wss://*.supabase.co https://pay.google.com",
-              "frame-src 'self' https://accounts.google.com",
+              "frame-src 'self' https://accounts.google.com https://www.openstreetmap.org",
               "frame-ancestors 'none'",
             ].join('; '),
           },
