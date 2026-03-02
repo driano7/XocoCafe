@@ -32,6 +32,7 @@ import { motion, type Variants } from 'framer-motion';
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/Auth/AuthProvider';
+import GoogleSignInButton from '@/components/Auth/GoogleSignInButton';
 import LoginForm from '@/components/Auth/LoginForm';
 import RegisterForm from '@/components/Auth/RegisterForm';
 import ForgotPasswordForm from '@/components/Auth/ForgotPasswordForm';
@@ -538,6 +539,28 @@ export default function LoginPage() {
                         'Prepara tus datos básicos para activar tu perfil POS.'}
                   </p>
                 </div>
+
+                <motion.div
+                  className="space-y-3"
+                  variants={interactiveVariants}
+                  initial="hidden"
+                  animate={shouldAnimateLoginStack ? 'visible' : 'instant'}
+                  custom={2}
+                >
+                  <GoogleSignInButton
+                    label={isLogin ? 'Iniciar sesión con Google' : 'Crear cuenta con Google'}
+                  />
+                  <div className="relative text-sm text-primary-600 dark:text-primary-300">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300 dark:border-gray-600" />
+                    </div>
+                    <div className="relative flex justify-center">
+                      <span className="bg-white px-2 text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                        {t('common.or_continue_with_email') || 'O continúa con email'}
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
 
                 {isLogin ? (
                   <>
