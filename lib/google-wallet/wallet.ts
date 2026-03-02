@@ -4,10 +4,38 @@ import * as jwt from 'jsonwebtoken';
 const ISSUER_ID = process.env.GOOGLE_WALLET_ISSUER_ID!;
 const CLASS_ID = `${ISSUER_ID}.xococafe_loyalty`;
 
+/**
+ * Parsea GOOGLE_WALLET_PRIVATE_KEY sin importar el formato en que
+ * fue pegada en la variable de entorno de Netlify:
+ *  - Con \\n literales (doble backslash n)  →  los reemplaza por \n real
+ *  - Con \n literales (un backslash n)       →  los reemplaza por \n real
+ *  - Con saltos de linea reales              →  la usa tal cual
+ */
+function parsePrivateKey(raw: string): string {
+  if (!raw) return '';
+  // Caso 1: Netlify escapo los backslashes → "\\n"
+  if (raw.includes('\\n')) {
+    return raw.replace(/\\n/g, '\n');
+  }
+  // Caso 2: La key viene con \n literal (un solo backslash + n)
+  if (raw.includes('\n')) {
+    return raw; // ya tiene saltos reales
+  }
+  // Caso 3: Todo en una sola linea sin ningun separador — intentar reconstruir
+  // (esto pasa si se pego sin las cabeceras)
+  if (raw.startsWith('-----BEGIN')) {
+    return raw;
+  }
+  // Fallback: devolver tal cual
+  return raw;
+}
+
 const rawPrivateKey = process.env.GOOGLE_WALLET_PRIVATE_KEY ?? '';
+const parsedPrivateKey = parsePrivateKey(rawPrivateKey);
+
 const credentials = {
   client_email: process.env.GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL!,
-    private_key: rawPrivateKey.includes('\\n') ? rawPrivateKey.replace(/\\n/g, '\n') : rawPrivateKey,
+  private_key: parsedPrivateKey,
 };
 
 const auth = new GoogleAuth({
@@ -69,7 +97,6 @@ export async function createLoyaltyClass() {
     },
     body: JSON.stringify(loyaltyClass),
   });
-
   const data = await res.json();
   if (!res.ok && data.error?.code !== 409) {
     throw new Error(`Error creating class: ${JSON.stringify(data.error)}`);
@@ -177,14 +204,12 @@ export async function upsertLoyaltyObject({
     }
     throw new Error(`Error upserting object: ${JSON.stringify(err)}`);
   }
-
   return createRes.json();
 }
 
 // ─── Generar JWT para "Add to Google Wallet" ──────────────────────────────────
 export function generateWalletJWT(userId: string): string {
   const objectId = `${ISSUER_ID}.user_${userId}`;
-
   const claims = {
     iss: credentials.client_email,
     aud: 'google',
@@ -194,7 +219,6 @@ export function generateWalletJWT(userId: string): string {
       loyaltyObjects: [{ id: objectId }],
     },
   };
-
   return jwt.sign(claims, credentials.private_key, { algorithm: 'RS256' });
 }
 
