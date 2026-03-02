@@ -4,6 +4,7 @@ import Image from 'next/image';
 import classNames from 'classnames';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '@/components/Language/LanguageProvider';
+import AddToGoogleWalletButton from '@/components/Loyalty/AddToGoogleWalletButton';
 
 interface LoyaltyProgressCardProps {
   coffees?: number | null;
@@ -172,6 +173,7 @@ export default function LoyaltyProgressCard({
           </span>
         )}
       </p>
+      <AddToGoogleWalletButton coffees={normalized} goal={goal} />
     </section>
   );
 }

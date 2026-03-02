@@ -27,41 +27,62 @@
 
 import { randomUUID } from 'crypto';
 import NextAuth from 'next-auth';
+type NextAuthOptions = Parameters<typeof NextAuth>[0];
+import type { Account, Profile, Session, User } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
+import type { Provider } from 'next-auth/providers';
 import { SupabaseAdapter } from '@auth/supabase-adapter';
 import { supabase } from '@/lib/supabase';
 import { encryptUserData, decryptUserData, mapEncryptedDataToColumnNames } from '@/lib/encryption';
+import type { JWT } from 'next-auth/jwt';
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+declare module 'next-auth' {
+  interface Session {
+    amplitudeApiUrl?: string;
+  }
+}
+
+const googleProvider = GoogleProvider({
+  clientId: process.env.GOOGLE_CLIENT_ID!,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  authorization: {
+    params: {
+      prompt: 'consent',
+      access_type: 'offline',
+      response_type: 'code',
+      scope: 'openid email profile',
+    },
+  },
+}) satisfies Provider;
+
+const authOptions: NextAuthOptions = {
   adapter: SupabaseAdapter({
     url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
     secret: process.env.SUPABASE_SERVICE_ROLE_KEY!,
   }),
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          prompt: 'consent',
-          access_type: 'offline',
-          response_type: 'code',
-          scope: 'openid email profile',
-        },
-      },
-    }),
-  ],
+  providers: [googleProvider],
   callbacks: {
-    async jwt({ token, account, profile }) {
+    async jwt({
+      token,
+      account,
+      profile,
+    }: {
+      token: JWT;
+      account?: Account | null;
+      profile?: Profile | null;
+    }) {
       if (account?.provider === 'google' && profile) {
-        const p: any = profile;
-        if (p.given_name) token.givenName = p.given_name;
-        if (p.family_name) token.familyName = p.family_name;
-        if (p.picture) token.picture = p.picture;
+        const profileData = profile as Record<string, unknown>;
+        const givenName = profileData['given_name'] ?? profileData['givenName'];
+        const familyName = profileData['family_name'] ?? profileData['familyName'];
+        const picture = profileData['picture'];
+        if (typeof givenName === 'string') token.givenName = givenName;
+        if (typeof familyName === 'string') token.familyName = familyName;
+        if (typeof picture === 'string') token.picture = picture;
       }
       return token;
     },
-    async signIn({ user, account }) {
+    async signIn({ user, account }: { user: User; account?: Account | null }) {
       try {
         if (account?.provider === 'google') {
           const { data: existingUser, error } = await supabase
@@ -75,7 +96,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
 
           if (!existingUser) {
-            // Crear nuevo usuario con Google
             const userData = {
               id: randomUUID(),
               email: user.email!,
@@ -84,7 +104,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               lastName: user.name?.split(' ').slice(1).join(' ') || null,
               authProvider: 'google',
               googleId: user.id,
-              termsAccepted: false, // Necesitará completar el perfil
+              termsAccepted: false,
               privacyAccepted: false,
               marketingEmail: false,
               marketingSms: false,
@@ -93,7 +113,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               consentUpdatedAt: new Date().toISOString(),
             };
 
-            // Cifrar datos sensibles
             const encryptedData = encryptUserData(user.email!, userData);
             const mappedData = mapEncryptedDataToColumnNames(encryptedData);
 
@@ -107,7 +126,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               throw new Error(`Error creando usuario con Google: ${insertError.message}`);
             }
           } else if (existingUser.authProvider === 'email') {
-            // Usuario existente con email, agregar Google
             const { error: updateError } = await supabase
               .from('users')
               .update({
@@ -121,12 +139,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         }
         return true;
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error en signIn callback:', error);
         return false;
       }
     },
-    async session({ session, token }) {
+    async session({ session, token }: { session: Session; token: JWT }) {
       if (session.user) {
         type MutableSessionUser = typeof session.user & {
           id?: string;
@@ -152,7 +170,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         if (dbUser) {
-          // Descifrar datos sensibles
           const decryptedData = decryptUserData(session.user.email!, dbUser);
 
           sessionUser.id = dbUser.id;
@@ -161,23 +178,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           sessionUser.lastName = decryptedData.lastName;
           sessionUser.authProvider = dbUser.authProvider;
           sessionUser.profileComplete = dbUser.termsAccepted && dbUser.privacyAccepted;
-          // Enriquecer con datos del token (Google profile)
           if (token && typeof token === 'object') {
-            const extendedSessionUser = session.user as unknown as Record<string, unknown>;
-            if ((token as any).givenName) {
-              extendedSessionUser.givenName = (token as any).givenName;
+            type ExtendedJWT = JWT & {
+              givenName?: string;
+              familyName?: string;
+              picture?: string;
+            };
+            const extendedToken = token as ExtendedJWT;
+            const extendedSessionUser = session.user as MutableSessionUser &
+              Record<string, unknown>;
+            if (extendedToken.givenName) {
+              extendedSessionUser.givenName = extendedToken.givenName;
             }
-            if ((token as any).familyName) {
-              extendedSessionUser.familyName = (token as any).familyName;
+            if (extendedToken.familyName) {
+              extendedSessionUser.familyName = extendedToken.familyName;
             }
-            if ((token as any).picture && !session.user.image) {
-              extendedSessionUser.image = (token as any).picture as string;
+            if (extendedToken.picture && !session.user.image) {
+              extendedSessionUser.image = extendedToken.picture;
             }
           }
         }
       }
-      // Exponer URL de Amplitude para debug/cliente
-      // @ts-expect-error campo extendido en session
       session.amplitudeApiUrl =
         process.env.NEXT_PUBLIC_AMPLITUDE_HTTP_API_URL || 'https://api2.amplitude.com/2/httpapi';
       return session;
@@ -189,23 +210,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 días
+    maxAge: 30 * 24 * 60 * 60,
   },
   jwt: {
-    maxAge: 30 * 24 * 60 * 60, // 30 días
+    maxAge: 30 * 24 * 60 * 60,
   },
   debug: process.env.NODE_ENV === 'development',
   logger: {
     error(...args: unknown[]) {
       console.error('NextAuth Error:', ...args);
     },
-    warn(...args: unknown[]) {
-      console.warn('NextAuth Warning:', ...args);
-    },
-    debug(...args: unknown[]) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('NextAuth Debug:', ...args);
-      }
-    },
   },
-});
+};
+
+export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);
+export { authOptions };
