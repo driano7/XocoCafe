@@ -113,7 +113,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
         if (dbUser) {
           const decryptedData = decryptUserData(session.user.email!, dbUser);
-          const u = session.user as Record<string, unknown>;
+          // Doble cast: primero a unknown, luego a Record para evitar error TS
+          const u = (session.user as unknown) as Record<string, unknown>;
           u['id'] = dbUser.id;
           u['clientId'] = dbUser.clientId;
           u['firstName'] = decryptedData.firstName;
@@ -125,7 +126,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (token.picture && !session.user.image) u['image'] = token.picture;
         }
       }
-      (session as Record<string, unknown>)['amplitudeApiUrl'] =
+      (session as unknown as Record<string, unknown>)['amplitudeApiUrl'] =
         process.env.NEXT_PUBLIC_AMPLITUDE_HTTP_API_URL || 'https://api2.amplitude.com/2/httpapi';
       return session;
     },
