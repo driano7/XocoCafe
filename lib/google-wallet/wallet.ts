@@ -7,7 +7,7 @@ const CLASS_ID = `${ISSUER_ID}.xococafe_loyalty`;
 const rawPrivateKey = process.env.GOOGLE_WALLET_PRIVATE_KEY ?? '';
 const credentials = {
   client_email: process.env.GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL!,
-  private_key: rawPrivateKey.replace(/\\n/g, '\n'),
+    private_key: rawPrivateKey.includes('\\n') ? rawPrivateKey.replace(/\\n/g, '\n') : rawPrivateKey,
 };
 
 const auth = new GoogleAuth({
