@@ -4,30 +4,42 @@ import * as jwt from 'jsonwebtoken';
 const ISSUER_ID = process.env.GOOGLE_WALLET_ISSUER_ID!;
 const CLASS_ID = `${ISSUER_ID}.xococafe_loyalty`;
 
+// Dominio canonical del sitio (usado en origins del JWT y URLs)
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://xococafe.netlify.app';
+
 /**
  * Parsea GOOGLE_WALLET_PRIVATE_KEY sin importar el formato en que
  * fue pegada en la variable de entorno de Netlify:
- *  - Con \\n literales (doble backslash n)  →  los reemplaza por \n real
- *  - Con \n literales (un backslash n)       →  los reemplaza por \n real
- *  - Con saltos de linea reales              →  la usa tal cual
+ * - Con \\n literales (doble backslash n)  -> los reemplaza por \n real
+ * - Con \n literales (un backslash n)       -> los reemplaza por \n real
+ * - Con saltos de linea reales              -> la usa tal cual
+ * - Clave en una sola linea sin headers     -> reconstruye con headers PEM
  */
 function parsePrivateKey(raw: string): string {
   if (!raw) return '';
-  // Caso 1: Netlify escapo los backslashes → "\\n"
-  if (raw.includes('\\n')) {
-    return raw.replace(/\\n/g, '\n');
+
+  // Caso 1: Netlify escapo los backslashes -> "\\n"
+  if (raw.includes('\\\\n')) {
+    return raw.replace(/\\\\n/g, '\\n');
   }
   // Caso 2: La key viene con \n literal (un solo backslash + n)
-  if (raw.includes('\n')) {
+  if (raw.includes('\\n')) {
     return raw; // ya tiene saltos reales
   }
-  // Caso 3: Todo en una sola linea sin ningun separador — intentar reconstruir
-  // (esto pasa si se pego sin las cabeceras)
+  // Caso 3: Ya tiene saltos de linea reales y headers PEM
   if (raw.startsWith('-----BEGIN')) {
     return raw;
   }
-  // Fallback: devolver tal cual
-  return raw;
+  // Caso 4: Clave en una sola linea sin headers - reconstruir PEM
+  // Esto pasa cuando se copia solo el body de la clave sin -----BEGIN-----
+  const cleaned = raw.replace(/\s+/g, '');
+  const body = cleaned
+    .replace('-----BEGINRSAPRIVATEKEY-----', '')
+    .replace('-----ENDRSAPRIVATEKEY-----', '')
+    .replace('-----BEGINPRIVATEKEY-----', '')
+    .replace('-----ENDPRIVATEKEY-----', '');
+  const lines = body.match(/.{1,64}/g)?.join('\n') ?? body;
+  return `-----BEGIN PRIVATE KEY-----\n${lines}\n-----END PRIVATE KEY-----\n`;
 }
 
 const rawPrivateKey = process.env.GOOGLE_WALLET_PRIVATE_KEY ?? '';
@@ -45,29 +57,24 @@ const auth = new GoogleAuth({
 
 const BASE_URL = 'https://walletobjects.googleapis.com/walletobjects/v1';
 
-// ─── Crear Loyalty Class (solo una vez) ───────────────────────────────────────
+// Imagen publica confiable para el logo del programa
+const PROGRAM_LOGO_URL = 'https://storage.googleapis.com/wallet-lab-tools-codelab-artifacts-public/pass_google_logo.jpg';
+
+// ─── Crear Loyalty Class (solo una vez) ──────────────────────────────────────
 export async function createLoyaltyClass() {
   const client = await auth.getClient();
   const token = await client.getAccessToken();
 
   const loyaltyClass = {
     id: CLASS_ID,
-    issuerName: 'Xoco Café',
+    issuerName: 'Xoco Caf\u00e9',
     programName: 'Programa de Lealtad Xoco',
     programLogo: {
       sourceUri: {
-        uri: 'https://xococafe.site/static/favicons/CafeIcon.png',
+        uri: PROGRAM_LOGO_URL,
       },
       contentDescription: {
-        defaultValue: { language: 'es-MX', value: 'Logo Xoco Café' },
-      },
-    },
-    heroImage: {
-      sourceUri: {
-        uri: 'https://xococafe.site/static/images/Xoco.jpeg',
-      },
-      contentDescription: {
-        defaultValue: { language: 'es-MX', value: 'Xoco Café' },
+        defaultValue: { language: 'es-MX', value: 'Logo Xoco Caf\u00e9' },
       },
     },
     hexBackgroundColor: '#7c3f00',
@@ -77,14 +84,14 @@ export async function createLoyaltyClass() {
     accountIdLabel: 'ID',
     reviewStatus: 'UNDER_REVIEW',
     localizedIssuerName: {
-      defaultValue: { language: 'es-MX', value: 'Xoco Café' },
+      defaultValue: { language: 'es-MX', value: 'Xoco Caf\u00e9' },
     },
     localizedProgramName: {
       defaultValue: { language: 'es-MX', value: 'Programa de Lealtad' },
     },
     discoverableProgram: {
       merchantSigninInfo: {
-        signinWebsite: { uri: 'https://xococafe.site/login' },
+        signinWebsite: { uri: `${SITE_URL}/login` },
       },
     },
   };
@@ -97,6 +104,7 @@ export async function createLoyaltyClass() {
     },
     body: JSON.stringify(loyaltyClass),
   });
+
   const data = await res.json();
   if (!res.ok && data.error?.code !== 409) {
     throw new Error(`Error creating class: ${JSON.stringify(data.error)}`);
@@ -120,6 +128,7 @@ export async function upsertLoyaltyObject({
 }) {
   const client = await auth.getClient();
   const token = await client.getAccessToken();
+
   const objectId = `${ISSUER_ID}.user_${userId}`;
 
   const loyaltyObject = {
@@ -129,7 +138,7 @@ export async function upsertLoyaltyObject({
     accountId: userId.substring(0, 12).toUpperCase(),
     accountName: name,
     loyaltyPoints: {
-      label: 'Cafés',
+      label: 'Caf\u00e9s',
       balance: { int: coffees },
     },
     secondaryLoyaltyPoints: {
@@ -139,41 +148,28 @@ export async function upsertLoyaltyObject({
     textModulesData: [
       {
         id: 'coffees',
-        header: '☕ CAFÉS ACUMULADOS',
-        body: `${coffees} de ${goal} para tu próxima recompensa`,
+        header: '\u2615 CAF\u00c9S ACUMULADOS',
+        body: `${coffees} de ${goal} para tu pr\u00f3xima recompensa`,
       },
       {
         id: 'reward',
-        header: '🎁 PRÓXIMA RECOMPENSA',
+        header: '\uD83C\uDF81 PR\u00d3XIMA RECOMPENSA',
         body:
           coffees >= goal
-            ? '¡Tienes una bebida gratis disponible!'
-            : `Te faltan ${goal - coffees} café${goal - coffees !== 1 ? 's' : ''}`,
+            ? '\u00a1Tienes una bebida gratis disponible!'
+            : `Te faltan ${goal - coffees} caf\u00e9${goal - coffees !== 1 ? 's' : ''}`,
       },
     ],
     linksModuleData: {
       uris: [
-        {
-          uri: 'https://xococafe.site/order',
-          description: 'Hacer un pedido',
-          id: 'order',
-        },
-        {
-          uri: 'https://xococafe.site/profile',
-          description: 'Ver mi perfil',
-          id: 'profile',
-        },
+        { uri: `${SITE_URL}/order`, description: 'Hacer un pedido', id: 'order' },
+        { uri: `${SITE_URL}/profile`, description: 'Ver mi perfil', id: 'profile' },
       ],
     },
     barcode: {
       type: 'QR_CODE',
       value: qrValue,
       alternateText: `ID: ${userId.substring(0, 8).toUpperCase()}`,
-    },
-    heroImage: {
-      sourceUri: {
-        uri: 'https://xococafe.site/static/images/Xoco.jpeg',
-      },
     },
   };
 
@@ -196,7 +192,7 @@ export async function upsertLoyaltyObject({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          loyaltyPoints: { label: 'Cafés', balance: { int: coffees } },
+          loyaltyPoints: { label: 'Caf\u00e9s', balance: { int: coffees } },
           textModulesData: loyaltyObject.textModulesData,
         }),
       });
@@ -210,15 +206,24 @@ export async function upsertLoyaltyObject({
 // ─── Generar JWT para "Add to Google Wallet" ──────────────────────────────────
 export function generateWalletJWT(userId: string): string {
   const objectId = `${ISSUER_ID}.user_${userId}`;
+
+  // origins debe incluir todos los dominios desde los que se puede llamar
+  const origins = [
+    'https://xococafe.site',
+    'https://xococafe.netlify.app',
+    SITE_URL,
+  ].filter((v, i, arr) => arr.indexOf(v) === i); // dedup
+
   const claims = {
     iss: credentials.client_email,
     aud: 'google',
-    origins: ['https://xococafe.site'],
+    origins,
     typ: 'savetowallet',
     payload: {
       loyaltyObjects: [{ id: objectId }],
     },
   };
+
   return jwt.sign(claims, credentials.private_key, { algorithm: 'RS256' });
 }
 
