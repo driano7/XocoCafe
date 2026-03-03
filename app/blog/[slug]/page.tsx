@@ -76,8 +76,6 @@ export default function BlogPost({ params }: { params: { slug: string } }) {
             content={coreContent(post)}
             prev={formatBlogLink(prev)}
             next={formatBlogLink(next)}
-            toc={post.toc}
-            authorDetails={author}
           >
             {/* MDXTranslated handles language detection client-side:
                 - Spanish: renders the original body.html from contentlayer
