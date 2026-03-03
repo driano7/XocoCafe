@@ -114,7 +114,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (dbUser) {
           const decryptedData = decryptUserData(session.user.email!, dbUser);
           // Doble cast: primero a unknown, luego a Record para evitar error TS
-          const u = (session.user as unknown) as Record<string, unknown>;
+          const u = session.user as unknown as Record<string, unknown>;
           u['id'] = dbUser.id;
           u['clientId'] = dbUser.clientId;
           u['firstName'] = decryptedData.firstName;

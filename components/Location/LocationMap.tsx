@@ -30,7 +30,9 @@ export default function LocationMap({ className }: LocationMapProps) {
 
   const loadingMode: 'lazy' | 'eager' = isAndroid ? 'eager' : 'lazy';
 
-  const osmUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${LON - 0.005}%2C${LAT - 0.003}%2C${LON + 0.005}%2C${LAT + 0.003}&layer=mapnik&marker=${LAT}%2C${LON}`;
+  const osmUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${LON - 0.005}%2C${
+    LAT - 0.003
+  }%2C${LON + 0.005}%2C${LAT + 0.003}&layer=mapnik&marker=${LAT}%2C${LON}&zoom=${ZOOM}`;
 
   return (
     <div

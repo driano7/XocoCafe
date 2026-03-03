@@ -30,8 +30,11 @@ import MDXTranslated from '@/components/MDXTranslated';
 import PostLayout from '@/layouts/MDX/PostLayout';
 import MainLayout from '@/layouts/MainLayout';
 import { coreContent, formatBlogLink, sortedBlogPost } from '@/lib/utils/contentlayer';
+import type { Blog } from 'contentlayer/generated';
 import { allBlogs } from 'contentlayer/generated';
 import { Metadata } from 'next';
+
+type BlogBodyWithHtml = Blog['body'] & { html?: string };
 
 export async function generateMetadata({
   params,
@@ -55,12 +58,11 @@ export default function BlogPost({ params }: { params: { slug: string } }) {
   const slug = params.slug;
 
   // Always use the Spanish version as the canonical source for translation
-  const matchingPosts = allBlogs.filter((p) => p.slug === slug);
-  const post = matchingPosts.find((p) => (p as any).locale === 'es') || matchingPosts[0];
-  const author = post?.author || ['default'];
+  const matchingPosts: Blog[] = allBlogs.filter((p) => p.slug === slug);
+  const post = matchingPosts.find((p) => p.locale === 'es') || matchingPosts[0];
 
   // Navigation: use Spanish posts for prev/next
-  const filteredPosts = sortedBlogPost(allBlogs.filter((p) => (p as any).locale === 'es'));
+  const filteredPosts = sortedBlogPost(allBlogs.filter((p) => p.locale === 'es'));
   const postIndex = filteredPosts.findIndex((p) => p.slug === slug);
   const prevContent = filteredPosts[postIndex + 1] || null;
   const prev = prevContent ? coreContent(prevContent) : null;
@@ -82,7 +84,8 @@ export default function BlogPost({ params }: { params: { slug: string } }) {
                 - Other: fetches translated markdown from /api/translate/mdx */}
             <MDXTranslated
               slug={slug}
-              fallbackHtml={(post as any).body?.html || ''}
+              fallbackHtml={(post.body as BlogBodyWithHtml).html ?? ''}
+              showLocationMap={Boolean(post.body.raw?.includes('<LocationMap'))}
             />
           </PostLayout>
         ) : (

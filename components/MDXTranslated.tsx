@@ -28,11 +28,13 @@
 
 import { useEffect, useState } from 'react';
 import { useLanguage } from '@/components/Language/LanguageProvider';
+import LocationMap from '@/components/Location/LocationMap';
 
 interface Props {
   slug: string;
   /** Fallback: original MDX body HTML rendered by contentlayer (shown in Spanish or while loading) */
   fallbackHtml: string;
+  showLocationMap?: boolean;
 }
 
 /**
@@ -41,19 +43,24 @@ interface Props {
  * from /api/translate/mdx and renders it as sanitised HTML.
  * Falls back to the original Spanish content while loading or on error.
  */
-export default function MDXTranslated({ slug, fallbackHtml }: Props) {
+export default function MDXTranslated({ slug, fallbackHtml, showLocationMap = false }: Props) {
   const { currentLanguage } = useLanguage();
   const [html, setHtml] = useState<string>(fallbackHtml);
   const [loading, setLoading] = useState(false);
+  const [hasTranslatedContent, setHasTranslatedContent] = useState(false);
+  const shouldRenderTranslatedMap =
+    showLocationMap && currentLanguage !== 'es' && hasTranslatedContent;
 
   useEffect(() => {
     if (currentLanguage === 'es') {
       setHtml(fallbackHtml);
+      setHasTranslatedContent(false);
       return;
     }
 
     let cancelled = false;
     setLoading(true);
+    setHasTranslatedContent(false);
 
     fetch('/api/translate/mdx', {
       method: 'POST',
@@ -71,10 +78,14 @@ export default function MDXTranslated({ slug, fallbackHtml }: Props) {
             .map((p) =>
               p.startsWith('#')
                 ? `<h2 class="text-2xl font-bold mt-6 mb-2">${p.replace(/^#+\s*/, '')}</h2>`
-                : `<p class="mb-4">${p.replace(/\n/g, ' ').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/_(.*?)_/g, '<em>$1</em>')}</p>`
+                : `<p class="mb-4">${p
+                    .replace(/\n/g, ' ')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/_(.*?)_/g, '<em>$1</em>')}</p>`
             )
             .join('');
           setHtml(paragraphs);
+          setHasTranslatedContent(true);
         }
       })
       .catch(() => {
@@ -94,6 +105,11 @@ export default function MDXTranslated({ slug, fallbackHtml }: Props) {
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-gray-900/60 z-10 rounded">
           <span className="text-sm text-gray-500 animate-pulse">Translating...</span>
+        </div>
+      )}
+      {shouldRenderTranslatedMap && (
+        <div className="mb-6">
+          <LocationMap />
         </div>
       )}
       <div

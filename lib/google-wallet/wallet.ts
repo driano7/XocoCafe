@@ -58,7 +58,8 @@ const auth = new GoogleAuth({
 const BASE_URL = 'https://walletobjects.googleapis.com/walletobjects/v1';
 
 // Imagen publica confiable para el logo del programa
-const PROGRAM_LOGO_URL = 'https://storage.googleapis.com/wallet-lab-tools-codelab-artifacts-public/pass_google_logo.jpg';
+const PROGRAM_LOGO_URL =
+  'https://storage.googleapis.com/wallet-lab-tools-codelab-artifacts-public/pass_google_logo.jpg';
 
 // ─── Crear Loyalty Class (solo una vez) ──────────────────────────────────────
 export async function createLoyaltyClass() {
@@ -208,11 +209,9 @@ export function generateWalletJWT(userId: string): string {
   const objectId = `${ISSUER_ID}.user_${userId}`;
 
   // origins debe incluir todos los dominios desde los que se puede llamar
-  const origins = [
-    'https://xococafe.site',
-    'https://xococafe.netlify.app',
-    SITE_URL,
-  ].filter((v, i, arr) => arr.indexOf(v) === i); // dedup
+  const origins = ['https://xococafe.site', 'https://xococafe.netlify.app', SITE_URL].filter(
+    (v, i, arr) => arr.indexOf(v) === i
+  ); // dedup
 
   const claims = {
     iss: credentials.client_email,
